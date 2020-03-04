@@ -13,9 +13,9 @@ We assume this gateware assumes a project structure modeled around the
 lxbuildenv methodology. Thus, we assume the gateware submodule is located
 as follows:
 
- <project_root>/deps/gateware/sim/<sim_proj>/sim.py
+ `<project_root>/deps/gateware/sim/<sim_proj>/sim.py`
  
-Where this "gateware" repository is cloned into <project_root>/deps/
+Where this "gateware" repository is cloned into `<project_root>/deps/`
 
 In order to run the script, we assume two items are in your path:
 
@@ -34,11 +34,11 @@ The code for gateware is located in the gateware/ directory.
 
 The test benches for a given gateware is located in a directory names as follows:
 
- sim/<gateware-root-name>/
+ `sim/<gateware-root-name>/`
 
-Where if the python module is called "zomg_mod.py" <gateware-root-name> is "zomg_mod".
+Where if the python module is called "zomg_mod.py", then `<gateware-root-name>` is "zomg_mod".
 
-Within the <gateware-root-name> subdirectory, the following artifacts are expected:
+Within the `<gateware-root-name>` subdirectory, the following artifacts are expected:
 
  - A file called `sim.py`. This is the script that builds the testbench, code, and runs the simulation itself
  - A `top_tb.v` file which wires up the test bench. It is copied to the run/ directory before integrating
