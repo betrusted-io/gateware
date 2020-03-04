@@ -26,11 +26,11 @@ If you don't have these installed, please refer to the readme at
 https://github.com/betrusted-io/betrusted-soc for how to obtain and
 install these.
 
-## Gateware
+### Gateware
 
-The code for gateware is located in the gateware/ directory.
+The code for gateware is located in the `gateware/` directory.
 
-## Simulation
+### Simulation
 
 The test benches for a given gateware is located in a directory names as follows:
 
