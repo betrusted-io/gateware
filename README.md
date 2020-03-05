@@ -17,7 +17,7 @@ as follows:
  
 Where this "gateware" repository is cloned into `<project_root>/deps/`
 
-In order to run the script, we assume two items are in your path:
+In order to run the script, we assume two items (or the latest equivalent) are in your path:
 
  - RISCV_TOOLS=/tools/riscv64-unknown-elf-gcc-8.3.0-2019.08.0-x86_64-linux-ubuntu14
  - VIVADO=/tools/Xilinx/Vivado/2019.2
@@ -25,6 +25,20 @@ In order to run the script, we assume two items are in your path:
 If you don't have these installed, please refer to the readme at
 https://github.com/betrusted-io/betrusted-soc for how to obtain and
 install these.
+
+We also assume the presence of a stable Rust environment that targets 
+the riscv32-imac target, and that the svd2rust and form packages are installed:
+
+  - `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+  - `cargo install svd2rust`
+  - `cargo install form`
+  - `rustup target add riscv32imac-unknown-none-elf`
+
+svd2rust and form are necessary to generate a peripheral access crate for each
+test environment, which is a set of macros the test author can optionally
+use to make the code a little bit safer/prettier.
+
+Builds are tested on an x86_64 system running Ubuntu 18.04LTS. 
 
 ### Gateware
 
@@ -43,7 +57,8 @@ Within the `<gateware-root-name>` subdirectory, the following artifacts are expe
  - A file called `sim.py`. This is the script that builds the testbench, code, and runs the simulation itself
  - A `top_tb.v` file which wires up the test bench. It is copied to the run/ directory before integrating
    with the generated `top.v` file. Usually `top_tb.v` is pretty minimal for simple IP blocks.
- - Either a `stub.c` or a `stub.rs` file which contains any program code necessary to run the simulation
+ - A `stub.rs` file which contains any program code necessary to run the simulation. The initial 
+ test methodology only supports Rust, but we may also extend to include a minimal C runtime.
  - Any other helper models that are required by the test bench
 
 For CI, the strategy would then be to descend into every subdirectory of sim/ and

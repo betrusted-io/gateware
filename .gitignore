@@ -14,5 +14,4 @@ pycharm.env
 run/
 target/
 /venv/*
-test/
 
