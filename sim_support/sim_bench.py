@@ -143,3 +143,20 @@ class Sim(SoCCore):
         # add the status reporting module, mandatory in every sim
         self.submodules.simstatus = SimStatus(platform.request("sim"))
         self.add_csr("simstatus")
+
+class BiosHelper():
+    def __init__(self, soc):
+        sim_name = os.path.basename(os.getcwd())
+
+        # generate the PAC
+        os.system("mkdir -p ../../target")  # this doesn't exist on the first run
+        lxsocdoc.generate_svd(soc, "../../target", name="simulation", description="simulation core framework", filename="soc.svd", vendor="betrusted.io")
+        os.system("cd ../../sim_support/rust/pac && svd2rust --target riscv -i ../../../target/soc.svd && rm -rf src && form -i lib.rs -o src/ && rm lib.rs && cargo doc && cargo fmt")
+
+        # run the BIOS build
+        ret = 0
+        ret += os.system("cd test && cargo build --release")
+        ret += os.system("riscv64-unknown-elf-objcopy -O binary ../../target/riscv32imac-unknown-none-elf/release/{} run/software/bios/bios.bin".format(sim_name))
+        ret += os.system("riscv64-unknown-elf-objdump -d ../../target/riscv32imac-unknown-none-elf/release/{} > run/bios.S".format(sim_name))
+        if ret != 0:
+            sys.exit(1)  # fail the build

@@ -37,6 +37,26 @@ impl Deref for TIMER0 {
 }
 #[doc = "TIMER0"]
 pub mod timer0;
+#[doc = "DEMO"]
+pub struct DEMO {
+    _marker: PhantomData<*const ()>,
+}
+unsafe impl Send for DEMO {}
+impl DEMO {
+    #[doc = r"Returns a pointer to the register block"]
+    #[inline(always)]
+    pub const fn ptr() -> *const demo::RegisterBlock {
+        0x8200_7000 as *const _
+    }
+}
+impl Deref for DEMO {
+    type Target = demo::RegisterBlock;
+    fn deref(&self) -> &Self::Target {
+        unsafe { &*DEMO::ptr() }
+    }
+}
+#[doc = "DEMO"]
+pub mod demo;
 #[doc = "IDENTIFIER_MEM"]
 pub struct IDENTIFIER_MEM {
     _marker: PhantomData<*const ()>,
@@ -57,26 +77,6 @@ impl Deref for IDENTIFIER_MEM {
 }
 #[doc = "IDENTIFIER_MEM"]
 pub mod identifier_mem;
-#[doc = "MEMLCD"]
-pub struct MEMLCD {
-    _marker: PhantomData<*const ()>,
-}
-unsafe impl Send for MEMLCD {}
-impl MEMLCD {
-    #[doc = r"Returns a pointer to the register block"]
-    #[inline(always)]
-    pub const fn ptr() -> *const memlcd::RegisterBlock {
-        0x8200_7000 as *const _
-    }
-}
-impl Deref for MEMLCD {
-    type Target = memlcd::RegisterBlock;
-    fn deref(&self) -> &Self::Target {
-        unsafe { &*MEMLCD::ptr() }
-    }
-}
-#[doc = "MEMLCD"]
-pub mod memlcd;
 #[doc = "CTRL"]
 pub struct CTRL {
     _marker: PhantomData<*const ()>,
@@ -117,26 +117,6 @@ impl Deref for SIMSTATUS {
 }
 #[doc = "SIMSTATUS"]
 pub mod simstatus;
-#[doc = "SRAM_EXT"]
-pub struct SRAM_EXT {
-    _marker: PhantomData<*const ()>,
-}
-unsafe impl Send for SRAM_EXT {}
-impl SRAM_EXT {
-    #[doc = r"Returns a pointer to the register block"]
-    #[inline(always)]
-    pub const fn ptr() -> *const sram_ext::RegisterBlock {
-        0x8200_8000 as *const _
-    }
-}
-impl Deref for SRAM_EXT {
-    type Target = sram_ext::RegisterBlock;
-    fn deref(&self) -> &Self::Target {
-        unsafe { &*SRAM_EXT::ptr() }
-    }
-}
-#[doc = "SRAM_EXT"]
-pub mod sram_ext;
 #[doc = "UART"]
 pub struct UART {
     _marker: PhantomData<*const ()>,
@@ -164,16 +144,14 @@ static mut DEVICE_PERIPHERALS: bool = false;
 pub struct Peripherals {
     #[doc = "TIMER0"]
     pub TIMER0: TIMER0,
+    #[doc = "DEMO"]
+    pub DEMO: DEMO,
     #[doc = "IDENTIFIER_MEM"]
     pub IDENTIFIER_MEM: IDENTIFIER_MEM,
-    #[doc = "MEMLCD"]
-    pub MEMLCD: MEMLCD,
     #[doc = "CTRL"]
     pub CTRL: CTRL,
     #[doc = "SIMSTATUS"]
     pub SIMSTATUS: SIMSTATUS,
-    #[doc = "SRAM_EXT"]
-    pub SRAM_EXT: SRAM_EXT,
     #[doc = "UART"]
     pub UART: UART,
 }
@@ -196,19 +174,16 @@ impl Peripherals {
             TIMER0: TIMER0 {
                 _marker: PhantomData,
             },
-            IDENTIFIER_MEM: IDENTIFIER_MEM {
+            DEMO: DEMO {
                 _marker: PhantomData,
             },
-            MEMLCD: MEMLCD {
+            IDENTIFIER_MEM: IDENTIFIER_MEM {
                 _marker: PhantomData,
             },
             CTRL: CTRL {
                 _marker: PhantomData,
             },
             SIMSTATUS: SIMSTATUS {
-                _marker: PhantomData,
-            },
-            SRAM_EXT: SRAM_EXT {
                 _marker: PhantomData,
             },
             UART: UART {

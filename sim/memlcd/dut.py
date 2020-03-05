@@ -100,6 +100,8 @@ def generate_top():
     global dutio
     global boot_from_spi
 
+    sim_name = os.path.basename(os.getcwd())
+
     # Pass the boot type to the Rust build subsystem via an environment variable
     # this is later used by the build.rs in the bios to copy the correct memory.x template for the linker
     if boot_from_spi:
@@ -119,31 +121,16 @@ def generate_top():
     vns = builder.build(run=False)
     soc.do_exit(vns)
 
-    """
-    all: bios.bin
-    
-    %.bin: %.elf
-        riscv64-unknown-elf-objcopy -O binary target/riscv32imac-unknown-none-elf/release/sim-bios $@
-    
-    bios.elf: memory.x test/src/lib.rs src/main.rs
-        cargo build --release
-        riscv64-unknown-elf-objdump -d target/riscv32imac-unknown-none-elf/release/sim-bios > sim-bios.S
-    """
     # generate the PAC
     os.system("mkdir -p ../../target")  # this doesn't exist on the first run
     lxsocdoc.generate_svd(soc, "../../target", name="simulation", description="simulation core framework", filename="soc.svd", vendor="betrusted.io")
     os.system("cd ../../sim_support/rust/pac && svd2rust --target riscv -i ../../../target/soc.svd && rm -rf src && form -i lib.rs -o src/ && rm lib.rs && cargo doc && cargo fmt")
 
-    # prepare the BIOS directory
-    #os.system("cp -rf ../../sim_support/rust/bios/* run/software/bios/")
-    #os.system("cp -rf ../../sim_support/rust/bios/.cargo run/software/bios/")
-    #os.system("cp -rf test run/software/bios/")
-
     # run the BIOS build
     ret = 0
     ret += os.system("cd test && cargo build --release")
-    ret += os.system("riscv64-unknown-elf-objcopy -O binary ../../target/riscv32imac-unknown-none-elf/release/memlcd run/software/bios/bios.bin")
-    ret += os.system("riscv64-unknown-elf-objdump -d ../../target/riscv32imac-unknown-none-elf/release/memlcd > bios.S")
+    ret += os.system("riscv64-unknown-elf-objcopy -O binary ../../target/riscv32imac-unknown-none-elf/release/{} run/software/bios/bios.bin".format(sim_name))
+    ret += os.system("riscv64-unknown-elf-objdump -d ../../target/riscv32imac-unknown-none-elf/release/{} > run/bios.S".format(sim_name))
     if ret != 0:
         sys.exit(1)  # fail the build
 
