@@ -10,14 +10,23 @@ Managing Python paths is painful, because everyone has their way to do it. This
 project is no exception.
 
 We assume this gateware assumes a project structure modeled around the
-lxbuildenv methodology. Thus, we assume the gateware submodule is located
-as follows:
+lxbuildenv methodology. Thus, we assume the gateware submodule is cloned
+into the parent project's `deps` directory:
 
- `<project_root>/deps/gateware/sim/<sim_proj>/sim.py`
+ `<project_root>/deps/gateware`
+
+Within this gateware repo, production hardware descriptions are contained
+in the gateware/ subdir, and simulation testbenches in the sim/ subdir: 
+
+ `<project_root>/deps/gateware/gateware/<module>.py`
+
+ `<project_root>/deps/gateware/sim/<module>/dut.py`
  
-Where this "gateware" repository is cloned into `<project_root>/deps/`
+Where `<module>` is the name of a given hardware function.
 
-In order to run the script, we assume two items (or the latest equivalent) are in your path:
+## Environment 
+
+In order to run the `dut.py` script, we assume two items (or the latest equivalent) are in your path:
 
  - RISCV_TOOLS=/tools/riscv64-unknown-elf-gcc-8.3.0-2019.08.0-x86_64-linux-ubuntu14
  - VIVADO=/tools/Xilinx/Vivado/2019.2
@@ -42,7 +51,13 @@ Builds are tested on an x86_64 system running Ubuntu 18.04LTS.
 
 ### Gateware
 
-The code for gateware is located in the `gateware/` directory.
+"Gateware" is the Litex/migen term for stuff that gets compiled LUTS and
+ routing within an FPGA bitstream. 
+ 
+ The code for gateware is located in the `gateware/` directory, and each
+ .py file describes a migen `Module` that can be submoduled into a
+ BaseSoC instance as a hardware peripheral. This methodology supports
+ both CSR and/or wishbone attached modules.
 
 ### Simulation
 
@@ -52,17 +67,28 @@ The test benches for a given gateware is located in a directory names as follows
 
 Where if the python module is called "zomg_mod.py", then `<gateware-root-name>` is "zomg_mod".
 
+There is a `sim_common` directory which contains several important properties that
+are inherited into every test bench. The idea is to put as much of the non-module specific
+integration into `sim_common`. For example, the `csr_paging` parameter and memory
+map are specified in `sim_common`, so if these parameters are changed in the target SoC
+all the module simulations can be regression-tested against these changes automatically.
+
 Within the `<gateware-root-name>` subdirectory, the following artifacts are expected:
 
- - A file called `sim.py`. This is the script that builds the testbench, code, and runs the simulation itself
+ - A file called `dut.py`. This is the script that builds the testbench, code, and runs the simulation itself.
+ It inherits SoC properties from a `sim_bench.py` file.
  - A `top_tb.v` file which wires up the test bench. It is copied to the run/ directory before integrating
    with the generated `top.v` file. Usually `top_tb.v` is pretty minimal for simple IP blocks.
- - A `stub.rs` file which contains any program code necessary to run the simulation. The initial 
- test methodology only supports Rust, but we may also extend to include a minimal C runtime.
+ - A `test` directory which contains a Rust library that creates a Test object. 
+ This library is configured to expect dependencies in the sim_common directory. The Test
+ object needs to have at least a `run()` method. The test framework essentially does
+ a minimal setup of the runtime environment and jumps to run. This happens within about 20us
+ of simulation time (about 2k CPU cycles @ 100MHz, of which half is spent waiting for the
+ PLL to lock).  
  - Any other helper models that are required by the test bench
 
 For CI, the strategy would then be to descend into every subdirectory of sim/ and
-run the `sim.py` script within.
+run the `dut.py` script within.
 
 ## Methodology
 
