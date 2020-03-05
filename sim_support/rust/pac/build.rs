@@ -3,8 +3,8 @@ use std::io::Write;
 
 extern crate svd2rust;
 fn main() {
-    println!("cargo:rerun-if-changed=../../../run/soc.svd");
-    let svd = String::from_utf8(include_bytes!("../../../run/soc.svd").to_vec())
+    println!("cargo:rerun-if-changed=../../../target/soc.svd");
+    let svd = String::from_utf8(include_bytes!("../../../target/soc.svd").to_vec())
         .expect("svd file wasn't valid utf8");
     let pac_file = svd2rust::generate(&svd, svd2rust::Target::RISCV, false)
         .expect("couldn't generate file with svd2rust");
