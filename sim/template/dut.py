@@ -28,7 +28,7 @@ from litex.build.generic_platform import *
 from litex.soc.integration.builder import *
 
 # pull in the common objects from sim_bench
-from sim_support.sim_bench import Sim, Platform, VEX_CPU_PATH, BiosHelper
+from sim_support.sim_bench import Sim, Platform, VEX_CPU_PATH, BiosHelper, CheckSim
 
 # handy to keep around in case a DUT framework needs it
 from litex.soc.integration.soc_core import *
@@ -38,8 +38,6 @@ from litex.soc.interconnect.csr import *
 
 # specific to a given DUT
 from gateware import sram_32  # for example...
-
-## todo: make automated waveform writing for ci mode
 
 """
 set boot_from_spi to change the reset vector and linking location of BIOS
@@ -176,7 +174,11 @@ def main():
 
     generate_top()
     run_sim(ci=args.ci)
+    if args.ci:
+        if CheckSim() != 0:
+            sys.exit(1)
 
+    sys.exit(0)
 
 if __name__ == "__main__":
     main()

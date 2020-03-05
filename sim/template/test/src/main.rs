@@ -34,5 +34,5 @@ fn run(p: &pac::Peripherals) {
     }
 
     // you can use this to end the simulation early, or you can also toggle 'failure()' instead of success as needed
-    p.SIMSTATUS.simstatus.write(|w| w.success().bit(true));
+    p.SIMSTATUS.simstatus.modify(|r, w| w.success().bit(true));
 }

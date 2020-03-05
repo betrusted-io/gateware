@@ -65,7 +65,7 @@ pub fn sim_test(args: TokenStream, input: TokenStream) -> TokenStream {
         use core::panic::PanicInfo;
         #[panic_handler]
         pub fn panic(_panic_info: &PanicInfo<'_>) -> ! {
-            unsafe{ pac::Peripherals::steal().SIMSTATUS.simstatus.write(|w| w.failure().bit(true)); }
+            unsafe{ pac::Peripherals::steal().SIMSTATUS.simstatus.write(|w| w.success().bit(false).report().bits(0xFFFF).done().bit(true)); }
             loop {}
         }
 

@@ -17,7 +17,7 @@ fn main() -> ! {
     let p = unsafe { pac::Peripherals::steal() };
     unsafe { run_test(&p) };
 
-    // set the success bit
-    p.SIMSTATUS.simstatus.write(|w| w.success().bit(true));
+    // set the done bit
+    p.SIMSTATUS.simstatus.write(|w| w.done().bit(true));
     loop {}
 }

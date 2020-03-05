@@ -42,7 +42,7 @@ benchio = [
 
     ("sim", 0,
      Subsignal("success", Pins("X")),
-     Subsignal("failure", Pins("Z")),
+     Subsignal("done", Pins("Z")),
      Subsignal("report", Pins("A B C D E F G H I J K L M N O P"))
      ),
 
@@ -85,12 +85,12 @@ class SimStatus(Module, AutoCSR, AutoDoc):
     def __init__(self, pads):
         self.simstatus = CSRStorage(description="status output for simulator", fields=[
             CSRField("success", size = 1, description="Write `1` if simulation was a success"),
-            CSRField("failure", size = 1, description="Write `1` to end the simulation in case of failure"),
-            CSRField("report", size = 16, description="A 16-bit field to report a result"),
+            CSRField("done", size = 1, description="Write `1` to indicate to the simulator that the simulation is done"),
+            CSRField("report", size = 16, description="A 16-bit field to report a result, in addition to the success field"),
         ])
         self.comb += pads.success.eq(self.simstatus.fields.success)
         self.comb += pads.report.eq(self.simstatus.fields.report)
-        self.comb += pads.failure.eq(self.simstatus.fields.failure)
+        self.comb += pads.done.eq(self.simstatus.fields.done)
 
 class Sim(SoCCore):
     mem_map = {
@@ -161,3 +161,73 @@ class BiosHelper():
         ret += os.system("riscv64-unknown-elf-objdump -d ../../target/riscv32imac-unknown-none-elf/release/{} > run/bios.S".format(sim_name))
         if ret != 0:
             sys.exit(1)  # fail the build
+
+# for automated VCD checking after CI run
+import vcd
+import logging
+
+ci_pass = False
+
+class CiTracker(vcd.VCDTracker):
+    skip = False
+    states = {}
+    state = None
+    def start(self):
+        self.states = {
+            "IDLE": self.idle_state,
+            "STOP": self.stop_state,
+        }
+        self.state = self.states["IDLE"]
+
+    def update(self):
+        self.state()
+
+    def idle_state(self):
+        if self["top_tb.success"] == "1":
+            global ci_pass
+            print("Success: report 0x{:04x}".format(vcd.v2d(self["top_tb.report"])))
+            ci_pass = True
+            self.state = self.states["STOP"]
+        else:
+            print("Failure: report 0x{:04x}".format(vcd.v2d(self["top_tb.report"])))
+            self.state = self.states["STOP"]
+
+    def stop_state(self):
+        return
+
+class CiWatcher(vcd.VCDWatcher):
+    def __init__(self, parser, **kwds):
+        super().__init__(parser, **kwds)
+
+    def should_notify(self):
+        if (self.get_id("top_tb.done") in self.activity
+            and self.get_active_2val("top_tb.done")  # errors out if X or Z
+            ):
+            return True
+
+        return False
+
+def CheckSim():
+    logging.basicConfig()
+
+    parser = vcd.VCDParser(log_level=logging.INFO)
+    tracker = CiTracker()
+    watcher = CiWatcher(
+        parser,
+        sensitive=["top_tb.done"],
+        watch=[
+            "top_tb.success",
+            "top_tb.done",
+            "top_tb.report",
+        ],
+        trackers=[tracker],
+    )
+
+    with open('run/ci.vcd') as vcd_file:
+        parser.parse(vcd_file)
+
+    global ci_pass
+    if ci_pass:
+        return 0
+    else:
+        return 1

@@ -21,7 +21,7 @@ top dut (
 
     // don't touch these three lines
     .sim_success(success),
-    .sim_failure(failure),
+    .sim_done(done),
     .sim_report(report)
 );
 
