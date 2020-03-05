@@ -172,12 +172,14 @@ class CiTracker(vcd.VCDTracker):
     skip = False
     states = {}
     state = None
+    journal = None
     def start(self):
         self.states = {
             "IDLE": self.idle_state,
             "STOP": self.stop_state,
         }
         self.state = self.states["IDLE"]
+        self.journal = open('run/ci.log', 'w')
 
     def update(self):
         self.state()
@@ -185,11 +187,11 @@ class CiTracker(vcd.VCDTracker):
     def idle_state(self):
         if self["top_tb.success"] == "1":
             global ci_pass
-            print("Success: report 0x{:04x}".format(vcd.v2d(self["top_tb.report"])))
+            print("Success: report 0x{:04x}".format(vcd.v2d(self["top_tb.report"])), file=self.journal)
             ci_pass = True
             self.state = self.states["STOP"]
         else:
-            print("Failure: report 0x{:04x}".format(vcd.v2d(self["top_tb.report"])))
+            print("Failure: report 0x{:04x}".format(vcd.v2d(self["top_tb.report"])), file=self.journal)
             self.state = self.states["STOP"]
 
     def stop_state(self):
@@ -225,6 +227,8 @@ def CheckSim():
 
     with open('run/ci.vcd') as vcd_file:
         parser.parse(vcd_file)
+
+    tracker.journal.close()
 
     global ci_pass
     if ci_pass:
