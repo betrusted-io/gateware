@@ -1,0 +1,13 @@
+[package]
+name = "pac"
+version = "0.1.0"
+authors = ["Sean Cross <sean@xobs.io>"]
+edition = "2018"
+
+[dependencies]
+riscv = { version = "0.0.2", package = "vexriscv" }
+bare-metal = "0.2.0"
+vcell = "0.1.0"
+
+[build-dependencies]
+svd2rust = "0.17.0"

@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "sim/memlcd/test",
+    "sim_support/rust/bios",
+    "sim_support/rust/pac",
+    "sim_support/rust/macros",
+]
