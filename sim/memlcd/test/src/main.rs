@@ -12,4 +12,7 @@ fn run(p: &pac::Peripherals) {
     unsafe {
         DBGSTR[0] = 0xface;
     };
+
+    p.SIMSTATUS.simstatus.write(|w| w.success().bit(true));
+    
 }

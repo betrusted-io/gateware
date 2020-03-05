@@ -2,12 +2,10 @@
 
 module top_tb();
 
-reg clk12;
-initial clk12 = 1'b1;
-always #41.16666 clk12 = ~clk12;
+/////////// boilerplate in here
+`include "common.v"
 
-wire success;
-wire [15:0] report;
+/////////// DUT code below here
 
 wire si;
 wire sclk;
@@ -21,10 +19,11 @@ top dut (
     .lcd_scs(scs),
 
     .sim_success(success),
+    .sim_failure(failure),
     .sim_report(report)
 );
 
-// make sure it eventually stops running for CI mode
+// DUT-specific end condition to make sure it eventually stops running for CI mode
 initial #800_000 $finish;
 
 endmodule

@@ -7,6 +7,8 @@ extern crate proc_macro2;
 #[macro_use]
 extern crate syn;
 
+extern crate pac;
+
 use proc_macro2::Span;
 use rand::Rng;
 use rand::SeedableRng;
@@ -63,6 +65,7 @@ pub fn sim_test(args: TokenStream, input: TokenStream) -> TokenStream {
         use core::panic::PanicInfo;
         #[panic_handler]
         pub fn panic(_panic_info: &PanicInfo<'_>) -> ! {
+            unsafe{ pac::Peripherals::steal().SIMSTATUS.simstatus.write(|w| w.failure().bit(true)); }
             loop {}
         }
 
