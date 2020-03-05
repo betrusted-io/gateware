@@ -9,3 +9,6 @@ version = "0.0.1"
 bare-metal = "0.2.0"
 riscv = { version = "0.0.2", package = "vexriscv" }
 vcell = "0.1.0"
+
+[build-dependencies]
+svd2rust = "0.17.0"
