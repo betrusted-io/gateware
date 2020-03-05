@@ -37,8 +37,7 @@ from litex.soc.integration.doc import AutoDoc, ModuleDoc
 from litex.soc.interconnect.csr import *
 
 # specific to a given DUT
-from gateware import memlcd
-from gateware import sram_32
+from gateware import sram_32  # for example...
 
 ## todo: make automated waveform writing for ci mode
 
@@ -66,7 +65,7 @@ dutio = [
 additional clocks beyond the simulation defaults
 """
 local_clocks = {
-    "clk50": [50e6, 45.0],
+    "clk50": [50e6, 22.5],
     # add more clocks here, formatted as {"name" : [freq, phase]}
 }
 
