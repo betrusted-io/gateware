@@ -15,4 +15,5 @@ run/
 target/
 /venv/*
 
-sim_support/rust/pac/src/
+sim_support/rust/pac/src/pac.rs
+
