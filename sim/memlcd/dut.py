@@ -28,7 +28,7 @@ from litex.build.generic_platform import *
 from litex.soc.integration.builder import *
 
 # pull in the common objects from sim_bench
-from sim_support.sim_bench import Sim, Platform, VEX_CPU_PATH
+from sim_support.sim_bench import Sim, Platform, VEX_CPU_PATH, BiosHelper
 
 # handy to keep around in case a DUT framework needs it
 from litex.soc.integration.soc_core import *
@@ -121,18 +121,7 @@ def generate_top():
     vns = builder.build(run=False)
     soc.do_exit(vns)
 
-    # generate the PAC
-    os.system("mkdir -p ../../target")  # this doesn't exist on the first run
-    lxsocdoc.generate_svd(soc, "../../target", name="simulation", description="simulation core framework", filename="soc.svd", vendor="betrusted.io")
-    os.system("cd ../../sim_support/rust/pac && svd2rust --target riscv -i ../../../target/soc.svd && rm -rf src && form -i lib.rs -o src/ && rm lib.rs && cargo doc && cargo fmt")
-
-    # run the BIOS build
-    ret = 0
-    ret += os.system("cd test && cargo build --release")
-    ret += os.system("riscv64-unknown-elf-objcopy -O binary ../../target/riscv32imac-unknown-none-elf/release/{} run/software/bios/bios.bin".format(sim_name))
-    ret += os.system("riscv64-unknown-elf-objdump -d ../../target/riscv32imac-unknown-none-elf/release/{} > run/bios.S".format(sim_name))
-    if ret != 0:
-        sys.exit(1)  # fail the build
+    BiosHelper(soc)
 
     # pass #2 -- generate the SoC, incorporating the now-built BIOS
     platform = Platform(dutio)
