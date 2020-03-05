@@ -28,7 +28,7 @@ from litex.build.generic_platform import *
 from litex.soc.integration.builder import *
 
 # pull in the common objects from sim_bench
-from sim_support.sim_bench import Sim, Platform, VEX_CPU_PATH, BiosHelper
+from sim_support.sim_bench import Sim, Platform, VEX_CPU_PATH, BiosHelper, CheckSim
 
 # handy to keep around in case a DUT framework needs it
 from litex.soc.integration.soc_core import *
@@ -173,6 +173,11 @@ def main():
 
     generate_top()
     run_sim(ci=args.ci)
+    if args.ci:
+        if CheckSim() != 0:
+            sys.exit(1)
+
+    sys.exit(0)
 
 
 if __name__ == "__main__":
