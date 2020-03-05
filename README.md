@@ -16,13 +16,18 @@ into the parent project's `deps` directory:
  `<project_root>/deps/gateware`
 
 Within this gateware repo, production hardware descriptions are contained
-in the gateware/ subdir, and simulation testbenches in the sim/ subdir: 
+in the gateware/ subdir: 
 
  `<project_root>/deps/gateware/gateware/<module>.py`
 
+ Simulation testbenches in the sim/ subdir:
+ 
  `<project_root>/deps/gateware/sim/<module>/dut.py`
  
-Where `<module>` is the name of a given hardware function.
+It is recommended to create new simulation testbenches by using the
+`new_sim.py -s <module>` command in the `sim/` directory. This script manages
+a couple of subtleties that ensure the Rust workspace framework built around
+this simulation works correctly.
 
 ## Environment 
 
@@ -79,18 +84,30 @@ Within the `<gateware-root-name>` subdirectory, the following artifacts are expe
  It inherits SoC properties from a `sim_bench.py` file.
  - A `top_tb.v` file which wires up the test bench. It is copied to the run/ directory before integrating
    with the generated `top.v` file. Usually `top_tb.v` is pretty minimal for simple IP blocks.
- - A `test` directory which contains a Rust library that creates a Test object. 
- This library is configured to expect dependencies in the sim_common directory. The Test
- object needs to have at least a `run()` method. The test framework essentially does
- a minimal setup of the runtime environment and jumps to run. This happens within about 20us
- of simulation time (about 2k CPU cycles @ 100MHz, of which half is spent waiting for the
- PLL to lock).  
+ - A `test` directory which contains a Rust program. The test starts with the `run()` method. 
  - Any other helper models that are required by the test bench
 
-For CI, the strategy would then be to descend into every subdirectory of sim/ and
-run the `dut.py` script within.
+The test framework essentially does a minimal setup of the runtime environment and jumps to `run()`. 
+This happens within about 20us of simulation time (about 2k CPU cycles @ 100MHz, of which half 
+is spent waiting for the PLL to lock).  
+ 
+### CI
 
-## Methodology
+For CI, the strategy would then be to descend into every subdirectory of sim/ and
+run script `dut.py -c`. The `-c` argument informs the script it should run with no GUI.
+
+The test harness builds three signals on the top level that are mandatory:
+
+- done, a 1-bit signal that is set when the test should be terminated
+- success, a 1-bit signal that indicates the test passed when set
+- report, a 16-bit signal for extra reporting to CI
+
+The simulator writes to a `ci.vcd` file in the `run/` directory. This is automatically
+parsed by the test bench to look for the `done` transition, and then based on the
+value of `success` at the rising edge of `done`, the script returns either 0 for
+pass, or 1 for fail.
+
+# Methodology Notes
 
 There are two goals of the testbenches in this repository:
 
