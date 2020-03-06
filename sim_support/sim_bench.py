@@ -167,6 +167,42 @@ class BiosHelper():
         if ret != 0:
             sys.exit(1)  # fail the build
 
+class SimRunner():
+    def __init__(self, ci, os_cmds):
+        os.system("mkdir -p run")
+        os.system("rm -rf run/xsim.dir")
+
+        # copy over the top test bench and common code
+        os.system("cp top_tb.v run/top_tb.v")
+        os.system("cp ../../sim_support/common.v run/")
+
+        # initialize with a default waveform that contains the most basic execution tracing
+        if os.path.isfile('run/top_tb_sim.wcfg') != True:
+            if os.path.isfile('top_tb_sim.wcfg'):
+                os.system('cp top_tb_sim.wcfg run/')
+            else:
+                os.system('cp ../../sim_support/top_tb_sim.wcfg run/')
+
+        # load up simulator dependencies
+        os.system("cd run && cp gateware/*.init .")
+        os.system("cd run && cp gateware/*.v .")
+        os.system("cd run && xvlog ../../../sim_support/glbl.v")
+        os.system("cd run && xvlog top.v -sv")
+        os.system("cd run && xvlog top_tb.v -sv ")
+        os.system("cd run && xvlog {}".format("../" + VEX_CPU_PATH))
+
+        # run user dependencies
+        for cmd in os_cmds:
+            os.system(cmd)
+
+        os.system(
+            "cd run && xelab -debug typical top_tb glbl -s top_tb_sim -L unisims_ver -L unimacro_ver -L SIMPRIM_VER -L secureip -L $xsimdir/xil_defaultlib -timescale 1ns/1ps")
+        if ci:
+            os.system("cd run && xsim top_tb_sim -runall -wdb ci.wdb")
+        else:
+            os.system("cd run && xsim top_tb_sim -gui")
+
+
 # for automated VCD checking after CI run
 import vcd
 import logging

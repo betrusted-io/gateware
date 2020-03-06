@@ -28,7 +28,7 @@ from litex.build.generic_platform import *
 from litex.soc.integration.builder import *
 
 # pull in the common objects from sim_bench
-from sim_support.sim_bench import Sim, Platform, VEX_CPU_PATH, BiosHelper, CheckSim
+from sim_support.sim_bench import Sim, Platform, SimRunner, BiosHelper, CheckSim
 
 # handy to keep around in case a DUT framework needs it
 from litex.soc.integration.soc_core import *
@@ -128,32 +128,8 @@ def generate_top():
 
 # script to drive xsim
 def run_sim(ci=False):
-    os.system("mkdir -p run")
-    os.system("rm -rf run/xsim.dir")
+    SimRunner(ci, [])
 
-    # copy over the top test bench and common code
-    os.system("cp top_tb.v run/top_tb.v")
-    os.system("cp ../../sim_support/common.v run/")
-    
-    # initialize with a default waveform that contains the most basic execution tracing
-    if os.path.isfile('run/top_tb_sim.wcfg') != True:
-        if os.path.isfile('top_tb_sim.wcfg'):
-            os.system('cp top_tb_sim.wcfg run/')
-        else:
-            os.system('cp ../../sim_support/top_tb_sim.wcfg run/')
-
-    # load up simulator dependencies
-    os.system("cd run && cp gateware/*.init .")
-    os.system("cd run && cp gateware/*.v .")
-    os.system("cd run && xvlog ../../../sim_support/glbl.v")
-    os.system("cd run && xvlog top.v -sv")
-    os.system("cd run && xvlog top_tb.v -sv ")
-    os.system("cd run && xvlog {}".format("../"+VEX_CPU_PATH))
-    os.system("cd run && xelab -debug typical top_tb glbl -s top_tb_sim -L unisims_ver -L unimacro_ver -L SIMPRIM_VER -L secureip -L $xsimdir/xil_defaultlib -timescale 1ns/1ps")
-    if ci:
-        os.system("cd run && xsim top_tb_sim -runall -wdb ci.wdb")
-    else:
-        os.system("cd run && xsim top_tb_sim -gui")
 
 
 def main():
