@@ -152,7 +152,7 @@ def run_sim(ci=False):
             os.system('cp top_tb_sim.wcfg run/')
         else:
             os.system('cp ../../sim_support/top_tb_sim.wcfg run/')
-            
+
     # load up simulator dependencies
     os.system("cd run && cp gateware/*.init .")
     os.system("cd run && cp gateware/*.v .")

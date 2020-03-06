@@ -18,6 +18,6 @@ fn main() -> ! {
     unsafe { run_test(&p) };
 
     // set the done bit
-    p.SIMSTATUS.simstatus.write(|w| w.done().bit(true));
+    p.SIMSTATUS.simstatus.modify(|_r, w| w.done().bit(true));
     loop {}
 }
