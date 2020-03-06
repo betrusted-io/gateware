@@ -43,7 +43,7 @@ benchio = [
     ("sim", 0,
      Subsignal("success", Pins("X")),
      Subsignal("done", Pins("Z")),
-     Subsignal("report", Pins("A B C D E F G H I J K L M N O P"))
+     Subsignal("report", Pins("A B C D E F G H I J K L M N O P A B C D E F G H I J K L M N O P"))
      ),
 
     ("serial", 0,
@@ -86,14 +86,14 @@ class SimStatus(Module, AutoCSR, AutoDoc):
         self.simstatus = CSRStorage(description="status output for simulator", fields=[
             CSRField("success", size = 1, description="Write `1` if simulation was a success"),
             CSRField("done", size = 1, description="Write `1` to indicate to the simulator that the simulation is done"),
-            CSRField("report", size = 16, description="A 16-bit field to report a result, in addition to the success field"),
         ])
+        self.report = CSRStorage(size=32, description="report code for simulation")
         self.comb += pads.success.eq(self.simstatus.fields.success)
-        self.comb += pads.report.eq(self.simstatus.fields.report)
+        self.comb += pads.report.eq(self.report.storage)
         self.comb += pads.done.eq(self.simstatus.fields.done)
 
 class Sim(SoCCore):
-    mem_map = {
+    SoCCore.mem_map = {
         "rom"           : 0x00000000,
         "sram"          : 0x01000000,
         "spiflash"      : 0x20000000,
@@ -104,7 +104,6 @@ class Sim(SoCCore):
         "vexriscv_debug": 0xefff0000,
         "csr"           : 0xf0000000,
     }
-    mem_map.update(SoCCore.mem_map)
 
     # custom_clocks is a dictionary of clock name to clock speed pairs to add to the CRG
     # spiboot sets the reset vector to either spiflash memory space, or rom memory space
@@ -127,7 +126,7 @@ class Sim(SoCCore):
             **kwargs)
 
         self.cpu.use_external_variant(VEX_CPU_PATH)
-        self.cpu.add_debug()
+        # self.cpu.add_debug()
         if spiboot:
             kwargs["cpu_reset_address"] = self.mem_map["spiflash"]
         else:
@@ -187,11 +186,11 @@ class CiTracker(vcd.VCDTracker):
     def idle_state(self):
         if self["top_tb.success"] == "1":
             global ci_pass
-            print("Success: report 0x{:04x}".format(vcd.v2d(self["top_tb.report"])), file=self.journal)
+            print("Success: report code 0x{:08x}".format(vcd.v2d(self["top_tb.report"])), file=self.journal)
             ci_pass = True
             self.state = self.states["STOP"]
         else:
-            print("Failure: report 0x{:04x}".format(vcd.v2d(self["top_tb.report"])), file=self.journal)
+            print("Failure: report code 0x{:08x}".format(vcd.v2d(self["top_tb.report"])), file=self.journal)
             self.state = self.states["STOP"]
 
     def stop_state(self):

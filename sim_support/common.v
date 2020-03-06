@@ -6,7 +6,7 @@ always #41.16666 clk12 = ~clk12;
 
 wire success;
 wire done;
-wire [15:0] report;
+wire [31:0] report;
 
 // termination condition upon success
 always @(*) begin
