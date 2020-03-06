@@ -100,14 +100,6 @@ def generate_top():
     global dutio
     global boot_from_spi
 
-    # Pass the boot type to the Rust build subsystem via an environment variable
-    # this is later used by the build.rs in the bios to copy the correct memory.x template for the linker
-    if boot_from_spi:
-        os.environ["BOOT_TYPE"] = 'SPI'
-    else:
-        os.environ["BOOT_TYPE"] = 'ROM'
-
-
     # we have to do two passes: once to make the SVD, without compiling the BIOS
     # second, to compile the BIOS, which is then built into the gateware.
 
@@ -119,7 +111,7 @@ def generate_top():
     vns = builder.build(run=False)
     soc.do_exit(vns)
 
-    BiosHelper(soc) # marshals cargo to generate the BIOS from Rust files
+    BiosHelper(soc, boot_from_spi) # marshals cargo to generate the BIOS from Rust files
 
     # pass #2 -- generate the SoC, incorporating the now-built BIOS
     platform = Platform(dutio)

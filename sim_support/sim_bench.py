@@ -144,8 +144,14 @@ class Sim(SoCCore):
         self.add_csr("simstatus")
 
 class BiosHelper():
-    def __init__(self, soc):
+    def __init__(self, soc, spiboot):
         sim_name = os.path.basename(os.getcwd())
+
+        # setup the correct linker script for the BIOS build based on the SoC's boot vector settings
+        if spiboot:
+            os.system("cp -f ../../sim_support/memory_spi.x ../../target/memory.x")
+        else:
+            os.system("cp -f ../../sim_support/memory_rom.x ../../target/memory.x")
 
         # generate the SVD
         os.system("mkdir -p ../../target")  # this doesn't exist on the first run

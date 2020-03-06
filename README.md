@@ -90,6 +90,13 @@ Within the `<gateware-root-name>` subdirectory, the following artifacts are expe
 The test framework essentially does a minimal setup of the runtime environment and jumps to `run()`. 
 This happens within about 20us of simulation time (about 2k CPU cycles @ 100MHz, of which half 
 is spent waiting for the PLL to lock).  
+
+### Rust notes
+
+During test development, you should be able to change into the `test` directory and build
+the simulation code using `cargo build --release`. __NOTE__: this only works after
+you've run the `dut.py` script once, as that script creates the `soc.svd` file and the `memory.x`
+files needed by the Rust build system.
  
 ### CI
 
