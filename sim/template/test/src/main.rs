@@ -27,10 +27,10 @@ fn run(p: &pac::Peripherals) {
     
     // example of updating the "report" bits monitored by the CI framework
     unsafe {
-        p.SIMSTATUS.simstatus.write(|w| w.report().bits(0x1234));
-        p.SIMSTATUS.simstatus.write(|w| w.report().bits(0xFFFF));
-        p.SIMSTATUS.simstatus.write(|w| w.report().bits(0xAAAA));
-        p.SIMSTATUS.simstatus.write(|w| w.report().bits(0x5555));
+        p.SIMSTATUS.report.write(|w| w.bits(0x00C0FFEE));
+        p.SIMSTATUS.report.write(|w| w.bits(0xADDCACA0));
+        p.SIMSTATUS.report.write(|w| w.bits(0x55555555));
+        p.SIMSTATUS.report.write(|w| w.bits(0xFEEDC0DE));
     }
 
     // you can use this to end the simulation early, or you can also toggle 'failure()' instead of success as needed

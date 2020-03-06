@@ -25,6 +25,12 @@ top dut (
     .sim_report(report)
 );
 
+// add extra variables for CI watching here   
+initial begin
+   $dumpvars(0, pin);
+   $dumpvars(0, bus);
+end
+
 // DUT-specific end condition to make sure it eventually stops running for CI mode
 initial #800_000 $finish;
 
