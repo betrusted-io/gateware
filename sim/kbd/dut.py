@@ -125,7 +125,7 @@ This is dut.py local because we may want to add local verilog models or tweak th
 simulator in unusual ways
 """
 def run_sim(ci=False):
-    os_cmds = ['echo "extra commands!"', 'echo "more extra commands!']
+    os_cmds = []
     SimRunner(ci, os_cmds)
 
 

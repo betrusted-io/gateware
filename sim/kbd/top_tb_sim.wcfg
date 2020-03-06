@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wave_config>
+   <wave_state>
+   </wave_state>
+   <db_ref_list>
+      <db_ref path="top_tb_sim.wdb" id="1">
+         <top_modules>
+            <top_module name="glbl" />
+            <top_module name="top_tb" />
+         </top_modules>
+      </db_ref>
+   </db_ref_list>
+   <zoom_setting>
+      <ZoomStartTime time="0fs"></ZoomStartTime>
+      <ZoomEndTime time="35393150fs"></ZoomEndTime>
+      <Cursor1Time time="21920321fs"></Cursor1Time>
+   </zoom_setting>
+   <column_width_setting>
+      <NameColumnWidth column_width="378"></NameColumnWidth>
+      <ValueColumnWidth column_width="76"></ValueColumnWidth>
+   </column_width_setting>
+   <WVObjectSize size="36" />
+   <wvobject type="logic" fp_name="/top_tb/dut/sys_rst">
+      <obj_property name="ElementShortName">sys_rst</obj_property>
+      <obj_property name="ObjectShortName">sys_rst</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sys_clk">
+      <obj_property name="ElementShortName">sys_clk</obj_property>
+      <obj_property name="ObjectShortName">sys_clk</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/success">
+      <obj_property name="ElementShortName">success</obj_property>
+      <obj_property name="ObjectShortName">success</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/report">
+      <obj_property name="ElementShortName">report[31:0]</obj_property>
+      <obj_property name="ObjectShortName">report[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_INSTRUCTION">
+      <obj_property name="ElementShortName">decode_to_execute_INSTRUCTION[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_INSTRUCTION[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_PC">
+      <obj_property name="ElementShortName">decode_to_execute_PC[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_PC[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_RS1">
+      <obj_property name="ElementShortName">decode_to_execute_RS1[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_RS1[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_RS2">
+      <obj_property name="ElementShortName">decode_to_execute_RS2[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_RS2[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/shared_adr">
+      <obj_property name="ElementShortName">shared_adr[29:0]</obj_property>
+      <obj_property name="ObjectShortName">shared_adr[29:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/shared_dat_w">
+      <obj_property name="ElementShortName">shared_dat_w[31:0]</obj_property>
+      <obj_property name="ObjectShortName">shared_dat_w[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/shared_dat_r">
+      <obj_property name="ElementShortName">shared_dat_r[31:0]</obj_property>
+      <obj_property name="ObjectShortName">shared_dat_r[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/shared_sel">
+      <obj_property name="ElementShortName">shared_sel[3:0]</obj_property>
+      <obj_property name="ObjectShortName">shared_sel[3:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/shared_cyc">
+      <obj_property name="ElementShortName">shared_cyc</obj_property>
+      <obj_property name="ObjectShortName">shared_cyc</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/shared_stb">
+      <obj_property name="ElementShortName">shared_stb</obj_property>
+      <obj_property name="ObjectShortName">shared_stb</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/shared_ack">
+      <obj_property name="ElementShortName">shared_ack</obj_property>
+      <obj_property name="ObjectShortName">shared_ack</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/shared_we">
+      <obj_property name="ElementShortName">shared_we</obj_property>
+      <obj_property name="ObjectShortName">shared_we</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/shared_cti">
+      <obj_property name="ElementShortName">shared_cti[2:0]</obj_property>
+      <obj_property name="ObjectShortName">shared_cti[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/shared_bte">
+      <obj_property name="ElementShortName">shared_bte[1:0]</obj_property>
+      <obj_property name="ObjectShortName">shared_bte[1:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/lpclk_clk">
+      <obj_property name="ElementShortName">lpclk_clk</obj_property>
+      <obj_property name="ObjectShortName">lpclk_clk</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/lpclk_rst">
+      <obj_property name="ElementShortName">lpclk_rst</obj_property>
+      <obj_property name="ObjectShortName">lpclk_rst</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/keyscan_pending_re">
+      <obj_property name="ElementShortName">keyscan_pending_re</obj_property>
+      <obj_property name="ObjectShortName">keyscan_pending_re</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/keyscan_pending_r">
+      <obj_property name="ElementShortName">keyscan_pending_r</obj_property>
+      <obj_property name="ObjectShortName">keyscan_pending_r</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/keyscan_pending_we">
+      <obj_property name="ElementShortName">keyscan_pending_we</obj_property>
+      <obj_property name="ObjectShortName">keyscan_pending_we</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/keyscan_pending_w">
+      <obj_property name="ElementShortName">keyscan_pending_w</obj_property>
+      <obj_property name="ObjectShortName">keyscan_pending_w</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/keyscan_irq">
+      <obj_property name="ElementShortName">keyscan_irq</obj_property>
+      <obj_property name="ObjectShortName">keyscan_irq</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/row">
+      <obj_property name="ElementShortName">row[8:0]</obj_property>
+      <obj_property name="ObjectShortName">row[8:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/col">
+      <obj_property name="ElementShortName">col[9:0]</obj_property>
+      <obj_property name="ObjectShortName">col[9:0]</obj_property>
+      <obj_property name="isExpanded"></obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/keyscan_row_scan0">
+      <obj_property name="ElementShortName">keyscan_row_scan0[9:0]</obj_property>
+      <obj_property name="ObjectShortName">keyscan_row_scan0[9:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/keyscan_row_scan1">
+      <obj_property name="ElementShortName">keyscan_row_scan1[9:0]</obj_property>
+      <obj_property name="ObjectShortName">keyscan_row_scan1[9:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/keyscan_row_scan2">
+      <obj_property name="ElementShortName">keyscan_row_scan2[9:0]</obj_property>
+      <obj_property name="ObjectShortName">keyscan_row_scan2[9:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/keyscan_row_scan3">
+      <obj_property name="ElementShortName">keyscan_row_scan3[9:0]</obj_property>
+      <obj_property name="ObjectShortName">keyscan_row_scan3[9:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/keyscan_row_scan4">
+      <obj_property name="ElementShortName">keyscan_row_scan4[9:0]</obj_property>
+      <obj_property name="ObjectShortName">keyscan_row_scan4[9:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/keyscan_row_scan5">
+      <obj_property name="ElementShortName">keyscan_row_scan5[9:0]</obj_property>
+      <obj_property name="ObjectShortName">keyscan_row_scan5[9:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/keyscan_row_scan6">
+      <obj_property name="ElementShortName">keyscan_row_scan6[9:0]</obj_property>
+      <obj_property name="ObjectShortName">keyscan_row_scan6[9:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/keyscan_row_scan7">
+      <obj_property name="ElementShortName">keyscan_row_scan7[9:0]</obj_property>
+      <obj_property name="ObjectShortName">keyscan_row_scan7[9:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/keyscan_row_scan8">
+      <obj_property name="ElementShortName">keyscan_row_scan8[9:0]</obj_property>
+      <obj_property name="ObjectShortName">keyscan_row_scan8[9:0]</obj_property>
+   </wvobject>
+</wave_config>
