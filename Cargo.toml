@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "sim/kbd/test",
     "sim/memlcd/test",
     "sim/template/test",
     "sim_support/rust/bios",
