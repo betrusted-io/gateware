@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wave_config>
+   <wave_state>
+   </wave_state>
+   <db_ref_list>
+      <db_ref path="top_tb_sim.wdb" id="1">
+         <top_modules>
+            <top_module name="glbl" />
+            <top_module name="top_tb" />
+         </top_modules>
+      </db_ref>
+   </db_ref_list>
+   <zoom_setting>
+      <ZoomStartTime time="133333333fs"></ZoomStartTime>
+      <ZoomEndTime time="933333334fs"></ZoomEndTime>
+      <Cursor1Time time="800000000fs"></Cursor1Time>
+   </zoom_setting>
+   <column_width_setting>
+      <NameColumnWidth column_width="378"></NameColumnWidth>
+      <ValueColumnWidth column_width="76"></ValueColumnWidth>
+   </column_width_setting>
+   <WVObjectSize size="39" />
+   <wvobject type="logic" fp_name="/top_tb/dut/sys_rst">
+      <obj_property name="ElementShortName">sys_rst</obj_property>
+      <obj_property name="ObjectShortName">sys_rst</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sys_clk">
+      <obj_property name="ElementShortName">sys_clk</obj_property>
+      <obj_property name="ObjectShortName">sys_clk</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/success">
+      <obj_property name="ElementShortName">success</obj_property>
+      <obj_property name="ObjectShortName">success</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/report">
+      <obj_property name="ElementShortName">report[15:0]</obj_property>
+      <obj_property name="ObjectShortName">report[15:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_INSTRUCTION">
+      <obj_property name="ElementShortName">decode_to_execute_INSTRUCTION[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_INSTRUCTION[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_PC">
+      <obj_property name="ElementShortName">decode_to_execute_PC[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_PC[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_RS1">
+      <obj_property name="ElementShortName">decode_to_execute_RS1[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_RS1[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_RS2">
+      <obj_property name="ElementShortName">decode_to_execute_RS2[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_RS2[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/shared_adr">
+      <obj_property name="ElementShortName">shared_adr[29:0]</obj_property>
+      <obj_property name="ObjectShortName">shared_adr[29:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/shared_dat_w">
+      <obj_property name="ElementShortName">shared_dat_w[31:0]</obj_property>
+      <obj_property name="ObjectShortName">shared_dat_w[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/shared_dat_r">
+      <obj_property name="ElementShortName">shared_dat_r[31:0]</obj_property>
+      <obj_property name="ObjectShortName">shared_dat_r[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/shared_sel">
+      <obj_property name="ElementShortName">shared_sel[3:0]</obj_property>
+      <obj_property name="ObjectShortName">shared_sel[3:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/shared_cyc">
+      <obj_property name="ElementShortName">shared_cyc</obj_property>
+      <obj_property name="ObjectShortName">shared_cyc</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/shared_stb">
+      <obj_property name="ElementShortName">shared_stb</obj_property>
+      <obj_property name="ObjectShortName">shared_stb</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/shared_ack">
+      <obj_property name="ElementShortName">shared_ack</obj_property>
+      <obj_property name="ObjectShortName">shared_ack</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/shared_we">
+      <obj_property name="ElementShortName">shared_we</obj_property>
+      <obj_property name="ObjectShortName">shared_we</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/shared_cti">
+      <obj_property name="ElementShortName">shared_cti[2:0]</obj_property>
+      <obj_property name="ObjectShortName">shared_cti[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/shared_bte">
+      <obj_property name="ElementShortName">shared_bte[1:0]</obj_property>
+      <obj_property name="ObjectShortName">shared_bte[1:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/si">
+      <obj_property name="ElementShortName">si</obj_property>
+      <obj_property name="ObjectShortName">si</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/sclk">
+      <obj_property name="ElementShortName">sclk</obj_property>
+      <obj_property name="ObjectShortName">sclk</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/scs">
+      <obj_property name="ElementShortName">scs</obj_property>
+      <obj_property name="ObjectShortName">scs</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/memlcd_update_line">
+      <obj_property name="ElementShortName">memlcd_update_line[9:0]</obj_property>
+      <obj_property name="ObjectShortName">memlcd_update_line[9:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/memlcd_update_addr">
+      <obj_property name="ElementShortName">memlcd_update_addr[14:0]</obj_property>
+      <obj_property name="ObjectShortName">memlcd_update_addr[14:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/memlcd_modeshift">
+      <obj_property name="ElementShortName">memlcd_modeshift[15:0]</obj_property>
+      <obj_property name="ObjectShortName">memlcd_modeshift[15:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/memlcd_mode">
+      <obj_property name="ElementShortName">memlcd_mode[5:0]</obj_property>
+      <obj_property name="ObjectShortName">memlcd_mode[5:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/memlcd_pixshift">
+      <obj_property name="ElementShortName">memlcd_pixshift[31:0]</obj_property>
+      <obj_property name="ObjectShortName">memlcd_pixshift[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/memlcd_pixcount">
+      <obj_property name="ElementShortName">memlcd_pixcount[8:0]</obj_property>
+      <obj_property name="ObjectShortName">memlcd_pixcount[8:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/memlcd_UpdateAll">
+      <obj_property name="ElementShortName">memlcd_UpdateAll</obj_property>
+      <obj_property name="ObjectShortName">memlcd_UpdateAll</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/memlcd_UpdateDirty">
+      <obj_property name="ElementShortName">memlcd_UpdateDirty</obj_property>
+      <obj_property name="ObjectShortName">memlcd_UpdateDirty</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/memlcd_busy_status">
+      <obj_property name="ElementShortName">memlcd_busy_status</obj_property>
+      <obj_property name="ObjectShortName">memlcd_busy_status</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/memlcd_busy_status_fsm0_next_value0">
+      <obj_property name="ElementShortName">memlcd_busy_status_fsm0_next_value0</obj_property>
+      <obj_property name="ObjectShortName">memlcd_busy_status_fsm0_next_value0</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/memlcd_busy_status_fsm0_next_value_ce0">
+      <obj_property name="ElementShortName">memlcd_busy_status_fsm0_next_value_ce0</obj_property>
+      <obj_property name="ObjectShortName">memlcd_busy_status_fsm0_next_value_ce0</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/memlcd_busy_we">
+      <obj_property name="ElementShortName">memlcd_busy_we</obj_property>
+      <obj_property name="ObjectShortName">memlcd_busy_we</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/memlcd_done_clear">
+      <obj_property name="ElementShortName">memlcd_done_clear</obj_property>
+      <obj_property name="ObjectShortName">memlcd_done_clear</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/memlcd_done_old_trigger">
+      <obj_property name="ElementShortName">memlcd_done_old_trigger</obj_property>
+      <obj_property name="ObjectShortName">memlcd_done_old_trigger</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/memlcd_done_pending">
+      <obj_property name="ElementShortName">memlcd_done_pending</obj_property>
+      <obj_property name="ObjectShortName">memlcd_done_pending</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/memlcd_done_status">
+      <obj_property name="ElementShortName">memlcd_done_status</obj_property>
+      <obj_property name="ObjectShortName">memlcd_done_status</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/memlcd_done_trigger">
+      <obj_property name="ElementShortName">memlcd_done_trigger</obj_property>
+      <obj_property name="ObjectShortName">memlcd_done_trigger</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/memlcd_linedone">
+      <obj_property name="ElementShortName">memlcd_linedone</obj_property>
+      <obj_property name="ObjectShortName">memlcd_linedone</obj_property>
+   </wvobject>
+</wave_config>
