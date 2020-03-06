@@ -34,5 +34,5 @@ fn run(p: &pac::Peripherals) {
     }
 
     // set success to indicate to the CI framework that the test has passed
-    p.SIMSTATUS.simstatus.modify(|r, w| w.success().bit(true));
+    p.SIMSTATUS.simstatus.modify(|_r, w| w.success().bit(true));
 }
