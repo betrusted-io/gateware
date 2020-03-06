@@ -23,7 +23,14 @@ top dut (
     .sim_report(report)
 );
 
+// extra reporting for CI
+initial begin
+        $dumpvars(0, sclk);
+        $dumpvars(0, si);
+        $dumpvars(0, scs);
+end
+
 // DUT-specific end condition to make sure it eventually stops running for CI mode
-initial #800_000 $finish;
+initial #8_000_000 $finish;
 
 endmodule
