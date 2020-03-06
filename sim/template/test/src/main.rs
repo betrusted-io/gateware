@@ -33,6 +33,6 @@ fn run(p: &pac::Peripherals) {
         p.SIMSTATUS.report.write(|w| w.bits(0xFEEDC0DE));
     }
 
-    // you can use this to end the simulation early, or you can also toggle 'failure()' instead of success as needed
+    // set success to indicate to the CI framework that the test has passed
     p.SIMSTATUS.simstatus.modify(|r, w| w.success().bit(true));
 }
