@@ -78,7 +78,7 @@ fn run(p: &pac::Peripherals) {
     unsafe{ p.SIMSTATUS.report.write( |w| w.bits(timer)); }
     unsafe{ p.SIMSTATUS.simstatus.write(|w| w.success().bit(true)); }
 
-    // do something with the rest of the sim time
-    lcd_clear(&p);
-    lcd_animate(&p);
+    // uncomment for manual checking of further behavior
+    // lcd_clear(&p);
+    // lcd_animate(&p);
 }
