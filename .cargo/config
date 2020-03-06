@@ -9,7 +9,7 @@ rustflags = [
 rustflags = [
   "-C", "link-arg=-Tmemory.x",
   "-C", "link-arg=-Tlink.x",
-  "-C", "link-arg=-Map=betrusted-soc.map",
+  "-C", "link-arg=-Map=simulation.map",
   "-C", "force-frame-pointers=no",
 ]
 
@@ -17,7 +17,7 @@ rustflags = [
 rustflags = [
   "-C", "link-arg=-Tmemory.x",
   "-C", "link-arg=-Tlink.x",
-  "-C", "link-arg=-Map=betrusted-soc.map",
+  "-C", "link-arg=-Map=simulation.map",
   "-C", "force-frame-pointers=no",
 ]
 
