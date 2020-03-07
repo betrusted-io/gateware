@@ -388,6 +388,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "spi_dopi"
+version = "0.1.0"
+dependencies = [
+ "pac",
+ "sim-bios",
+ "volatile",
+ "xous-nommu",
+]
+
+[[package]]
 name = "strsim"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -451,6 +461,7 @@ version = "0.1.0"
 dependencies = [
  "pac",
  "sim-bios",
+ "volatile",
  "xous-nommu",
 ]
 
@@ -546,6 +557,12 @@ dependencies = [
  "bare-metal",
  "bit_field",
 ]
+
+[[package]]
+name = "volatile"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6af0edf5b4faacc31fc51159244d78d65ec580f021afcef7bd53c04aeabc7f29"
 
 [[package]]
 name = "winapi"
