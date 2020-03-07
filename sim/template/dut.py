@@ -116,7 +116,7 @@ def generate_top():
 
     # pass #2 -- generate the SoC, incorporating the now-built BIOS
     platform = Platform(dutio)
-    soc = Dut(platform)
+    soc = Dut(platform, spiboot=boot_from_spi)
 
     builder = Builder(soc, output_dir="./run")
     builder.software_packages = [  # Point to a dummy Makefile, so Litex pulls in bios.bin but doesn't try building over it

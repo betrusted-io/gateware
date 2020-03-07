@@ -114,8 +114,14 @@ class Sim(SoCCore):
             for key in custom_clocks.keys():
                 crg_config[key] = custom_clocks[key]
 
+        rom_size = 0x8000
+        reset_address = self.mem_map["rom"]
+        if spiboot:
+            reset_address = self.mem_map["spiflash"]
+            rom_size = 0x0
+
         SoCCore.__init__(self, platform, crg_config["sys"][0],
-            integrated_rom_size=0x8000,
+            integrated_rom_size=rom_size,
             integrated_sram_size=0x20000,
             ident="simulation LiteX Base SoC",
             cpu_type="vexriscv",
@@ -123,14 +129,10 @@ class Sim(SoCCore):
             csr_address_width=16,
             csr_data_width=32,
             uart_name="crossover",  # use UART-over-wishbone for debugging
+            cpu_reset_address=reset_address,
             **kwargs)
 
         self.cpu.use_external_variant(VEX_CPU_PATH)
-        # self.cpu.add_debug()
-        if spiboot:
-            kwargs["cpu_reset_address"] = self.mem_map["spiflash"]
-        else:
-            kwargs["cpu_reset_address"] = self.mem_map["rom"]
 
         # instantiate the clock module
         self.submodules.crg = CRG(platform, crg_config)
