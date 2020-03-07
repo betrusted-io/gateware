@@ -54,8 +54,10 @@ top dut (
 
 // add extra variables for CI watching here   
 initial begin
-   $dumpvars(0, pin);
-   $dumpvars(0, bus);
+   $dumpvars(0, mclk);
+   $dumpvars(0, sync);
+   $dumpvars(0, tx0);
+   $dumpvars(0, tx1);
 end
 
 // DUT-specific end condition to make sure it eventually stops running for CI mode
