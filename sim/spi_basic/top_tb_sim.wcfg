@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wave_config>
+   <wave_state>
+   </wave_state>
+   <db_ref_list>
+      <db_ref path="top_tb_sim.wdb" id="1">
+         <top_modules>
+            <top_module name="glbl" />
+            <top_module name="top_tb" />
+         </top_modules>
+      </db_ref>
+   </db_ref_list>
+   <zoom_setting>
+      <ZoomStartTime time="216101019fs"></ZoomStartTime>
+      <ZoomEndTime time="218681892fs"></ZoomEndTime>
+      <Cursor1Time time="217918410fs"></Cursor1Time>
+   </zoom_setting>
+   <column_width_setting>
+      <NameColumnWidth column_width="378"></NameColumnWidth>
+      <ValueColumnWidth column_width="127"></ValueColumnWidth>
+   </column_width_setting>
+   <WVObjectSize size="47" />
+   <wvobject type="logic" fp_name="/top_tb/dut/sys_rst">
+      <obj_property name="ElementShortName">sys_rst</obj_property>
+      <obj_property name="ObjectShortName">sys_rst</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sys_clk">
+      <obj_property name="ElementShortName">sys_clk</obj_property>
+      <obj_property name="ObjectShortName">sys_clk</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/success">
+      <obj_property name="ElementShortName">success</obj_property>
+      <obj_property name="ObjectShortName">success</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/report">
+      <obj_property name="ElementShortName">report[31:0]</obj_property>
+      <obj_property name="ObjectShortName">report[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/miso">
+      <obj_property name="ElementShortName">miso</obj_property>
+      <obj_property name="ObjectShortName">miso</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/sclk">
+      <obj_property name="ElementShortName">sclk</obj_property>
+      <obj_property name="ObjectShortName">sclk</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/csn">
+      <obj_property name="ElementShortName">csn</obj_property>
+      <obj_property name="ObjectShortName">csn</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/mosi">
+      <obj_property name="ElementShortName">mosi</obj_property>
+      <obj_property name="ObjectShortName">mosi</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_INSTRUCTION">
+      <obj_property name="ElementShortName">decode_to_execute_INSTRUCTION[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_INSTRUCTION[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_PC">
+      <obj_property name="ElementShortName">decode_to_execute_PC[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_PC[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_RS1">
+      <obj_property name="ElementShortName">decode_to_execute_RS1[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_RS1[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_RS2">
+      <obj_property name="ElementShortName">decode_to_execute_RS2[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_RS2[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/shared_adr">
+      <obj_property name="ElementShortName">shared_adr[29:0]</obj_property>
+      <obj_property name="ObjectShortName">shared_adr[29:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/shared_dat_w">
+      <obj_property name="ElementShortName">shared_dat_w[31:0]</obj_property>
+      <obj_property name="ObjectShortName">shared_dat_w[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/shared_dat_r">
+      <obj_property name="ElementShortName">shared_dat_r[31:0]</obj_property>
+      <obj_property name="ObjectShortName">shared_dat_r[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/shared_sel">
+      <obj_property name="ElementShortName">shared_sel[3:0]</obj_property>
+      <obj_property name="ObjectShortName">shared_sel[3:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/shared_cyc">
+      <obj_property name="ElementShortName">shared_cyc</obj_property>
+      <obj_property name="ObjectShortName">shared_cyc</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/shared_stb">
+      <obj_property name="ElementShortName">shared_stb</obj_property>
+      <obj_property name="ObjectShortName">shared_stb</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/shared_ack">
+      <obj_property name="ElementShortName">shared_ack</obj_property>
+      <obj_property name="ObjectShortName">shared_ack</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/shared_we">
+      <obj_property name="ElementShortName">shared_we</obj_property>
+      <obj_property name="ObjectShortName">shared_we</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/shared_cti">
+      <obj_property name="ElementShortName">shared_cti[2:0]</obj_property>
+      <obj_property name="ObjectShortName">shared_cti[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/shared_bte">
+      <obj_property name="ElementShortName">shared_bte[1:0]</obj_property>
+      <obj_property name="ObjectShortName">shared_bte[1:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/shared_err">
+      <obj_property name="ElementShortName">shared_err</obj_property>
+      <obj_property name="ObjectShortName">shared_err</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/request">
+      <obj_property name="ElementShortName">request[1:0]</obj_property>
+      <obj_property name="ObjectShortName">request[1:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/grant">
+      <obj_property name="ElementShortName">grant</obj_property>
+      <obj_property name="ObjectShortName">grant</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/slave_sel">
+      <obj_property name="ElementShortName">slave_sel[2:0]</obj_property>
+      <obj_property name="ObjectShortName">slave_sel[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/slave_sel_r">
+      <obj_property name="ElementShortName">slave_sel_r[2:0]</obj_property>
+      <obj_property name="ObjectShortName">slave_sel_r[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/error">
+      <obj_property name="ElementShortName">error</obj_property>
+      <obj_property name="ObjectShortName">error</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/wait_1">
+      <obj_property name="ElementShortName">wait_1</obj_property>
+      <obj_property name="ObjectShortName">wait_1</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/done">
+      <obj_property name="ElementShortName">done</obj_property>
+      <obj_property name="ObjectShortName">done</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/count">
+      <obj_property name="ElementShortName">count[19:0]</obj_property>
+      <obj_property name="ObjectShortName">count[19:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spimaster_irq">
+      <obj_property name="ElementShortName">spimaster_irq</obj_property>
+      <obj_property name="ObjectShortName">spimaster_irq</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spimaster_spi_int_status">
+      <obj_property name="ElementShortName">spimaster_spi_int_status</obj_property>
+      <obj_property name="ObjectShortName">spimaster_spi_int_status</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spimaster_spi_int_pending">
+      <obj_property name="ElementShortName">spimaster_spi_int_pending</obj_property>
+      <obj_property name="ObjectShortName">spimaster_spi_int_pending</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spimaster_spi_int_trigger">
+      <obj_property name="ElementShortName">spimaster_spi_int_trigger</obj_property>
+      <obj_property name="ObjectShortName">spimaster_spi_int_trigger</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spimaster_spi_int_clear">
+      <obj_property name="ElementShortName">spimaster_spi_int_clear</obj_property>
+      <obj_property name="ObjectShortName">spimaster_spi_int_clear</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spimaster_spi_int_old_trigger">
+      <obj_property name="ElementShortName">spimaster_spi_int_old_trigger</obj_property>
+      <obj_property name="ObjectShortName">spimaster_spi_int_old_trigger</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spimaster_wirq_status">
+      <obj_property name="ElementShortName">spimaster_wirq_status</obj_property>
+      <obj_property name="ObjectShortName">spimaster_wirq_status</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spimaster_wirq_pending">
+      <obj_property name="ElementShortName">spimaster_wirq_pending</obj_property>
+      <obj_property name="ObjectShortName">spimaster_wirq_pending</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spimaster_wirq_trigger">
+      <obj_property name="ElementShortName">spimaster_wirq_trigger</obj_property>
+      <obj_property name="ObjectShortName">spimaster_wirq_trigger</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spimaster_wirq_clear">
+      <obj_property name="ElementShortName">spimaster_wirq_clear</obj_property>
+      <obj_property name="ObjectShortName">spimaster_wirq_clear</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spimaster_wirq_old_trigger">
+      <obj_property name="ElementShortName">spimaster_wirq_old_trigger</obj_property>
+      <obj_property name="ObjectShortName">spimaster_wirq_old_trigger</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/spislave_rx_status">
+      <obj_property name="ElementShortName">spislave_rx_status[15:0]</obj_property>
+      <obj_property name="ObjectShortName">spislave_rx_status[15:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/spislave_txrx">
+      <obj_property name="ElementShortName">spislave_txrx[15:0]</obj_property>
+      <obj_property name="ObjectShortName">spislave_txrx[15:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spislave_tip">
+      <obj_property name="ElementShortName">spislave_tip</obj_property>
+      <obj_property name="ObjectShortName">spislave_tip</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spislave_rxfull">
+      <obj_property name="ElementShortName">spislave_rxfull</obj_property>
+      <obj_property name="ObjectShortName">spislave_rxfull</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spislave_rxover">
+      <obj_property name="ElementShortName">spislave_rxover</obj_property>
+      <obj_property name="ObjectShortName">spislave_rxover</obj_property>
+   </wvobject>
+</wave_config>

@@ -398,6 +398,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "spi_basic"
+version = "0.1.0"
+dependencies = [
+ "pac",
+ "sim-bios",
+ "volatile",
+ "xous-nommu",
+]
+
+[[package]]
 name = "spi_dopi"
 version = "0.1.0"
 dependencies = [
