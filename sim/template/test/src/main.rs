@@ -2,6 +2,8 @@
 #![no_main]
 
 use sim_bios::sim_test;
+extern crate volatile;
+use volatile::Volatile;
 
 // allocate a global, unsafe static string. You can use this to force writes to RAM.
 #[used] // This is necessary to keep DBGSTR from being optimized out
@@ -9,9 +11,12 @@ static mut DBGSTR: [u32; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
 
 #[sim_test]
 fn run(p: &pac::Peripherals) {
-    // example of using the DBGSTR
+    let ram_ptr: *mut u32 = 0x0100_0000 as *mut u32;
+    let ram = ram_ptr as *mut Volatile<u32>;
+
+    // example of using the DBGSTR to stash a variable from a raw pointer
     unsafe {
-        DBGSTR[0] = 0xface;
+        DBGSTR[0] = (*(ram.add(4))).read();
     };
 
     // example of toggling a bit

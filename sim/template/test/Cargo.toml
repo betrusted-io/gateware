@@ -10,3 +10,4 @@ edition = "2018"
 pac = { path = "../../../sim_support/rust/pac" }
 sim-bios = { path = "../../../sim_support/rust/bios" }
 xous-nommu = { path = "../../../sim_support/rust/xous-nommu" }
+volatile = "0.2.6"
