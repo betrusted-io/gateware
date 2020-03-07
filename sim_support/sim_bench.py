@@ -153,12 +153,6 @@ class BiosHelper():
         else:
             os.system("cp -f ../../sim_support/memory_rom.x ../../target/memory.x")
 
-        # generate the SVD
-        os.system("mkdir -p ../../target")  # this doesn't exist on the first run
-        lxsocdoc.generate_svd(soc, "../../target", name="simulation", description="simulation core framework", filename="soc.svd", vendor="betrusted.io")
-        # this is now legacy, PAC generation is managed by a build.rs script
-        # os.system("cd ../../sim_support/rust/pac && svd2rust --target riscv -i ../../../target/soc.svd && rm -rf src && form -i lib.rs -o src/ && rm lib.rs && cargo doc && cargo fmt")
-
         # run the BIOS build
         ret = 0
         ret += os.system("cd test && cargo build --release")

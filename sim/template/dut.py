@@ -107,7 +107,8 @@ def generate_top():
     platform = Platform(dutio)
     soc = Dut(platform, spiboot=boot_from_spi)
 
-    builder = Builder(soc, output_dir="./run", compile_gateware=False, compile_software=False)
+    os.system("mkdir -p ../../target")  # this doesn't exist on the first run
+    builder = Builder(soc, output_dir="./run", csr_svd="../../target/soc.svd", compile_gateware=False, compile_software=False)
     vns = builder.build(run=False)
     soc.do_exit(vns)
 
