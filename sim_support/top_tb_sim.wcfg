@@ -11,15 +11,15 @@
       </db_ref>
    </db_ref_list>
    <zoom_setting>
-      <ZoomStartTime time="19074464fs"></ZoomStartTime>
-      <ZoomEndTime time="19387261fs"></ZoomEndTime>
-      <Cursor1Time time="19242872fs"></Cursor1Time>
+      <ZoomStartTime time="22645639fs"></ZoomStartTime>
+      <ZoomEndTime time="23808515fs"></ZoomEndTime>
+      <Cursor1Time time="22839451fs"></Cursor1Time>
    </zoom_setting>
    <column_width_setting>
       <NameColumnWidth column_width="378"></NameColumnWidth>
-      <ValueColumnWidth column_width="80"></ValueColumnWidth>
+      <ValueColumnWidth column_width="72"></ValueColumnWidth>
    </column_width_setting>
-   <WVObjectSize size="18" />
+   <WVObjectSize size="27" />
    <wvobject type="logic" fp_name="/top_tb/dut/sys_rst">
       <obj_property name="ElementShortName">sys_rst</obj_property>
       <obj_property name="ObjectShortName">sys_rst</obj_property>
@@ -33,8 +33,8 @@
       <obj_property name="ObjectShortName">success</obj_property>
    </wvobject>
    <wvobject type="array" fp_name="/top_tb/report">
-      <obj_property name="ElementShortName">report[15:0]</obj_property>
-      <obj_property name="ObjectShortName">report[15:0]</obj_property>
+      <obj_property name="ElementShortName">report[31:0]</obj_property>
+      <obj_property name="ObjectShortName">report[31:0]</obj_property>
    </wvobject>
    <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_INSTRUCTION">
       <obj_property name="ElementShortName">decode_to_execute_INSTRUCTION[31:0]</obj_property>
@@ -52,44 +52,80 @@
       <obj_property name="ElementShortName">decode_to_execute_RS2[31:0]</obj_property>
       <obj_property name="ObjectShortName">decode_to_execute_RS2[31:0]</obj_property>
    </wvobject>
-   <wvobject type="array" fp_name="/top_tb/dut/shared_adr">
-      <obj_property name="ElementShortName">shared_adr[29:0]</obj_property>
-      <obj_property name="ObjectShortName">shared_adr[29:0]</obj_property>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_shared_adr">
+      <obj_property name="ElementShortName">vns_shared_adr[29:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_adr[29:0]</obj_property>
    </wvobject>
-   <wvobject type="array" fp_name="/top_tb/dut/shared_dat_w">
-      <obj_property name="ElementShortName">shared_dat_w[31:0]</obj_property>
-      <obj_property name="ObjectShortName">shared_dat_w[31:0]</obj_property>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_shared_dat_w">
+      <obj_property name="ElementShortName">vns_shared_dat_w[31:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_dat_w[31:0]</obj_property>
    </wvobject>
-   <wvobject type="array" fp_name="/top_tb/dut/shared_dat_r">
-      <obj_property name="ElementShortName">shared_dat_r[31:0]</obj_property>
-      <obj_property name="ObjectShortName">shared_dat_r[31:0]</obj_property>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_shared_dat_r">
+      <obj_property name="ElementShortName">vns_shared_dat_r[31:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_dat_r[31:0]</obj_property>
    </wvobject>
-   <wvobject type="array" fp_name="/top_tb/dut/shared_sel">
-      <obj_property name="ElementShortName">shared_sel[3:0]</obj_property>
-      <obj_property name="ObjectShortName">shared_sel[3:0]</obj_property>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_shared_sel">
+      <obj_property name="ElementShortName">vns_shared_sel[3:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_sel[3:0]</obj_property>
    </wvobject>
-   <wvobject type="logic" fp_name="/top_tb/dut/shared_cyc">
-      <obj_property name="ElementShortName">shared_cyc</obj_property>
-      <obj_property name="ObjectShortName">shared_cyc</obj_property>
+   <wvobject type="logic" fp_name="/top_tb/dut/vns_shared_cyc">
+      <obj_property name="ElementShortName">vns_shared_cyc</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_cyc</obj_property>
    </wvobject>
-   <wvobject type="logic" fp_name="/top_tb/dut/shared_stb">
-      <obj_property name="ElementShortName">shared_stb</obj_property>
-      <obj_property name="ObjectShortName">shared_stb</obj_property>
+   <wvobject type="logic" fp_name="/top_tb/dut/vns_shared_stb">
+      <obj_property name="ElementShortName">vns_shared_stb</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_stb</obj_property>
    </wvobject>
-   <wvobject type="logic" fp_name="/top_tb/dut/shared_ack">
-      <obj_property name="ElementShortName">shared_ack</obj_property>
-      <obj_property name="ObjectShortName">shared_ack</obj_property>
+   <wvobject type="logic" fp_name="/top_tb/dut/vns_shared_ack">
+      <obj_property name="ElementShortName">vns_shared_ack</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_ack</obj_property>
    </wvobject>
-   <wvobject type="logic" fp_name="/top_tb/dut/shared_we">
-      <obj_property name="ElementShortName">shared_we</obj_property>
-      <obj_property name="ObjectShortName">shared_we</obj_property>
+   <wvobject type="logic" fp_name="/top_tb/dut/vns_shared_we">
+      <obj_property name="ElementShortName">vns_shared_we</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_we</obj_property>
    </wvobject>
-   <wvobject type="array" fp_name="/top_tb/dut/shared_cti">
-      <obj_property name="ElementShortName">shared_cti[2:0]</obj_property>
-      <obj_property name="ObjectShortName">shared_cti[2:0]</obj_property>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_shared_cti">
+      <obj_property name="ElementShortName">vns_shared_cti[2:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_cti[2:0]</obj_property>
    </wvobject>
-   <wvobject type="array" fp_name="/top_tb/dut/shared_bte">
-      <obj_property name="ElementShortName">shared_bte[1:0]</obj_property>
-      <obj_property name="ObjectShortName">shared_bte[1:0]</obj_property>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_shared_bte">
+      <obj_property name="ElementShortName">vns_shared_bte[1:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_bte[1:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/vns_shared_err">
+      <obj_property name="ElementShortName">vns_shared_err</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_err</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_request">
+      <obj_property name="ElementShortName">vns_request[1:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_request[1:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/vns_grant">
+      <obj_property name="ElementShortName">vns_grant</obj_property>
+      <obj_property name="ObjectShortName">vns_grant</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_slave_sel">
+      <obj_property name="ElementShortName">vns_slave_sel[2:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_slave_sel[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_slave_sel_r">
+      <obj_property name="ElementShortName">vns_slave_sel_r[2:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_slave_sel_r[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/vns_error">
+      <obj_property name="ElementShortName">vns_error</obj_property>
+      <obj_property name="ObjectShortName">vns_error</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/vns_wait">
+      <obj_property name="ElementShortName">vns_wait</obj_property>
+      <obj_property name="ObjectShortName">vns_wait</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/vns_done">
+      <obj_property name="ElementShortName">vns_done</obj_property>
+      <obj_property name="ObjectShortName">vns_done</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_count">
+      <obj_property name="ElementShortName">vns_count[19:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_count[19:0]</obj_property>
    </wvobject>
 </wave_config>
