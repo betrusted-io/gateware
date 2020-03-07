@@ -41,14 +41,19 @@ MX66UM1G45G rom(
 always #2.5 dqs_delay = dqs;  // this inserts the equivalent FPGA input clock buffer delay
 
 top dut (
+    .refclk(clk12),
+    .rst(fpga_reset),
+
     .spiflash_8x_cs_n(csn),
     .spiflash_8x_dq(sio),
     .spiflash_8x_dqs(dqs_delay),
     .spiflash_8x_ecs_n(ecsb),
     .spiflash_8x_sclk(sclk),
 
-    .refclk(clk12),
-    .rst(fpga_reset)
+    // don't touch these three lines
+    .sim_success(success),
+    .sim_done(done),
+    .sim_report(report)
 );
 
 // add extra variables for CI watching here   

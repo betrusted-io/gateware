@@ -11,13 +11,13 @@
       </db_ref>
    </db_ref_list>
    <zoom_setting>
-      <ZoomStartTime time="52630434fs"></ZoomStartTime>
-      <ZoomEndTime time="59478261fs"></ZoomEndTime>
-      <Cursor1Time time="55038632fs"></Cursor1Time>
+      <ZoomStartTime time="0fs"></ZoomStartTime>
+      <ZoomEndTime time="99717461fs"></ZoomEndTime>
+      <Cursor1Time time="80501074fs"></Cursor1Time>
    </zoom_setting>
    <column_width_setting>
       <NameColumnWidth column_width="378"></NameColumnWidth>
-      <ValueColumnWidth column_width="72"></ValueColumnWidth>
+      <ValueColumnWidth column_width="68"></ValueColumnWidth>
    </column_width_setting>
    <WVObjectSize size="34" />
    <wvobject type="logic" fp_name="/top_tb/dut/sys_rst">
@@ -105,12 +105,12 @@
       <obj_property name="ObjectShortName">vns_grant</obj_property>
    </wvobject>
    <wvobject type="array" fp_name="/top_tb/dut/vns_slave_sel">
-      <obj_property name="ElementShortName">vns_slave_sel[3:0]</obj_property>
-      <obj_property name="ObjectShortName">vns_slave_sel[3:0]</obj_property>
+      <obj_property name="ElementShortName">vns_slave_sel[2:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_slave_sel[2:0]</obj_property>
    </wvobject>
    <wvobject type="array" fp_name="/top_tb/dut/vns_slave_sel_r">
-      <obj_property name="ElementShortName">vns_slave_sel_r[3:0]</obj_property>
-      <obj_property name="ObjectShortName">vns_slave_sel_r[3:0]</obj_property>
+      <obj_property name="ElementShortName">vns_slave_sel_r[2:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_slave_sel_r[2:0]</obj_property>
    </wvobject>
    <wvobject type="logic" fp_name="/top_tb/dut/vns_error">
       <obj_property name="ElementShortName">vns_error</obj_property>
@@ -131,7 +131,6 @@
    <wvobject type="array" fp_name="/top_tb/sio">
       <obj_property name="ElementShortName">sio[7:0]</obj_property>
       <obj_property name="ObjectShortName">sio[7:0]</obj_property>
-      <obj_property name="isExpanded"></obj_property>
    </wvobject>
    <wvobject type="logic" fp_name="/top_tb/dqs">
       <obj_property name="ElementShortName">dqs</obj_property>

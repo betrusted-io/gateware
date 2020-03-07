@@ -157,6 +157,7 @@ class BiosHelper():
 
         # run the BIOS build
         ret = 0
+        os.system("mkdir -p run/software/bios") # make the directory if it doesn't exist
         ret += os.system("cd test && cargo build --release")
         ret += os.system("riscv64-unknown-elf-objcopy -O binary ../../target/riscv32imac-unknown-none-elf/release/{} run/software/bios/bios.bin".format(sim_name))
         ret += os.system("riscv64-unknown-elf-objdump -d ../../target/riscv32imac-unknown-none-elf/release/{} > run/bios.S".format(sim_name))

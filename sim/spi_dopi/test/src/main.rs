@@ -40,7 +40,7 @@ fn run(p: &pac::Peripherals) {
     // grab the return code embedded in the SPI ROM image
     let ret: u32;
     
-    unsafe{ ret = (*(rom.add(1024*10 / 4))).read(); }
+    unsafe{ ret = (*(rom.add(1024*64 / 4))).read(); }
 
     // example of updating the "report" bits monitored by the CI framework
     unsafe {

@@ -177,7 +177,7 @@ def main():
 
     # generate a .init file for the SPINOR memory based on the BIOS we want to boot
     with open("run/software/bios/bios.bin", "rb") as ifile:
-        with open("run/simpspi.init", "w") as ofile:
+        with open("run/simspi.init", "w") as ofile:
             binfile = ifile.read()
 
             count = 0
@@ -185,14 +185,14 @@ def main():
                 ofile.write("{:02x}\n".format(b))
                 count += 1
 
-            while count < 10 *1024:
+            while count < 64 *1024:
                 ofile.write("00\n")
                 count += 1
 
-            ofile.write("C0");
-            ofile.write("DE");
-            ofile.write("69");
-            ofile.write("C3");
+            ofile.write("C3\n");
+            ofile.write("69\n");
+            ofile.write("DE\n");
+            ofile.write("C0\n");
 
 
     run_sim(ci=args.ci)
