@@ -2,7 +2,7 @@
 // build a reference clock
 reg clk12;
 initial clk12 = 1'b1;
-always #41.16666 clk12 = ~clk12;
+always #41.6666 clk12 = ~clk12;
 
 wire success;
 wire done;
