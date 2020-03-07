@@ -408,6 +408,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "spififo"
+version = "0.1.0"
+dependencies = [
+ "pac",
+ "sim-bios",
+ "volatile",
+ "xous-nommu",
+]
+
+[[package]]
 name = "sram32"
 version = "0.1.0"
 dependencies = [

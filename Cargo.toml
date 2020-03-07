@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "sim/spififo/test",
     "sim/sram32/test",
     "sim/i2s/test",
     "sim/spi_dopi/test",
