@@ -146,7 +146,7 @@ class Sim(SoCCore):
         self.add_csr("simstatus")
 
 class BiosHelper():
-    def __init__(self, soc, spiboot):
+    def __init__(self, soc, spiboot, nightly=False):
         sim_name = os.path.basename(os.getcwd())
 
         # setup the correct linker script for the BIOS build based on the SoC's boot vector settings
@@ -158,7 +158,10 @@ class BiosHelper():
         # run the BIOS build
         ret = 0
         os.system("mkdir -p run/software/bios") # make the directory if it doesn't exist
-        ret += os.system("cd test && cargo build --release")
+        if nightly:
+            ret += os.system("cd test && cargo +nightly build --release")
+        else:
+            ret += os.system("cd test && cargo build --release")
         ret += os.system("riscv64-unknown-elf-objcopy -O binary ../../target/riscv32imac-unknown-none-elf/release/{} run/software/bios/bios.bin".format(sim_name))
         ret += os.system("riscv64-unknown-elf-objdump -d ../../target/riscv32imac-unknown-none-elf/release/{} > run/bios.S".format(sim_name))
         if ret != 0:
