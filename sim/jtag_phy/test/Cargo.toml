@@ -1,0 +1,15 @@
+[package]
+name = "jtag_phy"
+version = "0.1.0"
+authors = ["bunnie <bunnie@kosagi.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+pac = { path = "../../../sim_support/rust/pac" }
+sim-bios = { path = "../../../sim_support/rust/bios" }
+xous-nommu = { path = "../../../sim_support/rust/xous-nommu" }
+jtag = { path = "../jtag" }
+alloc-riscv = { path = "../alloc-riscv" }
+volatile = "0.2.6"

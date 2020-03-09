@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wave_config>
+   <wave_state>
+   </wave_state>
+   <db_ref_list>
+      <db_ref path="top_tb_sim.wdb" id="1">
+         <top_modules>
+            <top_module name="glbl" />
+            <top_module name="top_tb" />
+         </top_modules>
+      </db_ref>
+   </db_ref_list>
+   <zoom_setting>
+      <ZoomStartTime time="0fs"></ZoomStartTime>
+      <ZoomEndTime time="450000001fs"></ZoomEndTime>
+      <Cursor1Time time="27326985fs"></Cursor1Time>
+   </zoom_setting>
+   <column_width_setting>
+      <NameColumnWidth column_width="378"></NameColumnWidth>
+      <ValueColumnWidth column_width="117"></ValueColumnWidth>
+   </column_width_setting>
+   <WVObjectSize size="31" />
+   <wvobject type="logic" fp_name="/top_tb/dut/sys_rst">
+      <obj_property name="ElementShortName">sys_rst</obj_property>
+      <obj_property name="ObjectShortName">sys_rst</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sys_clk">
+      <obj_property name="ElementShortName">sys_clk</obj_property>
+      <obj_property name="ObjectShortName">sys_clk</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/success">
+      <obj_property name="ElementShortName">success</obj_property>
+      <obj_property name="ObjectShortName">success</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/report">
+      <obj_property name="ElementShortName">report[31:0]</obj_property>
+      <obj_property name="ObjectShortName">report[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/tck">
+      <obj_property name="ElementShortName">tck</obj_property>
+      <obj_property name="ObjectShortName">tck</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/tdi">
+      <obj_property name="ElementShortName">tdi</obj_property>
+      <obj_property name="ObjectShortName">tdi</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/tms">
+      <obj_property name="ElementShortName">tms</obj_property>
+      <obj_property name="ObjectShortName">tms</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/tdo">
+      <obj_property name="ElementShortName">tdo</obj_property>
+      <obj_property name="ObjectShortName">tdo</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_INSTRUCTION">
+      <obj_property name="ElementShortName">decode_to_execute_INSTRUCTION[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_INSTRUCTION[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_PC">
+      <obj_property name="ElementShortName">decode_to_execute_PC[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_PC[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_RS1">
+      <obj_property name="ElementShortName">decode_to_execute_RS1[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_RS1[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_RS2">
+      <obj_property name="ElementShortName">decode_to_execute_RS2[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_RS2[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_shared_adr">
+      <obj_property name="ElementShortName">vns_shared_adr[29:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_adr[29:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_shared_dat_w">
+      <obj_property name="ElementShortName">vns_shared_dat_w[31:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_dat_w[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_shared_dat_r">
+      <obj_property name="ElementShortName">vns_shared_dat_r[31:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_dat_r[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_shared_sel">
+      <obj_property name="ElementShortName">vns_shared_sel[3:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_sel[3:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/vns_shared_cyc">
+      <obj_property name="ElementShortName">vns_shared_cyc</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_cyc</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/vns_shared_stb">
+      <obj_property name="ElementShortName">vns_shared_stb</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_stb</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/vns_shared_ack">
+      <obj_property name="ElementShortName">vns_shared_ack</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_ack</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/vns_shared_we">
+      <obj_property name="ElementShortName">vns_shared_we</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_we</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_shared_cti">
+      <obj_property name="ElementShortName">vns_shared_cti[2:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_cti[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_shared_bte">
+      <obj_property name="ElementShortName">vns_shared_bte[1:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_bte[1:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/vns_shared_err">
+      <obj_property name="ElementShortName">vns_shared_err</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_err</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_request">
+      <obj_property name="ElementShortName">vns_request[1:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_request[1:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/vns_grant">
+      <obj_property name="ElementShortName">vns_grant</obj_property>
+      <obj_property name="ObjectShortName">vns_grant</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_slave_sel">
+      <obj_property name="ElementShortName">vns_slave_sel[2:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_slave_sel[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_slave_sel_r">
+      <obj_property name="ElementShortName">vns_slave_sel_r[2:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_slave_sel_r[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/vns_error">
+      <obj_property name="ElementShortName">vns_error</obj_property>
+      <obj_property name="ObjectShortName">vns_error</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/vns_wait">
+      <obj_property name="ElementShortName">vns_wait</obj_property>
+      <obj_property name="ObjectShortName">vns_wait</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/vns_done">
+      <obj_property name="ElementShortName">vns_done</obj_property>
+      <obj_property name="ObjectShortName">vns_done</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_count">
+      <obj_property name="ElementShortName">vns_count[19:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_count[19:0]</obj_property>
+   </wvobject>
+</wave_config>
