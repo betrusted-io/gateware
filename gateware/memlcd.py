@@ -7,7 +7,7 @@ from litex.soc.interconnect.csr_eventmanager import *
 from litex.soc.integration.doc import AutoDoc, ModuleDoc
 
 
-class MemLCD(Module, AutoCSR):
+class MemLCD(Module, AutoCSR, AutoDoc):
     def __init__(self, pads):
         self.background = ModuleDoc("""MemLCD: Driver for the SHARP Memory LCD model LS032B7DD02
 
