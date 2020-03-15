@@ -40,9 +40,11 @@ class Debounce(Module):
         ]
         self.specials += MultiReg(o_kbd, self.o)
 
-# A hardware key scanner that can run even when the CPU is powered down or stopped
 class KeyScan(Module, AutoCSR, AutoDoc):
     def __init__(self, pads):
+        self.background = ModuleDoc("""Matrix Keyboard Driver
+        A hardware key scanner that can run even when the CPU is powered down or stopped      
+        """)
         rows_unsync = pads.row
         cols        = Signal(pads.col.nbits)
 
