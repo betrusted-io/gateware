@@ -1,73 +1,97 @@
-import binascii
-import os
 import subprocess
-import sys
 
-from migen.fhdl import *
-from litex.soc.interconnect.csr import *
+from migen import Module
+from litex.soc.integration.doc import AutoDoc, ModuleDoc
+from litex.soc.interconnect.csr import AutoCSR, CSRStatus, CSRStorage, CSRField
 
-def git_root():
-    if sys.platform == "win32":
-        # Git on Windows is likely to use Unix-style paths (`/c/path/to/repo`),
-        # whereas directories passed to Python should be Windows-style paths
-        # (`C:/path/to/repo`) (because Python calls into the Windows API).
-        # `cygpath` converts between the two.
-        git = subprocess.Popen(
-            "git rev-parse --show-toplevel",
-            cwd=os.path.dirname(__file__),
-            stdout=subprocess.PIPE,
-        )
-        path = subprocess.check_output(
-            "cygpath -wf -",
-            stdin=git.stdout,
-        )
-        git.wait()
-        return path.decode('ascii').strip()
-    else:
-        return subprocess.check_output(
-            "git rev-parse --show-toplevel",
-            shell=True,
-            cwd=os.path.dirname(__file__),
-        ).decode('ascii').strip()
-
-def git_commit():
-    data = subprocess.check_output(
-        "git rev-parse HEAD",
-        shell=True,
-        cwd=git_root(),
-    ).decode('ascii').strip()
-    return binascii.unhexlify(data)
-
-def git_describe():
-    return subprocess.check_output(
-        "git describe --dirty",
-        shell=True,
-        cwd=git_root(),
-    ).decode('ascii').strip()
-
-def git_status():
-    return subprocess.check_output(
-        "git status --short",
-        shell=True,
-        cwd=git_root(),
-    ).decode('ascii').strip()
-
-
-class GitInfo(Module, AutoCSR):
+class GitInfo(Module, AutoCSR, AutoDoc):
     def __init__(self):
-        commit = sum(int(x) << (i*8) for i, x in enumerate(reversed(git_commit())))
-        self.commit = CSRStatus(160)
+        self.intro = ModuleDoc("""SoC Version Information
 
-	# FIXME: This should be a read-only Memory object
-        #extradata = [ord(x) for x in "\0".join([
-        #    "https://github.com/timvideos/HDMI2USB-misoc-firmware.git",
-        #    git_describe(),
-        #    git_status(),
-        #    "",
-        #    ])]
-        #self.extradata = CSRStatus(len(extradata)*8)
+            This block contains various information about the state of the source code
+            repository when this SoC was built.
+            """)
+
+        def makeint(i, base=10):
+            try:
+                return int(i, base=base)
+            except:
+                return 0
+        def get_gitver():
+            major = 0
+            minor = 0
+            rev = 0
+            gitrev = 0
+            gitextra = 0
+            dirty = 0
+
+            def decode_version(v):
+                version = v.split(".")
+                major = 0
+                minor = 0
+                rev = 0
+                if len(version) >= 3:
+                    rev = makeint(version[2])
+                if len(version) >= 2:
+                    minor = makeint(version[1])
+                if len(version) >= 1:
+                    major = makeint(version[0])
+                return (major, minor, rev)
+            git_rev_cmd = subprocess.Popen(["git", "describe", "--tags", "--long", "--dirty=+", "--abbrev=8"],
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+            (git_stdout, _) = git_rev_cmd.communicate()
+            if git_rev_cmd.wait() != 0:
+                print('unable to get git version')
+                return (major, minor, rev, gitrev, gitextra, dirty)
+            raw_git_rev = git_stdout.decode().strip()
+
+            parts = raw_git_rev.split("-")
+
+            if raw_git_rev[-1] == "+":
+                raw_git_rev = raw_git_rev[:-1]
+                dirty = 1
+
+            if len(parts) >= 3:
+                if parts[0].startswith("v"):
+                    version = parts[0]
+                    if version.startswith("v"):
+                        version = parts[0][1:]
+                    (major, minor, rev) = decode_version(version)
+                gitextra = makeint(parts[1])
+                if parts[2].startswith("g"):
+                    gitrev = makeint(parts[2][1:], base=16)
+            elif len(parts) >= 2:
+                if parts[1].startswith("g"):
+                    gitrev = makeint(parts[1][1:], base=16)
+                version = parts[0]
+                if version.startswith("v"):
+                    version = parts[0][1:]
+                (major, minor, rev) = decode_version(version)
+            elif len(parts) >= 1:
+                version = parts[0]
+                if version.startswith("v"):
+                    version = parts[0][1:]
+                (major, minor, rev) = decode_version(version)
+
+            return (major, minor, rev, gitrev, gitextra, dirty)
+
+        (major, minor, rev, gitrev, gitextra, dirty) = get_gitver()
+
+        self.major = CSRStatus(8, reset=major, description="Major git tag version.  For example, this firmware was built from git tag ``v{}.{}.{}``, so this value is ``{}``.".format(major, minor, rev, major))
+        self.minor = CSRStatus(8, reset=minor, description="Minor git tag version.  For example, this firmware was built from git tag ``v{}.{}.{}``, so this value is ``{}``.".format(major, minor, rev, minor))
+        self.revision = CSRStatus(8, reset=rev, description="Revision git tag version.  For example, this firmware was built from git tag ``v{}.{}.{}``, so this value is ``{}``.".format(major, minor, rev, rev))
+        self.gitrev = CSRStatus(32, reset=gitrev, description="First 32-bits of the git revision.  This documentation was built from git rev ``{:08x}``, so this value is {}, which should be enough to check out the exact git version used to build this firmware.".format(gitrev, gitrev))
+        self.gitextra = CSRStatus(10, reset=gitextra, description="The number of additional commits beyond the git tag.  For example, if this value is ``1``, then the repository this was built from has one additional commit beyond the tag indicated in `MAJOR`, `MINOR`, and `REVISION`.")
+        self.dirty = CSRStatus(fields=[
+            CSRField("dirty", reset=dirty, description="Set to ``1`` if this device was built from a git repo with uncommitted modifications.")
+        ])
 
         self.comb += [
-            self.commit.status.eq(commit),
-        #    self.extradata.status.eq(extradata),
+            self.major.status.eq(major),
+            self.minor.status.eq(minor),
+            self.revision.status.eq(rev),
+            self.gitrev.status.eq(gitrev),
+            self.gitextra.status.eq(gitextra),
+            self.dirty.fields.dirty.eq(dirty),
         ]
