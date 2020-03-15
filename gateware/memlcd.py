@@ -11,7 +11,7 @@ class MemLCD(Module, AutoCSR, AutoDoc):
     def __init__(self, pads):
         self.background = ModuleDoc("""MemLCD: Driver for the SHARP Memory LCD model LS032B7DD02
 
-        The LS032B7DD02 is a 336x536 pixel black and white memory LCD, with a 200ppi dot pitch.
+        The ``LS032B7DD02`` is a 336x536 pixel black and white memory LCD, with a 200ppi dot pitch.
         Memory LCDs can be thought of as 'fast E-ink displays that consume a tiny bit of standby
         power', as seen by these properties:
 
@@ -42,7 +42,7 @@ class MemLCD(Module, AutoCSR, AutoDoc):
                     { "name": "SCLK", "wave": "0.P.......|......|...|..l." },
                     { "name": "SCS", "wave": "01........|......|...|.0.." },
                     { "name": "SI", "wave": "0===x..===|======|==x|....", "data": ["M0", "M1", "M2", "R0", "R1", " ", "R8", "R9", "D0", "D1", "D2", " ", "D334", "D335"] },
-                    { "node": ".....................a.b..."},
+                    { "node": ".....................a.b..."}
                 ],
                   "edge": ['a<->b 16 cycles']
                 }
@@ -52,57 +52,59 @@ class MemLCD(Module, AutoCSR, AutoDoc):
         of row address, and then the pixel data.
 
             .. wavedrom::
-              :caption: Multiple line data transfer to memory LCD
+                :caption: Multiple line data transfer to memory LCD
 
-              { "signal": [
+                { "signal": [
                     { "name": "SCLK", "wave": "0.P.......|......|...|....|....." },
                     { "name": "SCS", "wave": "01........|......|...|....|....." },
                     { "name": "SI", "wave": "0===x..===|======|==x|.===|=====", "data": ["M0", "M1", "M2", "R0", "R1", " ", "R8", "R9", "D0", "D1", "D2", " ", "D334", "D335", "R0", "R1", " ", "R8", "R9", "D0", "D1"] },
-                    { "node": ".....................a.b..."},
-              ],
-                "edge": ['a<->b 6 cycles']
-              }
+                    { "node": ".....................a.b..."}
+                ],
+                    "edge": ['a<->b 6 cycles']
+                }
 
         The very last line in the multiple line data transfer must terminate with 16 dummy cycles.
 
         Mode bits M0-M2 have the following meaning:
-           M0: Set to 1 when transferring data lines. Set to 0 for hold mode, see below.
-           M1: VCOM inversion flag. Ignore when hardware strap pin EXTMODE is high. Betrusted
-               sets EXTMODE high, so the VCOM inversion is handled by low-power aux hardware.
-               When EXTMODE is low, software must explicitly manage the VCOM inversion flag such the
-               flag polarity changes once every second "as much as possible".
-           M2: Normally set to 0. Set to 1 for all clear (see below)
+
+        - **M0**: Set to 1 when transferring data lines. Set to 0 for hold mode, see below.
+        - **M1**: VCOM inversion flag. Ignore when hardware strap pin EXTMODE is high. Betrusted
+          sets EXTMODE high, so the VCOM inversion is handled by low-power aux hardware.
+          When EXTMODE is low, software must explicitly manage the VCOM inversion flag such the
+          flag polarity changes once every second "as much as possible".
+        - **M2**: Normally set to 0. Set to 1 for all clear (see below)
 
         Data bit polarity:
-           1 = White
-           0 = Black
+
+        - ``1`` = White
+        - ``0`` = Black
 
         For 'Hold mode' and 'All clear', a total of 16 cycles are sent, the first three being
         the mode bit and the last 13 being dummy cycles.
 
             .. wavedrom::
-              :caption: Hold and all clear timings
+                :caption: Hold and all clear timings
 
-              { "signal": [
+                { "signal": [
                     { "name": "SCLK", "wave": "0.P...|.l" },
                     { "name": "SCS", "wave": "01....|0." },
                     { "name": "SI", "wave": "0===x...", "data": ["M0", "M1", "M2", "R0", "R1", " ", "R8", "R9", "D0", "D1", "D2", " ", "D334", "D335", "R0", "R1", " ", "R8", "R9", "D0", "D1"] },
-                    { "node": ".....a.b..."},
-              ],
-                "edge": ['a<->b 13 cycles']
-            }
+                    { "node": ".....a.b..."}
+                ],
+                    "edge": ['a<->b 13 cycles']
+                }
 
-        All signals are 3.0V compatible, 5V tolerant (VIH is 2.7V-VDD). The display itself requires
+        All signals are 3.0V compatible, 5V tolerant (``VIH`` is 2.7V-VDD). The display itself requires
         a single 5V power supply (4.8-5.5V typ 5.8V abs max). In hold mode, typical power is 30uW, max 330uW;
-        with data updating at 1Hz, power is 250uW, max 750uW (SCLK=1MHz, EXTCOMMIN=1Hz).
+        with data updating at 1Hz, power is 250uW, max 750uW (when ``SCLK`` = 1MHz and ``EXTCOMMIN`` = 1Hz).
 
-        * The maximum clock frequency for SCLK is 2MHz (typ 1MHz).
-        * EXTCOMMIN frequency is 1-10Hz, 1Hz typ
-        * EXTCOMMIN minimum high duration is 1us
+        * The maximum clock frequency for ``SCLK`` is 2MHz (typ 1MHz).
+        * ``EXTCOMMIN`` frequency is 1-10Hz, 1Hz typ
+        * ``EXTCOMMIN`` minimum high duration is 1us
         * All rise/fall times must be less than 50ns
-        * SCS setup time is 3us, hold time is 1us. Minimum low duration is 1us,
+        * ``SCS`` setup time is 3us, hold time is 1us. Minimum low duration is 1us,
           minimum high is 188us for a data update, 12 us for a hold mode operation.
-        * SI setup time is 120ns, 190ns hold time.
+        * ``SI`` setup time is 120ns, 190ns hold time.
         * Operating temperature is -20 to 70C, storage temperature -30 to 80C.
         """)
 
@@ -118,7 +120,7 @@ class MemLCD(Module, AutoCSR, AutoDoc):
         update request.
 
         A line is 336 bits wide. When padded to 32-bit words, this yields a line width of
-        44 bytes (0x2C, or 352 bits). In order to simplify math, the frame buffer rounds
+        44 bytes (``0x2C``, or 352 bits). In order to simplify math, the frame buffer rounds
         the line width up to the nearest power of two, or 64 bytes.
 
         The unused bits can be used as a "hint" to the MemLCD block as to which lines
@@ -183,8 +185,8 @@ class MemLCD(Module, AutoCSR, AutoDoc):
         self.busy = CSRStatus(1, name="Busy", description="""A ``1`` indicates that the block is currently updating the LCD""")
 
         self.prescaler = CSRStorage(8, reset=99, name="prescaler", description="""
-        Prescaler value. LCD clock is module (clock / (prescaler+1)). Reset value: 99, so
-        for a default sysclk of 100MHz this yields an LCD SCLK of 1MHz""")
+        Prescaler value. LCD clock is module ``(clock / (prescaler+1))``. Reset value: ``99``, so
+        for a default sysclk of 100MHz this yields an LCD ``SCLK`` of 1MHz""")
 
         self.submodules.ev = EventManager()
         self.ev.done       = EventSourceProcess()
