@@ -43,7 +43,49 @@ class Debounce(Module):
 class KeyScan(Module, AutoCSR, AutoDoc):
     def __init__(self, pads):
         self.background = ModuleDoc("""Matrix Keyboard Driver
-        A hardware key scanner that can run even when the CPU is powered down or stopped      
+        A hardware key scanner that can run even when the CPU is powered down or stopped.
+        
+        The hardware is assumed to be a matrix of switches, divided into rows and columns. 
+        The number of rows and columns is inferred by the number of pins dedicated in
+        the `pads` record. 
+        
+        The rows are inputs, and require a `PULLDOWN` to be inferred on the pins, to prevent
+        them from floating when the keys are not pressed. Note that `PULLDOWN` is not offered
+        on all FPGA architectures, but at the very least is present on 7-Series FPGAs.
+        
+        The columns are driven by tristate drivers. The state of the columns is either driven
+        high (`1`), or hi-Z (`Z`). 
+        
+        The KeyScan module also expects a `kbd` clock domain. The preferred implementation
+        makes this a 32.768KHz always-on clock input with no PLL. This allows the keyboard 
+        module to continue scanning even if the CPU is powered down.
+        
+        Columns are scanned sequentially using a `kbd`-domain state machine by driving each
+        column in order. When a column is driven, its electrical state goes from `hi-z` to
+         `1`. The rows are then sampled with each column scan state. Since each row has
+         a pulldown on it, if no keys are hit, the result is `0`. When a key is pressed, it
+         will short a row to a column, and the `1` driven on a column will flip the row
+         state to a `1`, thus registering a key press. 
+        
+        Columns are driven for a minimum period of time known as a `settling` period. The
+        settling time must be at least 2 because a Multireg (2-stage synchronizer) is used
+        to sample the data on the receiving side. In this module, settling time is fixed
+        to `4` cycles.
+        
+        Thus a 1 in the `rowdat` registers indicate the column intersection that was active for 
+        a given row in the matrix.
+        
+        There is also a row shadow register that is maintained by the hardware. The row shadow
+        is used to maintain the previous state of the key matrix, so that a "key press change"
+        interrupt can be generated. The first change in the row registers is recorded in the
+        `rowchange` status register. It does not update until it has been read. The idea of this
+        register is that it can capture one key hit while the CPU is in standby, and the CPU
+        should wake up in time to read it, before a new key hit is registered. The CPU can consult
+        the `rowchange` register to read just the `rowdat` CSR with the key change, instead of
+        having to iterate through the entire array to find the row that changed. 
+        
+        There is also a `keypressed` interrupt which fires every time there is a change in
+        the row registers. 
         """)
         rows_unsync = pads.row
         cols        = Signal(pads.col.nbits)
@@ -125,7 +167,7 @@ class KeyScan(Module, AutoCSR, AutoDoc):
         self.sync.kbd += col_r.eq(self.coldecoder.o)
 
         self.submodules.ev = EventManager()
-        self.ev.keypressed = EventSourcePulse() # Rising edge triggered
+        self.ev.keypressed = EventSourcePulse(description="Triggered every time there is a difference in the row state") # Rising edge triggered
         self.ev.finalize()
         # Extract any changes just before the shadow takes its new values
         rowdiff = Signal(rows.nbits)
