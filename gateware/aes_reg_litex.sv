@@ -89,6 +89,7 @@ module aes_reg_top (
   input key_clear,
   input data_in_clear,
   input data_out_clear,
+  input prng_reseed,
 
   // Config
   input 	devmode_i // If 1, explicit error return for unmapped register access
@@ -323,10 +324,11 @@ module aes_reg_top (
   assign reg2hw.ctrl.key_len.q = ctrl_key_len;
   assign reg2hw.ctrl.key_len.qe = ctrl_update;
   assign ctrl_key_len_rbk = hw2reg.ctrl.key_len.d;
-  assign reg2hw.ctrl.manual_start_trigger.q = ctrl_manual_start_trigger;
-  assign reg2hw.ctrl.manual_start_trigger.qe = ctrl_update;
-  assign reg2hw.ctrl.force_data_overwrite.q = ctrl_force_data_overwrite;
-  assign reg2hw.ctrl.force_data_overwrite.qe = ctrl_update;
+
+  assign reg2hw.ctrl.manual_operation.q = ctrl_manual_start_trigger;
+  assign reg2hw.ctrl.manual_operation.qe = ctrl_update;
+  //assign reg2hw.ctrl.force_data_overwrite.q = ctrl_force_data_overwrite;
+  //assign reg2hw.ctrl.force_data_overwrite.qe = ctrl_update;
 
 
 `ifdef TRIGGER_DEF
@@ -436,6 +438,8 @@ module aes_reg_top (
   assign reg2hw.trigger.key_clear.q=key_clear;
   assign reg2hw.trigger.data_in_clear.q=data_in_clear;
   assign reg2hw.trigger.data_out_clear.q=data_out_clear;
+
+  assign reg2hw.trigger.prng_reseed.q = prng_reseed;
 
 `ifdef STATUS_DEF
   // R[status]: V(False)
