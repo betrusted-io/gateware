@@ -70,13 +70,23 @@ module aes_reg_top (
   output [31:0] data_out_3,
   input 	data_out_3_re,
 
+  // iv registers
+  input [31:0] iv_0_q,
+  input iv_0_qe,
+  input [31:0] iv_1_q,
+  input iv_1_qe,
+  input [31:0] iv_2_q,
+  input iv_2_qe,
+  input [31:0] iv_3_q,
+  input iv_3_qe,
+
   // ctrl register
-  input ctrl_mode,
+  input [2:0] ctrl_mode,
   input [2:0] ctrl_key_len,
   output [2:0] ctrl_key_len_rbk,
-  input ctrl_manual_start_trigger,
-  input ctrl_force_data_overwrite,
-  input ctrl_update,
+  input ctrl_operation,
+  input ctrl_manual_operation,
+  input ctrl_update,   // this is the 'qe' signal
 
   // status
   output idle,
@@ -87,6 +97,7 @@ module aes_reg_top (
   // trigger
   input start,
   input key_clear,
+  input iv_clear,
   input data_in_clear,
   input data_out_clear,
   input prng_reseed,
@@ -254,7 +265,16 @@ module aes_reg_top (
    assign reg2hw.data_out[2].re = data_out_2_re;
    assign data_out_3 = hw2reg.data_out[3].d;
    assign reg2hw.data_out[3].re = data_out_3_re;
-   
+
+   assign reg2hw.iv[0].q = iv_0_q;
+   assign reg2hw.iv[0].qe = iv_0_qe;
+   assign reg2hw.iv[1].q = iv_1_q;
+   assign reg2hw.iv[1].qe = iv_1_qe;
+   assign reg2hw.iv[2].q = iv_2_q;
+   assign reg2hw.iv[2].qe = iv_2_qe;
+   assign reg2hw.iv[2].q = iv_2_q;
+   assign reg2hw.iv[3].qe = iv_2_qe;
+
 
 `ifdef CTRL_DEF
   // R[ctrl]: V(True)
@@ -319,17 +339,17 @@ module aes_reg_top (
   );
 `endif
 
-  assign reg2hw.ctrl.mode.q = ctrl_mode;
+  assign reg2hw.ctrl.mode.q[2:0] = ctrl_mode[2:0];
   assign reg2hw.ctrl.mode.qe = ctrl_update;
-  assign reg2hw.ctrl.key_len.q = ctrl_key_len;
+  assign reg2hw.ctrl.key_len.q[2:0] = ctrl_key_len[2:0];
   assign reg2hw.ctrl.key_len.qe = ctrl_update;
   assign ctrl_key_len_rbk = hw2reg.ctrl.key_len.d;
 
-  assign reg2hw.ctrl.manual_operation.q = ctrl_manual_start_trigger;
+  assign reg2hw.ctrl.manual_operation.q = ctrl_manual_operation;
   assign reg2hw.ctrl.manual_operation.qe = ctrl_update;
-  //assign reg2hw.ctrl.force_data_overwrite.q = ctrl_force_data_overwrite;
-  //assign reg2hw.ctrl.force_data_overwrite.qe = ctrl_update;
 
+  assign reg2hw.ctrl.operation.q = ctrl_operation;
+  assign reg2hw.ctrl.operation.qe = ctrl_update;
 
 `ifdef TRIGGER_DEF
   // R[trigger]: V(False)
@@ -436,9 +456,9 @@ module aes_reg_top (
 
   assign reg2hw.trigger.start.q=start;
   assign reg2hw.trigger.key_clear.q=key_clear;
+  assign reg2hw.trigger.iv_clear.q=iv_clear;
   assign reg2hw.trigger.data_in_clear.q=data_in_clear;
   assign reg2hw.trigger.data_out_clear.q=data_out_clear;
-
   assign reg2hw.trigger.prng_reseed.q = prng_reseed;
 
 `ifdef STATUS_DEF
