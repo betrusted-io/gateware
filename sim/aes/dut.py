@@ -162,12 +162,12 @@ class Aes(Module, AutoDoc, AutoCSR):
         ])
 
         self.trigger = CSRStorage(fields=[
-            CSRField("start", size=1, description="Triggers an AES computation if manual_start is selected"),
-            CSRField("key_clear", size=1, description="Clears the key", reset=1),
-            CSRField("iv_clear", size=1, description="Clears the IV", reset=1),
-            CSRField("data_in_clear", size=1, description="Clears data input", reset=1),
-            CSRField("data_out_clear", size=1, description="Clears the data output", reset=1),
-            CSRField("prng_reseed", size=1, description="Reseed PRNG", reset=1),
+            CSRField("start", size=1, description="Triggers an AES computation if manual_start is selected", pulse=True),
+            CSRField("key_clear", size=1, description="Clears the key", reset=1, pulse=True),
+            CSRField("iv_clear", size=1, description="Clears the IV", reset=1, pulse=True),
+            CSRField("data_in_clear", size=1, description="Clears data input", reset=1, pulse=True),
+            CSRField("data_out_clear", size=1, description="Clears the data output", reset=1, pulse=True),
+            CSRField("prng_reseed", size=1, description="Reseed PRNG", reset=1, pulse=True),
         ])
         key0re50 = Signal()
         self.submodules.key0re = BlindTransfer("sys", "clk50")
@@ -355,6 +355,10 @@ def generate_top():
     vns = builder.build(run=False)
     soc.do_exit(vns)
 
+    os.system("rm -rf test/betrusted-pac")  # nuke the old PAC if it exists
+    os.system("mkdir -p test/betrusted-pac") # rebuild it from scratch every time
+    os.system("cp pac-cargo-template test/betrusted-pac/Cargo.toml")
+    os.system("cd test/betrusted-pac && svd2rust --target riscv -i ../../../../target/soc.svd && rm -rf src; form -i lib.rs -o src/; rm lib.rs")
     BiosHelper(soc, boot_from_spi) # marshals cargo to generate the BIOS from Rust files
 
     # pass #2 -- generate the SoC, incorporating the now-built BIOS

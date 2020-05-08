@@ -9,6 +9,11 @@ use volatile::Volatile;
 #[used] // This is necessary to keep DBGSTR from being optimized out
 static mut DBGSTR: [u32; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
 
+use betrusted_hal::hal_aes::*;
+
+mod aes_test;
+use aes_test::*;
+
 #[sim_test]
 fn run(p: &pac::Peripherals) {
     let ram_ptr: *mut u32 = 0x0100_0000 as *mut u32;
@@ -18,26 +23,20 @@ fn run(p: &pac::Peripherals) {
     unsafe {
         DBGSTR[0] = (*(ram.add(4))).read();
     };
-/*
-    // example of toggling a bit
-    for _ in 0..4 {
-        p.DEMO.demo.write(|w| w.pin().bit(true));
-        p.DEMO.demo.write(|w| w.pin().bit(false));
-    }
-    // example of changing a bus item
-    unsafe{
-        p.DEMO.demo.write(|w| w.bus().bits(0xA));
-        p.DEMO.demo.write(|w| w.bus().bits(0x5));
-    }
-*/
-    // example of updating the "report" bits monitored by the CI framework
-    unsafe {
-        p.SIMSTATUS.report.write(|w| w.bits(0x00C0FFEE));
-        p.SIMSTATUS.report.write(|w| w.bits(0xADDCACA0));
-        p.SIMSTATUS.report.write(|w| w.bits(0x55555555));
-        p.SIMSTATUS.report.write(|w| w.bits(0xFEEDC0DE));
+
+    let mut aes: BtAes = BtAes::new();
+
+    let (pass, data) = test_aes_enc(&mut aes);
+
+    for( reg, chunk) in data.chunks(4).enumerate() {
+        let mut temp: [u8; 4] = Default::default();
+        temp.copy_from_slice(chunk);
+        let dword: u32 = u32::from_be_bytes(temp);
+        unsafe{ p.SIMSTATUS.report.write(|w| w.bits(dword)); }
     }
 
     // set success to indicate to the CI framework that the test has passed
-    p.SIMSTATUS.simstatus.modify(|_r, w| w.success().bit(true));
+    if pass {
+        p.SIMSTATUS.simstatus.modify(|_r, w| w.success().bit(true));
+    }
 }
