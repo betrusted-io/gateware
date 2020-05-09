@@ -16,20 +16,30 @@ const CIPHERTEXT_1: [u8; 16] =
 use betrusted_hal::hal_aes::*;
 
 pub fn test_aes_enc(aes: &mut BtAes) -> (bool, [u8; 16]) {
-    aes.aes_setup();
+    aes.aes_reset();
+    aes.report(0x1000_0001);
     while !aes.aes_idle() {}
+    aes.report(0x1000_0002);
 
     let mut data: [u8; 16] = [0; 16];
 
-    aes.key_put(&mut &KEY_1[0..16]);
-
-    aes.control = AesCtrl::MODE_ECB | AesCtrl::KEY_LEN_256 | AesCtrl::ENC_OPER;
+    aes.report(0x1000_0003);
+    aes.control = AesCtrl::MODE_ECB | AesCtrl::KEY_LEN_256 | AesCtrl::ENC_OPER; // | AesCtrl::MANUAL_OP;
     aes.aes_init(aes.control);
+    aes.report(0x1000_0004);
+
+    aes.key_put(&mut &KEY_1[0..32]);
+    aes.report(0x1000_0005);
+    aes.report(0x1000_0006);
     aes.aes_data_put_wait(&mut &PLAINTEXT_1[0..16]);
+
+    aes.report(0x1000_0007);
     aes.aes_data_get_wait(&mut data);
+    aes.report(0x1000_0008);
 
     let mut pass = true;
     for i in 0..16 {
+        aes.report(0x8000_0000 | (data[i] as u32) << 8 | CIPHERTEXT_1[i] as u32);
         if data[i] != CIPHERTEXT_1[i] {
             pass = false;
         }
@@ -38,19 +48,22 @@ pub fn test_aes_enc(aes: &mut BtAes) -> (bool, [u8; 16]) {
 }
 
 pub fn test_aes_dec(aes: &mut BtAes) -> (bool, [u8; 16]) {
+    aes.aes_reset();
     while !aes.aes_idle() {}
 
     let mut data: [u8; 16] = [0; 16];
 
-    aes.key_put(&mut &KEY_1[0..16]);
-
     aes.control = AesCtrl::MODE_ECB | AesCtrl::KEY_LEN_256 | AesCtrl::DEC_OPER;
     aes.aes_init(aes.control);
+
+    aes.key_put(&mut &KEY_1[0..32]);
     aes.aes_data_put_wait(&mut &CIPHERTEXT_1[0..16]);
+
     aes.aes_data_get_wait(&mut data);
 
     let mut pass = true;
     for i in 0..16 {
+        aes.report(0x9000_0000 | (data[i] as u32) << 8 | PLAINTEXT_1[i] as u32);
         if data[i] != PLAINTEXT_1[i] {
             pass = false;
         }

@@ -160,14 +160,28 @@ class Aes(Module, AutoDoc, AutoCSR):
             CSRField("key_len_rbk", size=3, description="Actual key length selected by the hardware readback"),
             CSRField("manual_operation_rbk", size=1, description="Manual operation readback")
         ])
+        status_idle = Signal()
+        status_idle_de = Signal()
+        status_stall = Signal()
+        status_stall_de = Signal()
+        output_valid = Signal()
+        output_valid_de = Signal()
+        input_ready = Signal()
+        input_ready_de = Signal()
+        self.sync += [
+            If(status_idle_de, self.status.fields.idle.eq(status_idle)).Else(self.status.fields.idle.eq(self.status.fields.idle)),
+            If(status_stall_de, self.status.fields.stall.eq(status_stall)).Else(self.status.fields.stall.eq(self.status.fields.stall)),
+            If(output_valid_de, self.status.fields.output_valid.eq(output_valid)).Else(self.status.fields.output_valid.eq(self.status.fields.output_valid)),
+            If(input_ready_de, self.status.fields.input_ready.eq(input_ready)).Else(self.status.fields.input_ready.eq(self.status.fields.input_ready)),
+        ]
 
         self.trigger = CSRStorage(fields=[
             CSRField("start", size=1, description="Triggers an AES computation if manual_start is selected", pulse=True),
-            CSRField("key_clear", size=1, description="Clears the key", reset=1, pulse=True),
-            CSRField("iv_clear", size=1, description="Clears the IV", reset=1, pulse=True),
-            CSRField("data_in_clear", size=1, description="Clears data input", reset=1, pulse=True),
-            CSRField("data_out_clear", size=1, description="Clears the data output", reset=1, pulse=True),
-            CSRField("prng_reseed", size=1, description="Reseed PRNG", reset=1, pulse=True),
+            CSRField("key_clear", size=1, description="Clears the key", pulse=True),
+            CSRField("iv_clear", size=1, description="Clears the IV", pulse=True),
+            CSRField("data_in_clear", size=1, description="Clears data input", pulse=True),
+            CSRField("data_out_clear", size=1, description="Clears the data output", pulse=True),
+            CSRField("prng_reseed", size=1, description="Reseed PRNG", pulse=True),
         ])
         key0re50 = Signal()
         self.submodules.key0re = BlindTransfer("sys", "clk50")
@@ -192,7 +206,7 @@ class Aes(Module, AutoDoc, AutoCSR):
         self.comb += [self.key6re.i.eq(self.key_6_q.re), key6re50.eq(self.key6re.o)]
         key7re50 = Signal()
         self.submodules.key7re = BlindTransfer("sys", "clk50")
-        self.comb += [self.key7re.i.eq(self.key_7_q.re), key0re50.eq(self.key7re.o)]
+        self.comb += [self.key7re.i.eq(self.key_7_q.re), key7re50.eq(self.key7re.o)]
 
         iv0_50 = Signal()
         self.submodules.iv0_50 = BlindTransfer("sys", "clk50")
@@ -225,18 +239,36 @@ class Aes(Module, AutoDoc, AutoCSR):
         self.comb += [self.di3_50.i.eq(self.datain_3.re), di3_50.eq(self.di3_50.o)]
 
         trigger_start = Signal()
+        self.submodules.trigstart = BlindTransfer("sys", "clk50")
+        self.comb += [self.trigstart.i.eq(self.trigger.fields.start), trigger_start.eq(self.trigstart.o)]
         trigger_key_clear = Signal()
+        self.submodules.trigkeyclear = BlindTransfer("sys", "clk50")
+        self.comb += [self.trigkeyclear.i.eq(self.trigger.fields.key_clear), trigger_key_clear.eq(self.trigkeyclear.o)]
         trigger_iv_clear = Signal()
+        self.submodules.trigivclear = BlindTransfer("sys", "clk50")
+        self.comb += [self.trigivclear.i.eq(self.trigger.fields.iv_clear), trigger_iv_clear.eq(self.trigivclear.o)]
         trigger_data_in_clear = Signal()
+        self.submodules.trigdatinclear = BlindTransfer("sys", "clk50")
+        self.comb += [ self.trigdatinclear.i.eq(self.trigger.fields.data_in_clear), trigger_data_in_clear.eq(self.trigdatinclear.o)]
         trigger_data_out_clear = Signal()
+        self.submodules.trigdatoutclear = BlindTransfer("sys", "clk50")
+        self.comb += [ self.trigdatoutclear.i.eq(self.trigger.fields.data_out_clear), trigger_data_out_clear.eq(self.trigdatoutclear.o)]
         trigger_prng_reseed = Signal()
-        self.specials += MultiReg(self.trigger.fields.start, trigger_start, odomain="clk50")
-        self.specials += MultiReg(self.trigger.fields.key_clear, trigger_key_clear, odomain="clk50")
-        self.specials += MultiReg(self.trigger.fields.iv_clear, trigger_iv_clear, odomain="clk50")
-        self.specials += MultiReg(self.trigger.fields.data_in_clear, trigger_data_in_clear, odomain="clk50")
-        self.specials += MultiReg(self.trigger.fields.data_out_clear, trigger_data_out_clear, odomain="clk50")
-        self.specials += MultiReg(self.trigger.fields.prng_reseed, trigger_prng_reseed, odomain="clk50")
+        self.submodules.trigprng = BlindTransfer("sys", "clk50")
+        self.comb += [ self.trigprng.i.eq(self.trigger.fields.prng_reseed), trigger_prng_reseed.eq(self.trigprng.o)]
 
+        dataout0_re = Signal()
+        self.submodules.dataout0_re = BlindTransfer("sys", "clk50")
+        self.comb += [self.dataout0_re.i.eq(self.dataout_0.we), dataout0_re.eq(self.dataout0_re.o)]
+        dataout1_re = Signal()
+        self.submodules.dataout1_re = BlindTransfer("sys", "clk50")
+        self.comb += [self.dataout1_re.i.eq(self.dataout_1.we), dataout1_re.eq(self.dataout1_re.o)]
+        dataout2_re = Signal()
+        self.submodules.dataout2_re = BlindTransfer("sys", "clk50")
+        self.comb += [self.dataout2_re.i.eq(self.dataout_2.we), dataout2_re.eq(self.dataout2_re.o)]
+        dataout3_re = Signal()
+        self.submodules.dataout3_re = BlindTransfer("sys", "clk50")
+        self.comb += [self.dataout3_re.i.eq(self.dataout_3.we), dataout3_re.eq(self.dataout3_re.o)]
         self.specials += Instance("aes_reg_top",
             i_clk_i = ClockSignal("clk50"),
             i_rst_ni = ~ResetSignal("clk50"),
@@ -259,9 +291,13 @@ class Aes(Module, AutoDoc, AutoCSR):
             i_key_7_qe=key7re50,
 
             o_data_out_0=self.dataout_0.fields.data_0,
+            i_data_out_0_re=dataout0_re,
             o_data_out_1=self.dataout_1.fields.data_1,
+            i_data_out_1_re=dataout1_re,
             o_data_out_2=self.dataout_2.fields.data_2,
+            i_data_out_2_re=dataout2_re,
             o_data_out_3=self.dataout_3.fields.data_3,
+            i_data_out_3_re=dataout3_re,
 
             i_iv_0_q=self.iv_0.fields.iv_0,
             i_iv_0_qe=iv0_50,
@@ -287,10 +323,14 @@ class Aes(Module, AutoDoc, AutoCSR):
             i_ctrl_operation=self.ctrl.fields.operation,
             i_ctrl_update=ctrlre50,
 
-            o_idle=self.status.fields.idle,
-            o_stall=self.status.fields.stall,
-            o_output_valid=self.status.fields.output_valid,
-            o_input_ready=self.status.fields.input_ready,
+            o_idle=status_idle,
+            o_idle_de=status_idle_de,
+            o_stall=status_stall,
+            o_stall_de=status_stall_de,
+            o_output_valid=output_valid,
+            o_output_valid_de=output_valid_de,
+            o_input_ready=input_ready,
+            o_input_ready_de=input_ready_de,
             o_ctrl_key_len_rbk=self.status.fields.key_len_rbk,
             o_operation_rbk=self.status.fields.operation_rbk,
             o_mode_rbk=self.status.fields.mode_rbk,

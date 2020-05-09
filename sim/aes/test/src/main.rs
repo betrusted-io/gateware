@@ -25,18 +25,40 @@ fn run(p: &pac::Peripherals) {
     };
 
     let mut aes: BtAes = BtAes::new();
+    let mut final_result = 0;
 
     let (pass, data) = test_aes_enc(&mut aes);
+    if pass {
+        final_result += 1;
+    }
 
     for( reg, chunk) in data.chunks(4).enumerate() {
         let mut temp: [u8; 4] = Default::default();
         temp.copy_from_slice(chunk);
-        let dword: u32 = u32::from_be_bytes(temp);
+        let dword: u32 = u32::from_le_bytes(temp);
         unsafe{ p.SIMSTATUS.report.write(|w| w.bits(dword)); }
     }
 
-    // set success to indicate to the CI framework that the test has passed
+    let (pass, data) = test_aes_dec(&mut aes);
     if pass {
-        p.SIMSTATUS.simstatus.modify(|_r, w| w.success().bit(true));
+        final_result += 1;
     }
+    unsafe{ p.SIMSTATUS.report.write(|w| {w.bits(final_result)}); }
+
+    for( reg, chunk) in data.chunks(4).enumerate() {
+        let mut temp: [u8; 4] = Default::default();
+        temp.copy_from_slice(chunk);
+        let dword: u32 = u32::from_le_bytes(temp);
+        unsafe{ p.SIMSTATUS.report.write(|w| w.bits(dword)); }
+    }
+    unsafe{ p.SIMSTATUS.report.write(|w| {w.bits(final_result)}); }
+
+    // set success to indicate to the CI framework that the test has passed
+    if final_result == 2 {
+        p.SIMSTATUS.simstatus.modify(|_r, w| w.success().bit(true));
+    } else {
+        p.SIMSTATUS.simstatus.modify(|_r, w| w.success().bit(false));
+    }
+    // dummy update to let simulation flush value to register
+    unsafe{ p.SIMSTATUS.report.write(|w| {w.bits(final_result)}); }
 }

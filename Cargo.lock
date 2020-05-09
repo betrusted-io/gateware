@@ -4,6 +4,8 @@
 name = "aes"
 version = "0.1.0"
 dependencies = [
+ "betrusted-hal",
+ "betrusted-pac",
  "pac",
  "sim-bios",
  "volatile",
@@ -84,6 +86,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a3caf393d93b2d453e80638d0674597020cef3382ada454faacd43d1a55a735a"
 dependencies = [
  "rustc_version",
+]
+
+[[package]]
+name = "betrusted-hal"
+version = "0.1.0"
+dependencies = [
+ "betrusted-pac",
+ "bitflags",
+ "spin",
+]
+
+[[package]]
+name = "betrusted-pac"
+version = "0.0.1"
+dependencies = [
+ "bare-metal",
+ "svd2rust",
+ "vcell",
+ "vexriscv",
 ]
 
 [[package]]

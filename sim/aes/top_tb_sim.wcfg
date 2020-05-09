@@ -1,0 +1,1088 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wave_config>
+   <wave_state>
+   </wave_state>
+   <db_ref_list>
+      <db_ref path="top_tb_sim.wdb" id="1">
+         <top_modules>
+            <top_module name="aes_pkg" />
+            <top_module name="aes_reg_pkg" />
+            <top_module name="glbl" />
+            <top_module name="prim_cipher_pkg" />
+            <top_module name="top_tb" />
+         </top_modules>
+      </db_ref>
+   </db_ref_list>
+   <zoom_setting>
+      <ZoomStartTime time="53004948fs"></ZoomStartTime>
+      <ZoomEndTime time="60455264fs"></ZoomEndTime>
+      <Cursor1Time time="54397101fs"></Cursor1Time>
+   </zoom_setting>
+   <column_width_setting>
+      <NameColumnWidth column_width="372"></NameColumnWidth>
+      <ValueColumnWidth column_width="80"></ValueColumnWidth>
+   </column_width_setting>
+   <WVObjectSize size="264" />
+   <wvobject type="logic" fp_name="/top_tb/dut/sys_rst">
+      <obj_property name="ElementShortName">sys_rst</obj_property>
+      <obj_property name="ObjectShortName">sys_rst</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sys_clk">
+      <obj_property name="ElementShortName">sys_clk</obj_property>
+      <obj_property name="ObjectShortName">sys_clk</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/success">
+      <obj_property name="ElementShortName">success</obj_property>
+      <obj_property name="ObjectShortName">success</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/report">
+      <obj_property name="ElementShortName">report[31:0]</obj_property>
+      <obj_property name="ObjectShortName">report[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_INSTRUCTION">
+      <obj_property name="ElementShortName">decode_to_execute_INSTRUCTION[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_INSTRUCTION[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_PC">
+      <obj_property name="ElementShortName">decode_to_execute_PC[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_PC[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_RS1">
+      <obj_property name="ElementShortName">decode_to_execute_RS1[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_RS1[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_RS2">
+      <obj_property name="ElementShortName">decode_to_execute_RS2[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_RS2[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_shared_adr">
+      <obj_property name="ElementShortName">vns_shared_adr[29:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_adr[29:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_shared_dat_w">
+      <obj_property name="ElementShortName">vns_shared_dat_w[31:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_dat_w[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_shared_dat_r">
+      <obj_property name="ElementShortName">vns_shared_dat_r[31:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_dat_r[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_shared_sel">
+      <obj_property name="ElementShortName">vns_shared_sel[3:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_sel[3:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/vns_shared_cyc">
+      <obj_property name="ElementShortName">vns_shared_cyc</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_cyc</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/vns_shared_stb">
+      <obj_property name="ElementShortName">vns_shared_stb</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_stb</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/vns_shared_ack">
+      <obj_property name="ElementShortName">vns_shared_ack</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_ack</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/vns_shared_we">
+      <obj_property name="ElementShortName">vns_shared_we</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_we</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_shared_cti">
+      <obj_property name="ElementShortName">vns_shared_cti[2:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_cti[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_shared_bte">
+      <obj_property name="ElementShortName">vns_shared_bte[1:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_bte[1:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/vns_shared_err">
+      <obj_property name="ElementShortName">vns_shared_err</obj_property>
+      <obj_property name="ObjectShortName">vns_shared_err</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_request">
+      <obj_property name="ElementShortName">vns_request[1:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_request[1:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/vns_grant">
+      <obj_property name="ElementShortName">vns_grant</obj_property>
+      <obj_property name="ObjectShortName">vns_grant</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_slave_sel">
+      <obj_property name="ElementShortName">vns_slave_sel[2:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_slave_sel[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_slave_sel_r">
+      <obj_property name="ElementShortName">vns_slave_sel_r[2:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_slave_sel_r[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/vns_error">
+      <obj_property name="ElementShortName">vns_error</obj_property>
+      <obj_property name="ObjectShortName">vns_error</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/vns_wait">
+      <obj_property name="ElementShortName">vns_wait</obj_property>
+      <obj_property name="ObjectShortName">vns_wait</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/vns_done">
+      <obj_property name="ElementShortName">vns_done</obj_property>
+      <obj_property name="ObjectShortName">vns_done</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/vns_count">
+      <obj_property name="ElementShortName">vns_count[19:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_count[19:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/soc_start">
+      <obj_property name="ElementShortName">soc_start</obj_property>
+      <obj_property name="ObjectShortName">soc_start</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/soc_key_clear">
+      <obj_property name="ElementShortName">soc_key_clear</obj_property>
+      <obj_property name="ObjectShortName">soc_key_clear</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/soc_iv_clear">
+      <obj_property name="ElementShortName">soc_iv_clear</obj_property>
+      <obj_property name="ObjectShortName">soc_iv_clear</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/soc_data_in_clear">
+      <obj_property name="ElementShortName">soc_data_in_clear</obj_property>
+      <obj_property name="ObjectShortName">soc_data_in_clear</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/soc_data_out_clear">
+      <obj_property name="ElementShortName">soc_data_out_clear</obj_property>
+      <obj_property name="ObjectShortName">soc_data_out_clear</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/soc_prng_reseed">
+      <obj_property name="ElementShortName">soc_prng_reseed</obj_property>
+      <obj_property name="ObjectShortName">soc_prng_reseed</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/soc_trigger_storage">
+      <obj_property name="ElementShortName">soc_trigger_storage[5:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_trigger_storage[5:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/soc_trigger_start">
+      <obj_property name="ElementShortName">soc_trigger_start</obj_property>
+      <obj_property name="ObjectShortName">soc_trigger_start</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/soc_trigger_key_clear">
+      <obj_property name="ElementShortName">soc_trigger_key_clear</obj_property>
+      <obj_property name="ObjectShortName">soc_trigger_key_clear</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/soc_trigger_iv_clear">
+      <obj_property name="ElementShortName">soc_trigger_iv_clear</obj_property>
+      <obj_property name="ObjectShortName">soc_trigger_iv_clear</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/soc_trigger_data_in_clear">
+      <obj_property name="ElementShortName">soc_trigger_data_in_clear</obj_property>
+      <obj_property name="ObjectShortName">soc_trigger_data_in_clear</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/soc_trigger_data_out_clear">
+      <obj_property name="ElementShortName">soc_trigger_data_out_clear</obj_property>
+      <obj_property name="ObjectShortName">soc_trigger_data_out_clear</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/soc_trigger_prng_reseed">
+      <obj_property name="ElementShortName">soc_trigger_prng_reseed</obj_property>
+      <obj_property name="ObjectShortName">soc_trigger_prng_reseed</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/soc_trigger_re">
+      <obj_property name="ElementShortName">soc_trigger_re</obj_property>
+      <obj_property name="ObjectShortName">soc_trigger_re</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/clk_i">
+      <obj_property name="ElementShortName">clk_i</obj_property>
+      <obj_property name="ObjectShortName">clk_i</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/rst_ni">
+      <obj_property name="ElementShortName">rst_ni</obj_property>
+      <obj_property name="ObjectShortName">rst_ni</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/key_0_q">
+      <obj_property name="ElementShortName">key_0_q[31:0]</obj_property>
+      <obj_property name="ObjectShortName">key_0_q[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/key_0_qe">
+      <obj_property name="ElementShortName">key_0_qe</obj_property>
+      <obj_property name="ObjectShortName">key_0_qe</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/key_1_q">
+      <obj_property name="ElementShortName">key_1_q[31:0]</obj_property>
+      <obj_property name="ObjectShortName">key_1_q[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/key_1_qe">
+      <obj_property name="ElementShortName">key_1_qe</obj_property>
+      <obj_property name="ObjectShortName">key_1_qe</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/key_2_q">
+      <obj_property name="ElementShortName">key_2_q[31:0]</obj_property>
+      <obj_property name="ObjectShortName">key_2_q[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/key_2_qe">
+      <obj_property name="ElementShortName">key_2_qe</obj_property>
+      <obj_property name="ObjectShortName">key_2_qe</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/key_3_q">
+      <obj_property name="ElementShortName">key_3_q[31:0]</obj_property>
+      <obj_property name="ObjectShortName">key_3_q[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/key_3_qe">
+      <obj_property name="ElementShortName">key_3_qe</obj_property>
+      <obj_property name="ObjectShortName">key_3_qe</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/key_4_q">
+      <obj_property name="ElementShortName">key_4_q[31:0]</obj_property>
+      <obj_property name="ObjectShortName">key_4_q[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/key_4_qe">
+      <obj_property name="ElementShortName">key_4_qe</obj_property>
+      <obj_property name="ObjectShortName">key_4_qe</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/key_5_q">
+      <obj_property name="ElementShortName">key_5_q[31:0]</obj_property>
+      <obj_property name="ObjectShortName">key_5_q[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/key_5_qe">
+      <obj_property name="ElementShortName">key_5_qe</obj_property>
+      <obj_property name="ObjectShortName">key_5_qe</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/key_6_q">
+      <obj_property name="ElementShortName">key_6_q[31:0]</obj_property>
+      <obj_property name="ObjectShortName">key_6_q[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/key_6_qe">
+      <obj_property name="ElementShortName">key_6_qe</obj_property>
+      <obj_property name="ObjectShortName">key_6_qe</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/key_7_q">
+      <obj_property name="ElementShortName">key_7_q[31:0]</obj_property>
+      <obj_property name="ObjectShortName">key_7_q[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/key_7_qe">
+      <obj_property name="ElementShortName">key_7_qe</obj_property>
+      <obj_property name="ObjectShortName">key_7_qe</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/data_in_0">
+      <obj_property name="ElementShortName">data_in_0[31:0]</obj_property>
+      <obj_property name="ObjectShortName">data_in_0[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/data_in_0_qe">
+      <obj_property name="ElementShortName">data_in_0_qe</obj_property>
+      <obj_property name="ObjectShortName">data_in_0_qe</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/data_in_1">
+      <obj_property name="ElementShortName">data_in_1[31:0]</obj_property>
+      <obj_property name="ObjectShortName">data_in_1[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/data_in_1_qe">
+      <obj_property name="ElementShortName">data_in_1_qe</obj_property>
+      <obj_property name="ObjectShortName">data_in_1_qe</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/data_in_2">
+      <obj_property name="ElementShortName">data_in_2[31:0]</obj_property>
+      <obj_property name="ObjectShortName">data_in_2[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/data_in_2_qe">
+      <obj_property name="ElementShortName">data_in_2_qe</obj_property>
+      <obj_property name="ObjectShortName">data_in_2_qe</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/data_in_3">
+      <obj_property name="ElementShortName">data_in_3[31:0]</obj_property>
+      <obj_property name="ObjectShortName">data_in_3[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/data_in_3_qe">
+      <obj_property name="ElementShortName">data_in_3_qe</obj_property>
+      <obj_property name="ObjectShortName">data_in_3_qe</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/data_out_0">
+      <obj_property name="ElementShortName">data_out_0[31:0]</obj_property>
+      <obj_property name="ObjectShortName">data_out_0[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/data_out_1">
+      <obj_property name="ElementShortName">data_out_1[31:0]</obj_property>
+      <obj_property name="ObjectShortName">data_out_1[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/data_out_2">
+      <obj_property name="ElementShortName">data_out_2[31:0]</obj_property>
+      <obj_property name="ObjectShortName">data_out_2[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/data_out_3">
+      <obj_property name="ElementShortName">data_out_3[31:0]</obj_property>
+      <obj_property name="ObjectShortName">data_out_3[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/data_out_0_re">
+      <obj_property name="ElementShortName">data_out_0_re</obj_property>
+      <obj_property name="ObjectShortName">data_out_0_re</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/data_out_1_re">
+      <obj_property name="ElementShortName">data_out_1_re</obj_property>
+      <obj_property name="ObjectShortName">data_out_1_re</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/data_out_2_re">
+      <obj_property name="ElementShortName">data_out_2_re</obj_property>
+      <obj_property name="ObjectShortName">data_out_2_re</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/data_out_3_re">
+      <obj_property name="ElementShortName">data_out_3_re</obj_property>
+      <obj_property name="ObjectShortName">data_out_3_re</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/iv_0_q">
+      <obj_property name="ElementShortName">iv_0_q[31:0]</obj_property>
+      <obj_property name="ObjectShortName">iv_0_q[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/iv_0_qe">
+      <obj_property name="ElementShortName">iv_0_qe</obj_property>
+      <obj_property name="ObjectShortName">iv_0_qe</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/iv_1_q">
+      <obj_property name="ElementShortName">iv_1_q[31:0]</obj_property>
+      <obj_property name="ObjectShortName">iv_1_q[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/iv_1_qe">
+      <obj_property name="ElementShortName">iv_1_qe</obj_property>
+      <obj_property name="ObjectShortName">iv_1_qe</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/iv_2_q">
+      <obj_property name="ElementShortName">iv_2_q[31:0]</obj_property>
+      <obj_property name="ObjectShortName">iv_2_q[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/iv_2_qe">
+      <obj_property name="ElementShortName">iv_2_qe</obj_property>
+      <obj_property name="ObjectShortName">iv_2_qe</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/iv_3_q">
+      <obj_property name="ElementShortName">iv_3_q[31:0]</obj_property>
+      <obj_property name="ObjectShortName">iv_3_q[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/iv_3_qe">
+      <obj_property name="ElementShortName">iv_3_qe</obj_property>
+      <obj_property name="ObjectShortName">iv_3_qe</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/ctrl_mode">
+      <obj_property name="ElementShortName">ctrl_mode[2:0]</obj_property>
+      <obj_property name="ObjectShortName">ctrl_mode[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/ctrl_key_len">
+      <obj_property name="ElementShortName">ctrl_key_len[2:0]</obj_property>
+      <obj_property name="ObjectShortName">ctrl_key_len[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/ctrl_operation">
+      <obj_property name="ElementShortName">ctrl_operation</obj_property>
+      <obj_property name="ObjectShortName">ctrl_operation</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/ctrl_manual_operation">
+      <obj_property name="ElementShortName">ctrl_manual_operation</obj_property>
+      <obj_property name="ObjectShortName">ctrl_manual_operation</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/ctrl_update">
+      <obj_property name="ElementShortName">ctrl_update</obj_property>
+      <obj_property name="ObjectShortName">ctrl_update</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/idle">
+      <obj_property name="ElementShortName">idle</obj_property>
+      <obj_property name="ObjectShortName">idle</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/stall">
+      <obj_property name="ElementShortName">stall</obj_property>
+      <obj_property name="ObjectShortName">stall</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/output_valid">
+      <obj_property name="ElementShortName">output_valid</obj_property>
+      <obj_property name="ObjectShortName">output_valid</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/input_ready">
+      <obj_property name="ElementShortName">input_ready</obj_property>
+      <obj_property name="ObjectShortName">input_ready</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/operation_rbk">
+      <obj_property name="ElementShortName">operation_rbk</obj_property>
+      <obj_property name="ObjectShortName">operation_rbk</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/soc_status_we">
+      <obj_property name="ElementShortName">soc_status_we</obj_property>
+      <obj_property name="ObjectShortName">soc_status_we</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/soc_status_idle">
+      <obj_property name="ElementShortName">soc_status_idle</obj_property>
+      <obj_property name="ObjectShortName">soc_status_idle</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/soc_status_idle_de">
+      <obj_property name="ElementShortName">soc_status_idle_de</obj_property>
+      <obj_property name="ObjectShortName">soc_status_idle_de</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/soc_status_stall">
+      <obj_property name="ElementShortName">soc_status_stall</obj_property>
+      <obj_property name="ObjectShortName">soc_status_stall</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/soc_status_stall_de">
+      <obj_property name="ElementShortName">soc_status_stall_de</obj_property>
+      <obj_property name="ObjectShortName">soc_status_stall_de</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/soc_output_valid1">
+      <obj_property name="ElementShortName">soc_output_valid1</obj_property>
+      <obj_property name="ObjectShortName">soc_output_valid1</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/soc_output_valid_de">
+      <obj_property name="ElementShortName">soc_output_valid_de</obj_property>
+      <obj_property name="ObjectShortName">soc_output_valid_de</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/soc_input_ready1">
+      <obj_property name="ElementShortName">soc_input_ready1</obj_property>
+      <obj_property name="ObjectShortName">soc_input_ready1</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/soc_input_ready_de">
+      <obj_property name="ElementShortName">soc_input_ready_de</obj_property>
+      <obj_property name="ObjectShortName">soc_input_ready_de</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/soc_status_status">
+      <obj_property name="ElementShortName">soc_status_status[11:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_status_status[11:0]</obj_property>
+      <obj_property name="isExpanded"></obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/mode_rbk">
+      <obj_property name="ElementShortName">mode_rbk[2:0]</obj_property>
+      <obj_property name="ObjectShortName">mode_rbk[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/ctrl_key_len_rbk">
+      <obj_property name="ElementShortName">ctrl_key_len_rbk[2:0]</obj_property>
+      <obj_property name="ObjectShortName">ctrl_key_len_rbk[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/manual_operation_rbk">
+      <obj_property name="ElementShortName">manual_operation_rbk</obj_property>
+      <obj_property name="ObjectShortName">manual_operation_rbk</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/start">
+      <obj_property name="ElementShortName">start</obj_property>
+      <obj_property name="ObjectShortName">start</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/key_clear">
+      <obj_property name="ElementShortName">key_clear</obj_property>
+      <obj_property name="ObjectShortName">key_clear</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/iv_clear">
+      <obj_property name="ElementShortName">iv_clear</obj_property>
+      <obj_property name="ObjectShortName">iv_clear</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/data_in_clear">
+      <obj_property name="ElementShortName">data_in_clear</obj_property>
+      <obj_property name="ObjectShortName">data_in_clear</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/data_out_clear">
+      <obj_property name="ElementShortName">data_out_clear</obj_property>
+      <obj_property name="ObjectShortName">data_out_clear</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/prng_reseed">
+      <obj_property name="ElementShortName">prng_reseed</obj_property>
+      <obj_property name="ObjectShortName">prng_reseed</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/reg2hw">
+      <obj_property name="ElementShortName">reg2hw</obj_property>
+      <obj_property name="ObjectShortName">reg2hw</obj_property>
+      <obj_property name="isExpanded"></obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/hw2reg">
+      <obj_property name="ElementShortName">hw2reg</obj_property>
+      <obj_property name="ObjectShortName">hw2reg</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/reg2hw.trigger">
+      <obj_property name="ElementShortName">.trigger</obj_property>
+      <obj_property name="ObjectShortName">.trigger</obj_property>
+      <obj_property name="isExpanded"></obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/prng_data_req">
+      <obj_property name="ElementShortName">prng_data_req</obj_property>
+      <obj_property name="ObjectShortName">prng_data_req</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/prng_data_ack">
+      <obj_property name="ElementShortName">prng_data_ack</obj_property>
+      <obj_property name="ObjectShortName">prng_data_ack</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/prng_data">
+      <obj_property name="ElementShortName">prng_data[63:0]</obj_property>
+      <obj_property name="ObjectShortName">prng_data[63:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/prng_reseed_req">
+      <obj_property name="ElementShortName">prng_reseed_req</obj_property>
+      <obj_property name="ObjectShortName">prng_reseed_req</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/prng_reseed_ack">
+      <obj_property name="ElementShortName">prng_reseed_ack</obj_property>
+      <obj_property name="ObjectShortName">prng_reseed_ack</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/clk_i">
+      <obj_property name="ElementShortName">clk_i</obj_property>
+      <obj_property name="ObjectShortName">clk_i</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/rst_ni">
+      <obj_property name="ElementShortName">rst_ni</obj_property>
+      <obj_property name="ObjectShortName">rst_ni</obj_property>
+   </wvobject>
+   <wvobject type="other" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/op_i">
+      <obj_property name="ElementShortName">op_i</obj_property>
+      <obj_property name="ObjectShortName">op_i</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/mode_i">
+      <obj_property name="ElementShortName">mode_i[2:0]</obj_property>
+      <obj_property name="ObjectShortName">mode_i[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="other" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/cipher_op_i">
+      <obj_property name="ElementShortName">cipher_op_i</obj_property>
+      <obj_property name="ObjectShortName">cipher_op_i</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/manual_operation_i">
+      <obj_property name="ElementShortName">manual_operation_i</obj_property>
+      <obj_property name="ObjectShortName">manual_operation_i</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/start_i">
+      <obj_property name="ElementShortName">start_i</obj_property>
+      <obj_property name="ObjectShortName">start_i</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/key_clear_i">
+      <obj_property name="ElementShortName">key_clear_i</obj_property>
+      <obj_property name="ObjectShortName">key_clear_i</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/iv_clear_i">
+      <obj_property name="ElementShortName">iv_clear_i</obj_property>
+      <obj_property name="ObjectShortName">iv_clear_i</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/data_in_clear_i">
+      <obj_property name="ElementShortName">data_in_clear_i</obj_property>
+      <obj_property name="ObjectShortName">data_in_clear_i</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/data_out_clear_i">
+      <obj_property name="ElementShortName">data_out_clear_i</obj_property>
+      <obj_property name="ObjectShortName">data_out_clear_i</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/prng_reseed_i">
+      <obj_property name="ElementShortName">prng_reseed_i</obj_property>
+      <obj_property name="ObjectShortName">prng_reseed_i</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/key_init_qe_i">
+      <obj_property name="ElementShortName">key_init_qe_i[7:0]</obj_property>
+      <obj_property name="ObjectShortName">key_init_qe_i[7:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/iv_qe_i">
+      <obj_property name="ElementShortName">iv_qe_i[3:0]</obj_property>
+      <obj_property name="ObjectShortName">iv_qe_i[3:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/data_in_qe_i">
+      <obj_property name="ElementShortName">data_in_qe_i[3:0]</obj_property>
+      <obj_property name="ObjectShortName">data_in_qe_i[3:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/data_out_re_i">
+      <obj_property name="ElementShortName">data_out_re_i[3:0]</obj_property>
+      <obj_property name="ObjectShortName">data_out_re_i[3:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/data_in_we_o">
+      <obj_property name="ElementShortName">data_in_we_o</obj_property>
+      <obj_property name="ObjectShortName">data_in_we_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/data_out_we_o">
+      <obj_property name="ElementShortName">data_out_we_o</obj_property>
+      <obj_property name="ObjectShortName">data_out_we_o</obj_property>
+   </wvobject>
+   <wvobject type="other" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/data_in_prev_sel_o">
+      <obj_property name="ElementShortName">data_in_prev_sel_o</obj_property>
+      <obj_property name="ObjectShortName">data_in_prev_sel_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/data_in_prev_we_o">
+      <obj_property name="ElementShortName">data_in_prev_we_o</obj_property>
+      <obj_property name="ObjectShortName">data_in_prev_we_o</obj_property>
+   </wvobject>
+   <wvobject type="other" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/state_in_sel_o">
+      <obj_property name="ElementShortName">state_in_sel_o</obj_property>
+      <obj_property name="ObjectShortName">state_in_sel_o</obj_property>
+   </wvobject>
+   <wvobject type="other" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/add_state_in_sel_o">
+      <obj_property name="ElementShortName">add_state_in_sel_o</obj_property>
+      <obj_property name="ObjectShortName">add_state_in_sel_o</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/add_state_out_sel_o">
+      <obj_property name="ElementShortName">add_state_out_sel_o[2:0]</obj_property>
+      <obj_property name="ObjectShortName">add_state_out_sel_o[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/ctr_incr_o">
+      <obj_property name="ElementShortName">ctr_incr_o</obj_property>
+      <obj_property name="ObjectShortName">ctr_incr_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/ctr_ready_i">
+      <obj_property name="ElementShortName">ctr_ready_i</obj_property>
+      <obj_property name="ObjectShortName">ctr_ready_i</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/ctr_we_i">
+      <obj_property name="ElementShortName">ctr_we_i[7:0]</obj_property>
+      <obj_property name="ObjectShortName">ctr_we_i[7:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/cipher_in_valid_o">
+      <obj_property name="ElementShortName">cipher_in_valid_o</obj_property>
+      <obj_property name="ObjectShortName">cipher_in_valid_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/cipher_in_ready_i">
+      <obj_property name="ElementShortName">cipher_in_ready_i</obj_property>
+      <obj_property name="ObjectShortName">cipher_in_ready_i</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/cipher_out_valid_i">
+      <obj_property name="ElementShortName">cipher_out_valid_i</obj_property>
+      <obj_property name="ObjectShortName">cipher_out_valid_i</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/cipher_out_ready_o">
+      <obj_property name="ElementShortName">cipher_out_ready_o</obj_property>
+      <obj_property name="ObjectShortName">cipher_out_ready_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/cipher_crypt_o">
+      <obj_property name="ElementShortName">cipher_crypt_o</obj_property>
+      <obj_property name="ObjectShortName">cipher_crypt_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/cipher_crypt_i">
+      <obj_property name="ElementShortName">cipher_crypt_i</obj_property>
+      <obj_property name="ObjectShortName">cipher_crypt_i</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/cipher_dec_key_gen_o">
+      <obj_property name="ElementShortName">cipher_dec_key_gen_o</obj_property>
+      <obj_property name="ObjectShortName">cipher_dec_key_gen_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/cipher_dec_key_gen_i">
+      <obj_property name="ElementShortName">cipher_dec_key_gen_i</obj_property>
+      <obj_property name="ObjectShortName">cipher_dec_key_gen_i</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/cipher_key_clear_o">
+      <obj_property name="ElementShortName">cipher_key_clear_o</obj_property>
+      <obj_property name="ObjectShortName">cipher_key_clear_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/cipher_key_clear_i">
+      <obj_property name="ElementShortName">cipher_key_clear_i</obj_property>
+      <obj_property name="ObjectShortName">cipher_key_clear_i</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/cipher_data_out_clear_o">
+      <obj_property name="ElementShortName">cipher_data_out_clear_o</obj_property>
+      <obj_property name="ObjectShortName">cipher_data_out_clear_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/cipher_data_out_clear_i">
+      <obj_property name="ElementShortName">cipher_data_out_clear_i</obj_property>
+      <obj_property name="ObjectShortName">cipher_data_out_clear_i</obj_property>
+   </wvobject>
+   <wvobject type="other" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/key_init_sel_o">
+      <obj_property name="ElementShortName">key_init_sel_o</obj_property>
+      <obj_property name="ObjectShortName">key_init_sel_o</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/key_init_we_o">
+      <obj_property name="ElementShortName">key_init_we_o[7:0]</obj_property>
+      <obj_property name="ObjectShortName">key_init_we_o[7:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/iv_sel_o">
+      <obj_property name="ElementShortName">iv_sel_o[2:0]</obj_property>
+      <obj_property name="ObjectShortName">iv_sel_o[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/iv_we_o">
+      <obj_property name="ElementShortName">iv_we_o[7:0]</obj_property>
+      <obj_property name="ObjectShortName">iv_we_o[7:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/prng_data_req_o">
+      <obj_property name="ElementShortName">prng_data_req_o</obj_property>
+      <obj_property name="ObjectShortName">prng_data_req_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/prng_data_ack_i">
+      <obj_property name="ElementShortName">prng_data_ack_i</obj_property>
+      <obj_property name="ObjectShortName">prng_data_ack_i</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/prng_reseed_req_o">
+      <obj_property name="ElementShortName">prng_reseed_req_o</obj_property>
+      <obj_property name="ObjectShortName">prng_reseed_req_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/prng_reseed_ack_i">
+      <obj_property name="ElementShortName">prng_reseed_ack_i</obj_property>
+      <obj_property name="ObjectShortName">prng_reseed_ack_i</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/start_o">
+      <obj_property name="ElementShortName">start_o</obj_property>
+      <obj_property name="ObjectShortName">start_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/start_we_o">
+      <obj_property name="ElementShortName">start_we_o</obj_property>
+      <obj_property name="ObjectShortName">start_we_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/key_clear_o">
+      <obj_property name="ElementShortName">key_clear_o</obj_property>
+      <obj_property name="ObjectShortName">key_clear_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/key_clear_we_o">
+      <obj_property name="ElementShortName">key_clear_we_o</obj_property>
+      <obj_property name="ObjectShortName">key_clear_we_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/iv_clear_o">
+      <obj_property name="ElementShortName">iv_clear_o</obj_property>
+      <obj_property name="ObjectShortName">iv_clear_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/iv_clear_we_o">
+      <obj_property name="ElementShortName">iv_clear_we_o</obj_property>
+      <obj_property name="ObjectShortName">iv_clear_we_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/data_in_clear_o">
+      <obj_property name="ElementShortName">data_in_clear_o</obj_property>
+      <obj_property name="ObjectShortName">data_in_clear_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/data_in_clear_we_o">
+      <obj_property name="ElementShortName">data_in_clear_we_o</obj_property>
+      <obj_property name="ObjectShortName">data_in_clear_we_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/data_out_clear_o">
+      <obj_property name="ElementShortName">data_out_clear_o</obj_property>
+      <obj_property name="ObjectShortName">data_out_clear_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/data_out_clear_we_o">
+      <obj_property name="ElementShortName">data_out_clear_we_o</obj_property>
+      <obj_property name="ObjectShortName">data_out_clear_we_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/prng_reseed_o">
+      <obj_property name="ElementShortName">prng_reseed_o</obj_property>
+      <obj_property name="ObjectShortName">prng_reseed_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/prng_reseed_we_o">
+      <obj_property name="ElementShortName">prng_reseed_we_o</obj_property>
+      <obj_property name="ObjectShortName">prng_reseed_we_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/output_valid_o">
+      <obj_property name="ElementShortName">output_valid_o</obj_property>
+      <obj_property name="ObjectShortName">output_valid_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/output_valid_we_o">
+      <obj_property name="ElementShortName">output_valid_we_o</obj_property>
+      <obj_property name="ObjectShortName">output_valid_we_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/input_ready_o">
+      <obj_property name="ElementShortName">input_ready_o</obj_property>
+      <obj_property name="ObjectShortName">input_ready_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/input_ready_we_o">
+      <obj_property name="ElementShortName">input_ready_we_o</obj_property>
+      <obj_property name="ObjectShortName">input_ready_we_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/idle_o">
+      <obj_property name="ElementShortName">idle_o</obj_property>
+      <obj_property name="ObjectShortName">idle_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/idle_we_o">
+      <obj_property name="ElementShortName">idle_we_o</obj_property>
+      <obj_property name="ObjectShortName">idle_we_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/stall_o">
+      <obj_property name="ElementShortName">stall_o</obj_property>
+      <obj_property name="ObjectShortName">stall_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/stall_we_o">
+      <obj_property name="ElementShortName">stall_we_o</obj_property>
+      <obj_property name="ObjectShortName">stall_we_o</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/aes_ctrl_ns">
+      <obj_property name="ElementShortName">aes_ctrl_ns[2:0]</obj_property>
+      <obj_property name="ObjectShortName">aes_ctrl_ns[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/aes_ctrl_cs">
+      <obj_property name="ElementShortName">aes_ctrl_cs[2:0]</obj_property>
+      <obj_property name="ObjectShortName">aes_ctrl_cs[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/key_init_clear">
+      <obj_property name="ElementShortName">key_init_clear</obj_property>
+      <obj_property name="ObjectShortName">key_init_clear</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/key_init_new_d">
+      <obj_property name="ElementShortName">key_init_new_d[7:0]</obj_property>
+      <obj_property name="ObjectShortName">key_init_new_d[7:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/key_init_new_q">
+      <obj_property name="ElementShortName">key_init_new_q[7:0]</obj_property>
+      <obj_property name="ObjectShortName">key_init_new_q[7:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/key_init_new">
+      <obj_property name="ElementShortName">key_init_new</obj_property>
+      <obj_property name="ObjectShortName">key_init_new</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/dec_key_gen">
+      <obj_property name="ElementShortName">dec_key_gen</obj_property>
+      <obj_property name="ObjectShortName">dec_key_gen</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/iv_qe">
+      <obj_property name="ElementShortName">iv_qe[7:0]</obj_property>
+      <obj_property name="ObjectShortName">iv_qe[7:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/iv_clear">
+      <obj_property name="ElementShortName">iv_clear</obj_property>
+      <obj_property name="ObjectShortName">iv_clear</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/iv_new_d">
+      <obj_property name="ElementShortName">iv_new_d[7:0]</obj_property>
+      <obj_property name="ObjectShortName">iv_new_d[7:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/iv_new_q">
+      <obj_property name="ElementShortName">iv_new_q[7:0]</obj_property>
+      <obj_property name="ObjectShortName">iv_new_q[7:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/iv_new">
+      <obj_property name="ElementShortName">iv_new</obj_property>
+      <obj_property name="ObjectShortName">iv_new</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/iv_clean">
+      <obj_property name="ElementShortName">iv_clean</obj_property>
+      <obj_property name="ObjectShortName">iv_clean</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/iv_load">
+      <obj_property name="ElementShortName">iv_load</obj_property>
+      <obj_property name="ObjectShortName">iv_load</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/iv_ready_d">
+      <obj_property name="ElementShortName">iv_ready_d</obj_property>
+      <obj_property name="ObjectShortName">iv_ready_d</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/iv_ready_q">
+      <obj_property name="ElementShortName">iv_ready_q</obj_property>
+      <obj_property name="ObjectShortName">iv_ready_q</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/data_in_new_d">
+      <obj_property name="ElementShortName">data_in_new_d[3:0]</obj_property>
+      <obj_property name="ObjectShortName">data_in_new_d[3:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/data_in_new_q">
+      <obj_property name="ElementShortName">data_in_new_q[3:0]</obj_property>
+      <obj_property name="ObjectShortName">data_in_new_q[3:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/data_in_new">
+      <obj_property name="ElementShortName">data_in_new</obj_property>
+      <obj_property name="ObjectShortName">data_in_new</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/data_in_load">
+      <obj_property name="ElementShortName">data_in_load</obj_property>
+      <obj_property name="ObjectShortName">data_in_load</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/data_out_read_d">
+      <obj_property name="ElementShortName">data_out_read_d[3:0]</obj_property>
+      <obj_property name="ObjectShortName">data_out_read_d[3:0]</obj_property>
+      <obj_property name="isExpanded"></obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/data_out_read_q">
+      <obj_property name="ElementShortName">data_out_read_q[3:0]</obj_property>
+      <obj_property name="ObjectShortName">data_out_read_q[3:0]</obj_property>
+      <obj_property name="isExpanded"></obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/data_out_read">
+      <obj_property name="ElementShortName">data_out_read</obj_property>
+      <obj_property name="ObjectShortName">data_out_read</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/output_valid_q">
+      <obj_property name="ElementShortName">output_valid_q</obj_property>
+      <obj_property name="ObjectShortName">output_valid_q</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/start">
+      <obj_property name="ElementShortName">start</obj_property>
+      <obj_property name="ObjectShortName">start</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/finish">
+      <obj_property name="ElementShortName">finish</obj_property>
+      <obj_property name="ObjectShortName">finish</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/cipher_crypt">
+      <obj_property name="ElementShortName">cipher_crypt</obj_property>
+      <obj_property name="ObjectShortName">cipher_crypt</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/doing_cbc_enc">
+      <obj_property name="ElementShortName">doing_cbc_enc</obj_property>
+      <obj_property name="ObjectShortName">doing_cbc_enc</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/doing_cbc_dec">
+      <obj_property name="ElementShortName">doing_cbc_dec</obj_property>
+      <obj_property name="ObjectShortName">doing_cbc_dec</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_control/doing_ctr">
+      <obj_property name="ElementShortName">doing_ctr</obj_property>
+      <obj_property name="ObjectShortName">doing_ctr</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/in_valid_i">
+      <obj_property name="ElementShortName">in_valid_i</obj_property>
+      <obj_property name="ObjectShortName">in_valid_i</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/in_ready_o">
+      <obj_property name="ElementShortName">in_ready_o</obj_property>
+      <obj_property name="ObjectShortName">in_ready_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/out_valid_o">
+      <obj_property name="ElementShortName">out_valid_o</obj_property>
+      <obj_property name="ObjectShortName">out_valid_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/out_ready_i">
+      <obj_property name="ElementShortName">out_ready_i</obj_property>
+      <obj_property name="ObjectShortName">out_ready_i</obj_property>
+   </wvobject>
+   <wvobject type="other" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/op_i">
+      <obj_property name="ElementShortName">op_i</obj_property>
+      <obj_property name="ObjectShortName">op_i</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/key_len_i">
+      <obj_property name="ElementShortName">key_len_i[2:0]</obj_property>
+      <obj_property name="ObjectShortName">key_len_i[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/crypt_i">
+      <obj_property name="ElementShortName">crypt_i</obj_property>
+      <obj_property name="ObjectShortName">crypt_i</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/crypt_o">
+      <obj_property name="ElementShortName">crypt_o</obj_property>
+      <obj_property name="ObjectShortName">crypt_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/dec_key_gen_i">
+      <obj_property name="ElementShortName">dec_key_gen_i</obj_property>
+      <obj_property name="ObjectShortName">dec_key_gen_i</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/dec_key_gen_o">
+      <obj_property name="ElementShortName">dec_key_gen_o</obj_property>
+      <obj_property name="ObjectShortName">dec_key_gen_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/key_clear_i">
+      <obj_property name="ElementShortName">key_clear_i</obj_property>
+      <obj_property name="ObjectShortName">key_clear_i</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/key_clear_o">
+      <obj_property name="ElementShortName">key_clear_o</obj_property>
+      <obj_property name="ObjectShortName">key_clear_o</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/data_out_clear_i">
+      <obj_property name="ElementShortName">data_out_clear_i</obj_property>
+      <obj_property name="ObjectShortName">data_out_clear_i</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/data_out_clear_o">
+      <obj_property name="ElementShortName">data_out_clear_o</obj_property>
+      <obj_property name="ObjectShortName">data_out_clear_o</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/prng_data_i">
+      <obj_property name="ElementShortName">prng_data_i[63:0]</obj_property>
+      <obj_property name="ObjectShortName">prng_data_i[63:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/state_init_i">
+      <obj_property name="ElementShortName">state_init_i[3:0][3:0][7:0]</obj_property>
+      <obj_property name="ObjectShortName">state_init_i[3:0][3:0][7:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/key_init_i">
+      <obj_property name="ElementShortName">key_init_i[7:0][31:0]</obj_property>
+      <obj_property name="ObjectShortName">key_init_i[7:0][31:0]</obj_property>
+      <obj_property name="isExpanded"></obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/state_o">
+      <obj_property name="ElementShortName">state_o[3:0][3:0][7:0]</obj_property>
+      <obj_property name="ObjectShortName">state_o[3:0][3:0][7:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/state_d">
+      <obj_property name="ElementShortName">state_d[3:0][3:0][7:0]</obj_property>
+      <obj_property name="ObjectShortName">state_d[3:0][3:0][7:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/state_q">
+      <obj_property name="ElementShortName">state_q[3:0][3:0][7:0]</obj_property>
+      <obj_property name="ObjectShortName">state_q[3:0][3:0][7:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/state_we">
+      <obj_property name="ElementShortName">state_we</obj_property>
+      <obj_property name="ObjectShortName">state_we</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/state_sel">
+      <obj_property name="ElementShortName">state_sel[1:0]</obj_property>
+      <obj_property name="ObjectShortName">state_sel[1:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/sub_bytes_out">
+      <obj_property name="ElementShortName">sub_bytes_out[3:0][3:0][7:0]</obj_property>
+      <obj_property name="ObjectShortName">sub_bytes_out[3:0][3:0][7:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/shift_rows_out">
+      <obj_property name="ElementShortName">shift_rows_out[3:0][3:0][7:0]</obj_property>
+      <obj_property name="ObjectShortName">shift_rows_out[3:0][3:0][7:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/mix_columns_out">
+      <obj_property name="ElementShortName">mix_columns_out[3:0][3:0][7:0]</obj_property>
+      <obj_property name="ObjectShortName">mix_columns_out[3:0][3:0][7:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/add_round_key_in">
+      <obj_property name="ElementShortName">add_round_key_in[3:0][3:0][7:0]</obj_property>
+      <obj_property name="ObjectShortName">add_round_key_in[3:0][3:0][7:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/add_round_key_out">
+      <obj_property name="ElementShortName">add_round_key_out[3:0][3:0][7:0]</obj_property>
+      <obj_property name="ObjectShortName">add_round_key_out[3:0][3:0][7:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/add_round_key_in_sel">
+      <obj_property name="ElementShortName">add_round_key_in_sel[1:0]</obj_property>
+      <obj_property name="ObjectShortName">add_round_key_in_sel[1:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/key_full_d">
+      <obj_property name="ElementShortName">key_full_d[7:0][31:0]</obj_property>
+      <obj_property name="ObjectShortName">key_full_d[7:0][31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/key_full_q">
+      <obj_property name="ElementShortName">key_full_q[7:0][31:0]</obj_property>
+      <obj_property name="ObjectShortName">key_full_q[7:0][31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/key_full_we">
+      <obj_property name="ElementShortName">key_full_we</obj_property>
+      <obj_property name="ObjectShortName">key_full_we</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/key_full_sel">
+      <obj_property name="ElementShortName">key_full_sel[1:0]</obj_property>
+      <obj_property name="ObjectShortName">key_full_sel[1:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/key_dec_d">
+      <obj_property name="ElementShortName">key_dec_d[7:0][31:0]</obj_property>
+      <obj_property name="ObjectShortName">key_dec_d[7:0][31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/key_dec_q">
+      <obj_property name="ElementShortName">key_dec_q[7:0][31:0]</obj_property>
+      <obj_property name="ObjectShortName">key_dec_q[7:0][31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/key_dec_we">
+      <obj_property name="ElementShortName">key_dec_we</obj_property>
+      <obj_property name="ObjectShortName">key_dec_we</obj_property>
+   </wvobject>
+   <wvobject type="other" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/key_dec_sel">
+      <obj_property name="ElementShortName">key_dec_sel</obj_property>
+      <obj_property name="ObjectShortName">key_dec_sel</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/key_expand_out">
+      <obj_property name="ElementShortName">key_expand_out[7:0][31:0]</obj_property>
+      <obj_property name="ObjectShortName">key_expand_out[7:0][31:0]</obj_property>
+   </wvobject>
+   <wvobject type="other" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/key_expand_op">
+      <obj_property name="ElementShortName">key_expand_op</obj_property>
+      <obj_property name="ObjectShortName">key_expand_op</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/key_expand_step">
+      <obj_property name="ElementShortName">key_expand_step</obj_property>
+      <obj_property name="ObjectShortName">key_expand_step</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/key_expand_clear">
+      <obj_property name="ElementShortName">key_expand_clear</obj_property>
+      <obj_property name="ObjectShortName">key_expand_clear</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/key_expand_round">
+      <obj_property name="ElementShortName">key_expand_round[3:0]</obj_property>
+      <obj_property name="ObjectShortName">key_expand_round[3:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/key_words_sel">
+      <obj_property name="ElementShortName">key_words_sel[1:0]</obj_property>
+      <obj_property name="ObjectShortName">key_words_sel[1:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/key_words">
+      <obj_property name="ElementShortName">key_words[3:0][31:0]</obj_property>
+      <obj_property name="ObjectShortName">key_words[3:0][31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/key_bytes">
+      <obj_property name="ElementShortName">key_bytes[3:0][3:0][7:0]</obj_property>
+      <obj_property name="ObjectShortName">key_bytes[3:0][3:0][7:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/key_mix_columns_out">
+      <obj_property name="ElementShortName">key_mix_columns_out[3:0][3:0][7:0]</obj_property>
+      <obj_property name="ObjectShortName">key_mix_columns_out[3:0][3:0][7:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/round_key">
+      <obj_property name="ElementShortName">round_key[3:0][3:0][7:0]</obj_property>
+      <obj_property name="ObjectShortName">round_key[3:0][3:0][7:0]</obj_property>
+   </wvobject>
+   <wvobject type="other" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/round_key_sel">
+      <obj_property name="ElementShortName">round_key_sel</obj_property>
+      <obj_property name="ObjectShortName">round_key_sel</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/aes_reg_top/aes_core/aes_cipher_core/AES192Enable">
+      <obj_property name="ElementShortName">AES192Enable</obj_property>
+      <obj_property name="ObjectShortName">AES192Enable</obj_property>
+   </wvobject>
+</wave_config>

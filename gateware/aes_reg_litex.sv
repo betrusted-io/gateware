@@ -69,9 +69,13 @@ module aes_reg_top #(
   input 	data_in_3_qe,
 
   output [31:0] data_out_0,
+  input data_out_0_re,
   output [31:0] data_out_1,
+  input data_out_1_re,
   output [31:0] data_out_2,
+  input data_out_2_re,
   output [31:0] data_out_3,
+  input data_out_3_re,
 
   // iv registers
   input [31:0] iv_0_q,
@@ -92,9 +96,13 @@ module aes_reg_top #(
 
   // status
   output idle,
+  output idle_de,
   output stall,
+  output stall_de,
   output output_valid,
+  output output_valid_de,
   output input_ready,
+  output input_ready_de,
   output operation_rbk,
   output [2:0] mode_rbk,
   output [2:0] ctrl_key_len_rbk,
@@ -257,9 +265,13 @@ module aes_reg_top #(
   // Subregister 0 of Multireg data_out
   // R[data_out0]: V(True)
    assign data_out_0 = hw2reg.data_out[0].d;
+   assign reg2hw.data_out[0].re = data_out_0_re;
    assign data_out_1 = hw2reg.data_out[1].d;
+   assign reg2hw.data_out[1].re = data_out_1_re;
    assign data_out_2 = hw2reg.data_out[2].d;
+   assign reg2hw.data_out[2].re = data_out_2_re;
    assign data_out_3 = hw2reg.data_out[3].d;
+   assign reg2hw.data_out[3].re = data_out_3_re;
 
    assign reg2hw.iv[0].q = iv_0_q;
    assign reg2hw.iv[0].qe = iv_0_qe;
@@ -291,9 +303,13 @@ module aes_reg_top #(
 
   // status bank has attribute "RO"
   assign idle = hw2reg.status.idle.d;
+  assign idle_de = hw2reg.status.idle.de;
   assign stall = hw2reg.status.stall.d;
+  assign stall_de = hw2reg.status.stall.de;
   assign output_valid = hw2reg.status.output_valid.d;
+  assign output_valid_de = hw2reg.status.output_valid.de;
   assign input_ready = hw2reg.status.input_ready.d;
+  assign input_ready_de = hw2reg.status.input_ready.de;
   assign ctrl_key_len_rbk[2:0] = hw2reg.ctrl.key_len.d[2:0];
   assign operation_rbk = hw2reg.ctrl.operation.d;
   assign mode_rbk = hw2reg.ctrl.mode.d;
