@@ -21,5 +21,3 @@ rustflags = [
   "-C", "force-frame-pointers=no",
 ]
 
-[build]
-target = "riscv32imac-unknown-none-elf"

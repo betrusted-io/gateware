@@ -159,9 +159,9 @@ class BiosHelper():
         ret = 0
         os.system("mkdir -p run/software/bios") # make the directory if it doesn't exist
         if nightly:
-            ret += os.system("cd testbench && cargo +nightly build --release")
+            ret += os.system("cd testbench && cargo +nightly build --target riscv32imac-unknown-none-elf --release")
         else:
-            ret += os.system("cd testbench && cargo build --release")
+            ret += os.system("cd testbench && cargo build --target riscv32imac-unknown-none-elf --release")
         ret += os.system("riscv64-unknown-elf-objcopy -O binary ../../target/riscv32imac-unknown-none-elf/release/{} run/software/bios/bios.bin".format(sim_name))
         ret += os.system("riscv64-unknown-elf-objdump -d ../../target/riscv32imac-unknown-none-elf/release/{} > run/bios.S".format(sim_name))
         if ret != 0:
