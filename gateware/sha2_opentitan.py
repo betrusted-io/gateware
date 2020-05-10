@@ -90,9 +90,7 @@ class Hmac(Module, AutoDoc, AutoCSR):
 
         # At a width of 32 bits, an 36kiB fifo is 1024 entries deep
         fifo_wvalid=Signal()
-        fifo_wready=Signal()
         fifo_wdata=Signal(32)
-        fifo_rvalid=Signal()
         fifo_rready=Signal()
         fifo_rdata=Signal(32)
         self.fifo = CSRStatus(description="FIFO status", fields=[
@@ -103,6 +101,12 @@ class Hmac(Module, AutoDoc, AutoCSR):
             CSRField("almost_full", size=1, description="almost full"),
             CSRField("almost_empty", size=1, description="almost empty"),
         ])
+        fifo_rvalid = Signal()
+        fifo_empty = Signal()
+        fifo_wready=Signal()
+        fifo_full = Signal()
+        self.comb += fifo_rvalid.eq(~fifo_empty)
+        self.comb += fifo_wready.eq(~fifo_full)
         self.specials += Instance("FIFO_SYNC_MACRO",
             p_DEVICE="7SERIES",
             p_FIFO_SIZE="36Kb",
@@ -112,10 +116,10 @@ class Hmac(Module, AutoDoc, AutoCSR):
             p_DO_REG=0,
             i_CLK=ClockSignal("clk50"),
             i_RST=ResetSignal("clk50"),
-            o_FULL=~fifo_wready,
+            o_FULL=fifo_full,
             i_WREN=fifo_wvalid,
             i_DI=fifo_wdata,
-            o_EMPTY=~fifo_rvalid,
+            o_EMPTY=fifo_empty,
             i_RDEN=fifo_rready & ~fifo_rvalid,
             o_DO=fifo_rdata,
             o_RDCOUNT=self.fifo.fields.read_count,
@@ -126,9 +130,11 @@ class Hmac(Module, AutoDoc, AutoCSR):
             o_ALMOSTEMPTY=self.fifo.fields.almost_empty,
         )
 
-        key_re_50 = Signal()
-        self.submodules.keyre = BlindTransfer("sys", "clk50")
-        self.comb += [ self.keyre.i.eq(self.key_re), key_re_50.eq(self.keyre.o) ]
+        key_re_50 = Signal(8)
+        for k in range(0, 8):
+            setattr(self.submodules, 'keyre50_' + str(k), BlindTransfer("sys", "clk50"))
+            getattr(self, 'keyre50_' + str(k)).i.eq(getattr(self, 'key' + str(k)).re)
+            self.comb += key_re_50[k].eq(getattr(self, 'keyre50_' + str(k)).o)
 
         hash_start_50 = Signal()
         self.submodules.hashstart = BlindTransfer("sys", "clk50")

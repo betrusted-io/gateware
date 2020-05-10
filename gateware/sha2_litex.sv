@@ -215,7 +215,11 @@ module sha2_litex
   assign fifo_full   = ~fifo_wready;
   assign fifo_empty  = ~fifo_rvalid;
   assign fifo_wvalid = (hmac_fifo_wsel && fifo_wready) ? hmac_fifo_wvalid : reg_fifo_wvalid;
-  assign fifo_wdata  = (hmac_fifo_wsel) ? '{data: digest[hmac_fifo_wdata_sel], mask: '1}
+
+  sha_fifo_t temp;
+  assign temp.data = digest[hmac_fifo_wdata_sel];
+  assign temp.mask = '1;
+  assign fifo_wdata  = (hmac_fifo_wsel) ? temp
                                        : reg_fifo_wentry;
 
   /// monkey patch in a fifo at the upper level
