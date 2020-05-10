@@ -121,7 +121,7 @@ def generate_top():
     builder = Builder(soc, output_dir="./run")
     os.environ["DUTNAME"] = 'memlcd'
     builder.software_packages = [
-        ("bios", os.path.abspath(os.path.join(os.path.dirname(__file__), "test")))
+        ("bios", os.path.abspath(os.path.join(os.path.dirname(__file__), "testbench")))
     ]
     vns = builder.build(run=False)
     soc.do_exit(vns)

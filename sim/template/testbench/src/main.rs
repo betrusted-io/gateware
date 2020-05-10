@@ -29,7 +29,7 @@ fn run(p: &pac::Peripherals) {
         p.DEMO.demo.write(|w| w.bus().bits(0xA));
         p.DEMO.demo.write(|w| w.bus().bits(0x5));
     }
-    
+
     // example of updating the "report" bits monitored by the CI framework
     unsafe {
         p.SIMSTATUS.report.write(|w| w.bits(0x00C0FFEE));

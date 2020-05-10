@@ -101,10 +101,10 @@ def generate_top():
     vns = builder.build(run=False)
     soc.do_exit(vns)
 
-    os.system("rm -rf test/betrusted-pac")  # nuke the old PAC if it exists
-    os.system("mkdir -p test/betrusted-pac") # rebuild it from scratch every time
-    os.system("cp pac-cargo-template test/betrusted-pac/Cargo.toml")
-    os.system("cd test/betrusted-pac && svd2rust --target riscv -i ../../../../target/soc.svd && rm -rf src; form -i lib.rs -o src/; rm lib.rs")
+    os.system("rm -rf testbench/betrusted-pac")  # nuke the old PAC if it exists
+    os.system("mkdir -p testbench/betrusted-pac") # rebuild it from scratch every time
+    os.system("cp pac-cargo-template testbench/betrusted-pac/Cargo.toml")
+    os.system("cd testbench/betrusted-pac && svd2rust --target riscv -i ../../../../target/soc.svd && rm -rf src; form -i lib.rs -o src/; rm lib.rs")
     BiosHelper(soc, boot_from_spi) # marshals cargo to generate the BIOS from Rust files
 
     # pass #2 -- generate the SoC, incorporating the now-built BIOS
@@ -113,7 +113,7 @@ def generate_top():
 
     builder = Builder(soc, output_dir="./run")
     builder.software_packages = [  # Point to a dummy Makefile, so Litex pulls in bios.bin but doesn't try building over it
-        ("bios", os.path.abspath(os.path.join(os.path.dirname(__file__), "test")))
+        ("bios", os.path.abspath(os.path.join(os.path.dirname(__file__), "testbench")))
     ]
     vns = builder.build(run=False)
     soc.do_exit(vns)
