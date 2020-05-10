@@ -495,9 +495,30 @@ name = "sha2"
 version = "0.1.0"
 dependencies = [
  "pac",
+ "sha2-hal",
+ "sha2-pac",
  "sim-bios",
  "volatile",
  "xous-nommu",
+]
+
+[[package]]
+name = "sha2-hal"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "sha2-pac",
+ "spin",
+]
+
+[[package]]
+name = "sha2-pac"
+version = "0.0.1"
+dependencies = [
+ "bare-metal",
+ "svd2rust",
+ "vcell",
+ "vexriscv",
 ]
 
 [[package]]

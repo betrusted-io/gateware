@@ -11,3 +11,5 @@ pac = { path = "../../../sim_support/rust/pac" }
 sim-bios = { path = "../../../sim_support/rust/bios" }
 xous-nommu = { path = "../../../sim_support/rust/xous-nommu" }
 volatile = "0.2.6"
+sha2-pac = { path = "sha2-pac" }
+sha2-hal = { path = "sha2-hal" }

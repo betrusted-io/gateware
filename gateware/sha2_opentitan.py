@@ -1,3 +1,5 @@
+import os
+
 from migen import *
 from litex.soc.integration.doc import AutoDoc
 from litex.soc.interconnect.csr import *

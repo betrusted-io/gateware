@@ -16,8 +16,6 @@ top dut (
     .rst(0),
 
     // dut I/O goes here
-    .template_pin(pin),
-    .template_bus(bus),
 
     // don't touch these three lines
     .sim_success(success),

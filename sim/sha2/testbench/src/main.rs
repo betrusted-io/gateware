@@ -19,17 +19,6 @@ fn run(p: &pac::Peripherals) {
         DBGSTR[0] = (*(ram.add(4))).read();
     };
 
-    // example of toggling a bit
-    for _ in 0..4 {
-        p.DEMO.demo.write(|w| w.pin().bit(true));
-        p.DEMO.demo.write(|w| w.pin().bit(false));
-    }
-    // example of changing a bus item
-    unsafe{
-        p.DEMO.demo.write(|w| w.bus().bits(0xA));
-        p.DEMO.demo.write(|w| w.bus().bits(0x5));
-    }
-
     // example of updating the "report" bits monitored by the CI framework
     unsafe {
         p.SIMSTATUS.report.write(|w| w.bits(0x00C0FFEE));

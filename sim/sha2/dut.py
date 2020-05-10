@@ -37,7 +37,7 @@ from litex.soc.integration.doc import AutoDoc, ModuleDoc
 from litex.soc.interconnect.csr import *
 
 # specific to a given DUT
-from gateware import sram_32  # for example...
+from gateware import sha2_opentitan as sha2
 
 """
 set boot_from_spi to change the reset vector and linking location of BIOS
@@ -68,30 +68,18 @@ local_clocks = {
 }
 
 """
-A self-contained module for the template. Normally this is deleted and
-instead a `from gateware import <dut>` statement is used to pull in
-the appropriate DUT from the gateware directory.
-"""
-class Demo(Module, AutoCSR, AutoDoc):
-    def __init__(self, pads):
-        self.demo = CSRStorage(description="A demo register for the template", fields=[
-            CSRField("pin", size=1, description="Connect this to the `pin` port"),
-            CSRField("bus", size=4, description="Connect this to the `bus` port"),
-        ])
-        self.sync.clk50 += pads.pin.eq(self.demo.fields.pin)  # use the clk50 local clock domain
-        self.sync.clk50 += pads.bus.eq(self.demo.fields.bus)
-
-"""
 add the submodules we're testing to the SoC, which is encapsulated in the Sim class
 """
 class Dut(Sim):
     def __init__(self, platform, spiboot=False, **kwargs):
         Sim.__init__(self, platform, custom_clocks=local_clocks, spiboot=spiboot, **kwargs) # SoC magic is in here
 
-        # Add something to simulate: Demo module for the template
-        self.submodules.demo = Demo(platform.request("template"))
-        self.add_csr("demo")
-
+        # SHA block --------------------------------------------------------------------------------
+        self.submodules.sha = sha2.Hmac(platform)
+        self.add_csr("sha")
+        self.add_interrupt("sha")
+        self.add_wb_slave(self.mem_map["sha"], self.sha.bus, 4)
+        self.add_memory_region("sha", self.mem_map["sha"], 4, type='io')
 
 """
 generate all the files necessary to run xsim
@@ -112,6 +100,10 @@ def generate_top():
     vns = builder.build(run=False)
     soc.do_exit(vns)
 
+    os.system("rm -rf testbench/sha2-pac")  # nuke the old PAC if it exists
+    os.system("mkdir -p testbench/sha2-pac") # rebuild it from scratch every time
+    os.system("cp pac-cargo-template testbench/sha2-pac/Cargo.toml")
+    os.system("cd testbench/sha2-pac && svd2rust --target riscv -i ../../../../target/soc.svd && rm -rf src; form -i lib.rs -o src/; rm lib.rs")
     BiosHelper(soc, boot_from_spi) # marshals cargo to generate the BIOS from Rust files
 
     # pass #2 -- generate the SoC, incorporating the now-built BIOS
@@ -134,7 +126,13 @@ before calling SimRunner
 """
 def run_sim(ci=False):
     # add third-party modules via extra_cmds, eg. "cd run && xvlog ../MX66UM1G45G/MX66UM1G45G.v"
-    extra_cmds = ['echo "extra commands!"', 'echo "more extra commands!"']
+    extra_cmds =  ['cd run && xvlog -sv ../hmac/prim_assert.sv']
+    extra_cmds +=  ['cd run && xvlog -sv ../hmac/prim_packer.sv']
+    extra_cmds +=  ['cd run && xvlog -sv ../hmac/hmac_pkg.sv']
+    extra_cmds +=  ['cd run && xvlog -sv ../hmac/hmac_core.sv']
+    extra_cmds +=  ['cd run && xvlog -sv ../hmac/sha2_pad.sv']
+    extra_cmds +=  ['cd run && xvlog -sv ../hmac/sha2.sv']
+    extra_cmds +=  ['cd run && xvlog -sv ../../../gateware/sha2_litex.sv']
     SimRunner(ci, extra_cmds)
 
 
