@@ -48,7 +48,7 @@ class Hmac(Module, AutoDoc, AutoCSR):
         ])
         control_latch = Signal(self.control.size)
         ctrl_freeze = Signal()
-        self.sync += [
+        self.sync.clk50 += [
             If(ctrl_freeze,
                 control_latch.eq(control_latch)
             ).Else(
