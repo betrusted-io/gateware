@@ -104,9 +104,9 @@ class Hmac(Module, AutoDoc, AutoCSR):
         fifo_rvalid = Signal()
         fifo_empty = Signal()
         fifo_wready=Signal()
-        fifo_full = Signal()
+        fifo_full_local = Signal()
         self.comb += fifo_rvalid.eq(~fifo_empty)
-        self.comb += fifo_wready.eq(~fifo_full)
+        self.comb += fifo_wready.eq(~fifo_full_local)
         self.specials += Instance("FIFO_SYNC_MACRO",
             p_DEVICE="7SERIES",
             p_FIFO_SIZE="36Kb",
@@ -116,7 +116,7 @@ class Hmac(Module, AutoDoc, AutoCSR):
             p_DO_REG=0,
             i_CLK=ClockSignal("clk50"),
             i_RST=ResetSignal("clk50"),
-            o_FULL=fifo_full,
+            o_FULL=fifo_full_local,
             i_WREN=fifo_wvalid,
             i_DI=fifo_wdata,
             o_EMPTY=fifo_empty,
