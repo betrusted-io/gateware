@@ -1,6 +1,7 @@
 #![cfg_attr(not(test), no_std)]
 
 extern crate bitflags;
+extern crate volatile;
 
 pub mod hal_sha2;
 

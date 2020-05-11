@@ -28,6 +28,7 @@ module sha2_litex
   input digest_swap,
 
   output reg_hash_done,
+  output sha_hash_done,
 
   input wipe_secret_re,
   input [31:0] wipe_secret_v,
@@ -56,10 +57,10 @@ module sha2_litex
   // plumbing to fifo on level up
   output local_fifo_wvalid,
   input local_fifo_wready,
-  output [31:0] local_fifo_wdata,
+  output [35:0] local_fifo_wdata_mask,
   input  local_fifo_rvalid,
   output local_fifo_rready,
-  input [31:0] local_fifo_rdata,
+  input [35:0] local_fifo_rdata_mask,
 
   // these should trigger interrupts
   output reg err_valid,
@@ -85,7 +86,7 @@ module sha2_litex
   logic [8:0]  msg_fifo_addr;   // NOT_READ
   //logic [31:0] msg_fifo_wdata;
   logic [31:0] msg_fifo_wmask;
-  for (genvar i = 0; i < 31; i++) begin : gen_msg_fifo_wmask
+  for (genvar i = 0; i < 32; i++) begin : gen_msg_fifo_wmask
       assign msg_fifo_wmask[i] = msg_fifo_write_mask[i / 8]; // copy byte mask to bit mask
   end
   logic [31:0] msg_fifo_rdata;
@@ -120,7 +121,7 @@ module sha2_litex
   logic        sha_hash_process;
 
   //logic        reg_hash_done;
-  logic        sha_hash_done;
+  //logic        sha_hash_done;
 
   logic [63:0] sha_message_length;
   logic [63:0] message_length;   // bits but byte based
@@ -157,6 +158,8 @@ module sha2_litex
   assign key_adapter[7] = secret_key_7;
 
   logic                 cfg_block;  // Prevent changing config
+  logic                 msg_allowed; // MSG_FIFO from software is allowed
+
   assign ctrl_freeze = cfg_block;
 
   always_ff @(posedge clk_i or negedge rst_ni) begin
@@ -189,6 +192,17 @@ module sha2_litex
     end
   end
 
+  // Open up the MSG_FIFO from the TL-UL port when it is ready
+  always_ff @(posedge clk_i or negedge rst_ni) begin
+    if (!rst_ni) begin
+      msg_allowed <= '0;
+    end else if (hash_start) begin
+      msg_allowed <= 1'b 1;
+    end else if (packer_flush_done) begin
+      msg_allowed <= 1'b 0;
+    end
+  end
+
   ////////////////
   // Interrupts //
   ////////////////
@@ -201,6 +215,10 @@ module sha2_litex
   //logic fifo_full_event;
   assign fifo_full_event = fifo_full & !fifo_full_q;
 
+
+  ///////////////
+  // Instances //
+  ///////////////
 
   assign msg_fifo_rvalid = msg_fifo_req & ~msg_fifo_we;
   assign msg_fifo_rdata  = '1;  // Return all F
@@ -225,22 +243,24 @@ module sha2_litex
   /// monkey patch in a fifo at the upper level
   assign local_fifo_wvalid = fifo_wvalid & sha_en;
   assign fifo_wready = local_fifo_wready;
-  assign local_fifo_wdata = fifo_wdata;
+  assign local_fifo_wdata_mask[31:0] = fifo_wdata.data;
+  assign local_fifo_wdata_mask[35:32] = fifo_wdata.mask;
   assign fifo_rvalid = local_fifo_rvalid;
   assign local_fifo_rready = fifo_rready;
-  assign rdata = local_fifo_rdata;
+  assign fifo_rdata.data = local_fifo_rdata_mask[31:0];
+  assign fifo_rdata.mask = local_fifo_rdata_mask[35:32];
 
   // TL-UL to MSG_FIFO byte write handling
   logic msg_write;
 
-  assign msg_write = msg_fifo_req & msg_fifo_we & ~hmac_fifo_wsel;
+  assign msg_write = msg_fifo_req & msg_fifo_we & ~hmac_fifo_wsel & msg_allowed;
 
   logic [$clog2(32+1)-1:0] wmask_ones;
 
   always_comb begin
     wmask_ones = '0;
     for (int i = 0 ; i < 32 ; i++) begin
-      wmask_ones = wmask_ones + reg_fifo_wmask[i];
+      wmask_ones = wmask_ones + msg_fifo_wmask[i];
     end
   end
 
@@ -250,10 +270,11 @@ module sha2_litex
       message_length <= '0;
     end else if (hash_start) begin
       message_length <= '0;
-    end else if (reg_fifo_wvalid && fifo_wready && !hmac_fifo_wsel) begin
+    end else if (msg_write && sha_en && packer_ready) begin
       message_length <= message_length + 64'(wmask_ones);
     end
   end
+
 
   // Convert endian here
   //    prim_packer always packs to the right, but SHA engine assumes incoming

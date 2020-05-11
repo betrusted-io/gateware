@@ -75,11 +75,11 @@ class Dut(Sim):
         Sim.__init__(self, platform, custom_clocks=local_clocks, spiboot=spiboot, **kwargs) # SoC magic is in here
 
         # SHA block --------------------------------------------------------------------------------
-        self.submodules.sha = sha2.Hmac(platform)
-        self.add_csr("sha")
-        self.add_interrupt("sha")
-        self.add_wb_slave(self.mem_map["sha"], self.sha.bus, 4)
-        self.add_memory_region("sha", self.mem_map["sha"], 4, type='io')
+        self.submodules.sha2 = sha2.Hmac(platform)
+        self.add_csr("sha2")
+        self.add_interrupt("sha2")
+        self.add_wb_slave(self.mem_map["sha2"], self.sha2.bus, 4)
+        self.add_memory_region("sha2", self.mem_map["sha2"], 4, type='io')
 
 """
 generate all the files necessary to run xsim

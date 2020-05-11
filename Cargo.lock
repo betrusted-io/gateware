@@ -196,6 +196,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "hal-sha2"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "sha2-pac",
+ "spin",
+ "volatile",
+]
+
+[[package]]
 name = "hermit-abi"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -494,21 +504,12 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 name = "sha2"
 version = "0.1.0"
 dependencies = [
+ "hal-sha2",
  "pac",
- "sha2-hal",
  "sha2-pac",
  "sim-bios",
  "volatile",
  "xous-nommu",
-]
-
-[[package]]
-name = "sha2-hal"
-version = "0.1.0"
-dependencies = [
- "bitflags",
- "sha2-pac",
- "spin",
 ]
 
 [[package]]

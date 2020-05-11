@@ -1,5 +1,5 @@
 [package]
-name = "sha2-hal"
+name = "hal-sha2"
 version = "0.1.0"
 authors = ["bunnie <bunnie@kosagi.com>"]
 edition = "2018"
@@ -10,6 +10,7 @@ edition = "2018"
 sha2-pac = { path = "../sha2-pac" }
 spin = "0.5.2"
 bitflags = "1.2.1"
+volatile = "0.2.6"
 
 [features]
 evt = []

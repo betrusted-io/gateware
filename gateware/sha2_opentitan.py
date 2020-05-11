@@ -38,25 +38,24 @@ class Hmac(Module, AutoDoc, AutoCSR):
             setattr(self, "key" + str(k), CSRStorage(32, name="key" + str(k), description="""secret key word {}""".format(k)))
             self.key_re[k].eq(getattr(self, "key" + str(k)).re)
 
-        self.control = CSRStorage(description="Control register for the HMAC block", fields=[
-            CSRField("sha_en", size=1, description="Enable the SHA block; disabling resets state"),
+        self.config = CSRStorage(description="Configuration register for the HMAC block", fields=[
+            CSRField("sha_en", size=1, description="Enable the SHA256 core"),
             CSRField("endian_swap", size=1, description="Swap the endianness on the input data"),
             CSRField("digest_swap", size=1, description="Swap the endianness on the output digest"),
-            CSRField("hmac_en", size=1, description="Latch configuration for HMAC block"),
-            CSRField("hash_start", size=1, description="Writing a 1 indicates the beginning of hash data", pulse=True),
-            CSRField("hash_process", size=1, description="Writing a 1 digests the hash data", pulse=True),
+            CSRField("hmac_en", size=1, description="Enable the HMAC core"),
         ])
-        control_latch = Signal(self.control.size)
+        control_latch = Signal(self.config.size)
         ctrl_freeze = Signal()
         self.sync.clk50 += [
             If(ctrl_freeze,
                 control_latch.eq(control_latch)
             ).Else(
-                control_latch.eq(self.control.storage)
+                control_latch.eq(self.config.storage)
             )
         ]
-        self.status = CSRStatus(fields=[
-            CSRField("done", size=1, description="Set when hash is done")
+        self.command = CSRStorage(description="Command register for the HMAC block", fields=[
+            CSRField("hash_start", size=1, description="Writing a 1 indicates the beginning of hash data", pulse=True),
+            CSRField("hash_process", size=1, description="Writing a 1 digests the hash data", pulse=True),
         ])
 
         self.wipe = CSRStorage(32, description="wipe the secret key using the written value. Wipe happens upon write.")
@@ -70,29 +69,31 @@ class Hmac(Module, AutoDoc, AutoCSR):
         self.submodules.ev = EventManager()
         self.ev.err_valid = EventSourcePulse(description="Error flag was generated")
         self.ev.fifo_full = EventSourcePulse(description="FIFO is full")
-        self.ev.hash_done = EventSourcePulse(description="Hash is done")
+        self.ev.hash_done = EventSourcePulse(description="HMAC is done")
+        self.ev.sha256_done = EventSourcePulse(description="SHA256 is done")
         self.ev.finalize()
         err_valid=Signal()
         err_valid_r=Signal()
         fifo_full=Signal()
         fifo_full_r=Signal()
-        hash_done=Signal()
+        hmac_hash_done=Signal()
+        sha256_hash_done=Signal()
         self.sync += [
             err_valid_r.eq(err_valid),
             fifo_full_r.eq(fifo_full),
-            hash_done.eq(self.status.fields.done),
         ]
         self.comb += [
             self.ev.err_valid.trigger.eq(~err_valid_r & err_valid),
             self.ev.fifo_full.trigger.eq(~fifo_full_r & fifo_full),
-            self.ev.hash_done.trigger.eq(~hash_done & self.status.fields.done),
+            self.ev.hash_done.trigger.eq(hmac_hash_done),
+            self.ev.sha256_done.trigger.eq(sha256_hash_done),
         ]
 
         # At a width of 32 bits, an 36kiB fifo is 1024 entries deep
         fifo_wvalid=Signal()
-        fifo_wdata=Signal(32)
+        fifo_wdata_mask=Signal(36)
         fifo_rready=Signal()
-        fifo_rdata=Signal(32)
+        fifo_rdata_mask=Signal(36)
         self.fifo = CSRStatus(description="FIFO status", fields=[
             CSRField("read_count", size=10, description="read pointer"),
             CSRField("write_count", size=10, description="write pointer"),
@@ -107,21 +108,24 @@ class Hmac(Module, AutoDoc, AutoCSR):
         fifo_full_local = Signal()
         self.comb += fifo_rvalid.eq(~fifo_empty)
         self.comb += fifo_wready.eq(~fifo_full_local)
-        self.specials += Instance("FIFO_SYNC_MACRO",
-            p_DEVICE="7SERIES",
-            p_FIFO_SIZE="36Kb",
-            p_DATA_WIDTH=32,
+        self.specials += Instance("FIFO36E1",
+            p_DATA_WIDTH=36,
             p_ALMOST_EMPTY_OFFSET=8,
-            p_ALMOST_FULL_OFFSET=(1024 - 8),
-            p_DO_REG=0,
-            i_CLK=ClockSignal("clk50"),
+            p_ALMOST_FULL_OFFSET=8,
+            p_DO_REG=1,
+            p_FIRST_WORD_FALL_THROUGH="TRUE",
+            p_EN_SYN="FALSE",
+            i_RDCLK=ClockSignal("clk50"),
+            i_WRCLK=ClockSignal("clk50"),
             i_RST=ResetSignal("clk50"),
             o_FULL=fifo_full_local,
             i_WREN=fifo_wvalid,
-            i_DI=fifo_wdata,
+            i_DI=fifo_wdata_mask[:32],
+            i_DIP=fifo_wdata_mask[32:],
             o_EMPTY=fifo_empty,
-            i_RDEN=fifo_rready & ~fifo_rvalid,
-            o_DO=fifo_rdata,
+            i_RDEN=fifo_rready & fifo_rvalid,
+            o_DO=fifo_rdata_mask[:32],
+            o_DOP=fifo_rdata_mask[32:],
             o_RDCOUNT=self.fifo.fields.read_count,
             o_RDERR=self.fifo.fields.read_error,
             o_WRCOUNT=self.fifo.fields.write_count,
@@ -138,11 +142,11 @@ class Hmac(Module, AutoDoc, AutoCSR):
 
         hash_start_50 = Signal()
         self.submodules.hashstart = BlindTransfer("sys", "clk50")
-        self.comb += [ self.hashstart.i.eq(self.control.fields.hash_start), hash_start_50.eq(self.hashstart.o) ]
+        self.comb += [ self.hashstart.i.eq(self.command.fields.hash_start), hash_start_50.eq(self.hashstart.o) ]
 
         hash_proc_50 = Signal()
         self.submodules.hashproc = BlindTransfer("sys", "clk50")
-        self.comb += [ self.hashproc.i.eq(self.control.fields.hash_process), hash_proc_50.eq(self.hashproc.o) ]
+        self.comb += [ self.hashproc.i.eq(self.command.fields.hash_process), hash_proc_50.eq(self.hashproc.o) ]
 
         wipe_50 = Signal()
         self.submodules.wipe50 = BlindTransfer("sys", "clk50")
@@ -171,7 +175,8 @@ class Hmac(Module, AutoDoc, AutoCSR):
             i_digest_swap=control_latch[2],
             i_hmac_en=control_latch[3],
 
-            o_reg_hash_done=self.status.fields.done,
+            o_reg_hash_done=hmac_hash_done,
+            o_sha_hash_done=sha256_hash_done,
 
             i_wipe_secret_re=wipe_50,
             i_wipe_secret_v=self.wipe.storage,
@@ -196,10 +201,10 @@ class Hmac(Module, AutoDoc, AutoCSR):
 
             o_local_fifo_wvalid=fifo_wvalid,
             i_local_fifo_wready=fifo_wready,
-            o_local_fifo_wdata=fifo_wdata,
+            o_local_fifo_wdata_mask=fifo_wdata_mask,
             i_local_fifo_rvalid=fifo_rvalid,
             o_local_fifo_rready=fifo_rready,
-            i_local_fifo_rdata=fifo_rdata,
+            i_local_fifo_rdata_mask=fifo_rdata_mask,
 
             o_err_valid=err_valid,
             i_err_valid_pending=self.ev.err_valid.pending,
