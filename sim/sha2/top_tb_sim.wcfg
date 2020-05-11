@@ -1,0 +1,384 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wave_config>
+   <wave_state>
+   </wave_state>
+   <db_ref_list>
+      <db_ref path="top_tb_sim.wdb" id="1">
+         <top_modules>
+            <top_module name="glbl" />
+            <top_module name="hmac_pkg" />
+            <top_module name="top_tb" />
+         </top_modules>
+      </db_ref>
+   </db_ref_list>
+   <zoom_setting>
+      <ZoomStartTime time="0fs"></ZoomStartTime>
+      <ZoomEndTime time="77677284fs"></ZoomEndTime>
+      <Cursor1Time time="51548429fs"></Cursor1Time>
+   </zoom_setting>
+   <column_width_setting>
+      <NameColumnWidth column_width="368"></NameColumnWidth>
+      <ValueColumnWidth column_width="91"></ValueColumnWidth>
+   </column_width_setting>
+   <WVObjectSize size="90" />
+   <wvobject type="logic" fp_name="/top_tb/dut/sys_rst">
+      <obj_property name="ElementShortName">sys_rst</obj_property>
+      <obj_property name="ObjectShortName">sys_rst</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sys_clk">
+      <obj_property name="ElementShortName">sys_clk</obj_property>
+      <obj_property name="ObjectShortName">sys_clk</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/success">
+      <obj_property name="ElementShortName">success</obj_property>
+      <obj_property name="ObjectShortName">success</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/report">
+      <obj_property name="ElementShortName">report[31:0]</obj_property>
+      <obj_property name="ObjectShortName">report[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_INSTRUCTION">
+      <obj_property name="ElementShortName">decode_to_execute_INSTRUCTION[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_INSTRUCTION[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_PC">
+      <obj_property name="ElementShortName">decode_to_execute_PC[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_PC[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_RS1">
+      <obj_property name="ElementShortName">decode_to_execute_RS1[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_RS1[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_RS2">
+      <obj_property name="ElementShortName">decode_to_execute_RS2[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_RS2[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_bus_adr">
+      <obj_property name="ElementShortName">sha2_bus_adr[29:0]</obj_property>
+      <obj_property name="ObjectShortName">sha2_bus_adr[29:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_bus_dat_w">
+      <obj_property name="ElementShortName">sha2_bus_dat_w[31:0]</obj_property>
+      <obj_property name="ObjectShortName">sha2_bus_dat_w[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_bus_dat_r">
+      <obj_property name="ElementShortName">sha2_bus_dat_r[31:0]</obj_property>
+      <obj_property name="ObjectShortName">sha2_bus_dat_r[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_bus_sel">
+      <obj_property name="ElementShortName">sha2_bus_sel[3:0]</obj_property>
+      <obj_property name="ObjectShortName">sha2_bus_sel[3:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_bus_cyc">
+      <obj_property name="ElementShortName">sha2_bus_cyc</obj_property>
+      <obj_property name="ObjectShortName">sha2_bus_cyc</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_bus_stb">
+      <obj_property name="ElementShortName">sha2_bus_stb</obj_property>
+      <obj_property name="ObjectShortName">sha2_bus_stb</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_bus_ack">
+      <obj_property name="ElementShortName">sha2_bus_ack</obj_property>
+      <obj_property name="ObjectShortName">sha2_bus_ack</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_bus_we">
+      <obj_property name="ElementShortName">sha2_bus_we</obj_property>
+      <obj_property name="ObjectShortName">sha2_bus_we</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_bus_cti">
+      <obj_property name="ElementShortName">sha2_bus_cti[2:0]</obj_property>
+      <obj_property name="ObjectShortName">sha2_bus_cti[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_bus_bte">
+      <obj_property name="ElementShortName">sha2_bus_bte[1:0]</obj_property>
+      <obj_property name="ObjectShortName">sha2_bus_bte[1:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_bus_err">
+      <obj_property name="ElementShortName">sha2_bus_err</obj_property>
+      <obj_property name="ObjectShortName">sha2_bus_err</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_wdata">
+      <obj_property name="ElementShortName">sha2_wdata[31:0]</obj_property>
+      <obj_property name="ObjectShortName">sha2_wdata[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_wmask">
+      <obj_property name="ElementShortName">sha2_wmask[3:0]</obj_property>
+      <obj_property name="ObjectShortName">sha2_wmask[3:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_wdata_we">
+      <obj_property name="ElementShortName">sha2_wdata_we</obj_property>
+      <obj_property name="ObjectShortName">sha2_wdata_we</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_wdata_avail">
+      <obj_property name="ElementShortName">sha2_wdata_avail</obj_property>
+      <obj_property name="ObjectShortName">sha2_wdata_avail</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_wdata_ready">
+      <obj_property name="ElementShortName">sha2_wdata_ready</obj_property>
+      <obj_property name="ObjectShortName">sha2_wdata_ready</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_litex/clk_i">
+      <obj_property name="ElementShortName">clk_i</obj_property>
+      <obj_property name="ObjectShortName">clk_i</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_litex/rst_ni">
+      <obj_property name="ElementShortName">rst_ni</obj_property>
+      <obj_property name="ObjectShortName">rst_ni</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_litex/reg_hash_start">
+      <obj_property name="ElementShortName">reg_hash_start</obj_property>
+      <obj_property name="ObjectShortName">reg_hash_start</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_litex/reg_hash_process">
+      <obj_property name="ElementShortName">reg_hash_process</obj_property>
+      <obj_property name="ObjectShortName">reg_hash_process</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_litex/ctrl_freeze">
+      <obj_property name="ElementShortName">ctrl_freeze</obj_property>
+      <obj_property name="ObjectShortName">ctrl_freeze</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_litex/sha_en">
+      <obj_property name="ElementShortName">sha_en</obj_property>
+      <obj_property name="ObjectShortName">sha_en</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_litex/hmac_en">
+      <obj_property name="ElementShortName">hmac_en</obj_property>
+      <obj_property name="ObjectShortName">hmac_en</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_litex/endian_swap">
+      <obj_property name="ElementShortName">endian_swap</obj_property>
+      <obj_property name="ObjectShortName">endian_swap</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_litex/digest_swap">
+      <obj_property name="ElementShortName">digest_swap</obj_property>
+      <obj_property name="ObjectShortName">digest_swap</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_litex/reg_hash_done">
+      <obj_property name="ElementShortName">reg_hash_done</obj_property>
+      <obj_property name="ObjectShortName">reg_hash_done</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_litex/sha_hash_done">
+      <obj_property name="ElementShortName">sha_hash_done</obj_property>
+      <obj_property name="ObjectShortName">sha_hash_done</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_litex/wipe_secret_re">
+      <obj_property name="ElementShortName">wipe_secret_re</obj_property>
+      <obj_property name="ObjectShortName">wipe_secret_re</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_litex/wipe_secret_v">
+      <obj_property name="ElementShortName">wipe_secret_v[31:0]</obj_property>
+      <obj_property name="ObjectShortName">wipe_secret_v[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_litex/digest_0">
+      <obj_property name="ElementShortName">digest_0[31:0]</obj_property>
+      <obj_property name="ObjectShortName">digest_0[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_litex/digest_1">
+      <obj_property name="ElementShortName">digest_1[31:0]</obj_property>
+      <obj_property name="ObjectShortName">digest_1[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_litex/digest_2">
+      <obj_property name="ElementShortName">digest_2[31:0]</obj_property>
+      <obj_property name="ObjectShortName">digest_2[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_litex/digest_3">
+      <obj_property name="ElementShortName">digest_3[31:0]</obj_property>
+      <obj_property name="ObjectShortName">digest_3[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_litex/digest_4">
+      <obj_property name="ElementShortName">digest_4[31:0]</obj_property>
+      <obj_property name="ObjectShortName">digest_4[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_litex/digest_5">
+      <obj_property name="ElementShortName">digest_5[31:0]</obj_property>
+      <obj_property name="ObjectShortName">digest_5[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_litex/digest_6">
+      <obj_property name="ElementShortName">digest_6[31:0]</obj_property>
+      <obj_property name="ObjectShortName">digest_6[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_litex/digest_7">
+      <obj_property name="ElementShortName">digest_7[31:0]</obj_property>
+      <obj_property name="ObjectShortName">digest_7[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_litex/msg_length">
+      <obj_property name="ElementShortName">msg_length[63:0]</obj_property>
+      <obj_property name="ObjectShortName">msg_length[63:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_litex/error_code">
+      <obj_property name="ElementShortName">error_code[31:0]</obj_property>
+      <obj_property name="ObjectShortName">error_code[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_fifo_wvalid">
+      <obj_property name="ElementShortName">sha2_fifo_wvalid</obj_property>
+      <obj_property name="ObjectShortName">sha2_fifo_wvalid</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_fifo_we">
+      <obj_property name="ElementShortName">sha2_fifo_we</obj_property>
+      <obj_property name="ObjectShortName">sha2_fifo_we</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_fifo_wdata_mask">
+      <obj_property name="ElementShortName">sha2_fifo_wdata_mask[35:0]</obj_property>
+      <obj_property name="ObjectShortName">sha2_fifo_wdata_mask[35:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_fifo_rready">
+      <obj_property name="ElementShortName">sha2_fifo_rready</obj_property>
+      <obj_property name="ObjectShortName">sha2_fifo_rready</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_fifo_rvalid">
+      <obj_property name="ElementShortName">sha2_fifo_rvalid</obj_property>
+      <obj_property name="ObjectShortName">sha2_fifo_rvalid</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_fifo_rdata_mask">
+      <obj_property name="ElementShortName">sha2_fifo_rdata_mask[35:0]</obj_property>
+      <obj_property name="ObjectShortName">sha2_fifo_rdata_mask[35:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_read_count">
+      <obj_property name="ElementShortName">sha2_read_count[9:0]</obj_property>
+      <obj_property name="ObjectShortName">sha2_read_count[9:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_write_count">
+      <obj_property name="ElementShortName">sha2_write_count[9:0]</obj_property>
+      <obj_property name="ObjectShortName">sha2_write_count[9:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_read_error">
+      <obj_property name="ElementShortName">sha2_read_error</obj_property>
+      <obj_property name="ObjectShortName">sha2_read_error</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_write_error">
+      <obj_property name="ElementShortName">sha2_write_error</obj_property>
+      <obj_property name="ObjectShortName">sha2_write_error</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_almost_full">
+      <obj_property name="ElementShortName">sha2_almost_full</obj_property>
+      <obj_property name="ObjectShortName">sha2_almost_full</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_almost_empty">
+      <obj_property name="ElementShortName">sha2_almost_empty</obj_property>
+      <obj_property name="ObjectShortName">sha2_almost_empty</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_fifo_status">
+      <obj_property name="ElementShortName">sha2_fifo_status[23:0]</obj_property>
+      <obj_property name="ObjectShortName">sha2_fifo_status[23:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_fifo_empty">
+      <obj_property name="ElementShortName">sha2_fifo_empty</obj_property>
+      <obj_property name="ObjectShortName">sha2_fifo_empty</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_fifo_wready">
+      <obj_property name="ElementShortName">sha2_fifo_wready</obj_property>
+      <obj_property name="ObjectShortName">sha2_fifo_wready</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_fifo_full_local">
+      <obj_property name="ElementShortName">sha2_fifo_full_local</obj_property>
+      <obj_property name="ObjectShortName">sha2_fifo_full_local</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_err_valid">
+      <obj_property name="ElementShortName">sha2_err_valid</obj_property>
+      <obj_property name="ObjectShortName">sha2_err_valid</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_err_valid_r">
+      <obj_property name="ElementShortName">sha2_err_valid_r</obj_property>
+      <obj_property name="ObjectShortName">sha2_err_valid_r</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_fifo_full">
+      <obj_property name="ElementShortName">sha2_fifo_full</obj_property>
+      <obj_property name="ObjectShortName">sha2_fifo_full</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_fifo_full_r">
+      <obj_property name="ElementShortName">sha2_fifo_full_r</obj_property>
+      <obj_property name="ObjectShortName">sha2_fifo_full_r</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_litex/msg_fifo_gnt">
+      <obj_property name="ElementShortName">msg_fifo_gnt</obj_property>
+      <obj_property name="ObjectShortName">msg_fifo_gnt</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_litex/msg_fifo_rdata">
+      <obj_property name="ElementShortName">msg_fifo_rdata[31:0]</obj_property>
+      <obj_property name="ObjectShortName">msg_fifo_rdata[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_litex/msg_fifo_req">
+      <obj_property name="ElementShortName">msg_fifo_req</obj_property>
+      <obj_property name="ObjectShortName">msg_fifo_req</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_litex/msg_fifo_rerror">
+      <obj_property name="ElementShortName">msg_fifo_rerror[1:0]</obj_property>
+      <obj_property name="ObjectShortName">msg_fifo_rerror[1:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_litex/msg_fifo_rvalid">
+      <obj_property name="ElementShortName">msg_fifo_rvalid</obj_property>
+      <obj_property name="ObjectShortName">msg_fifo_rvalid</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_litex/msg_fifo_wdata">
+      <obj_property name="ElementShortName">msg_fifo_wdata[31:0]</obj_property>
+      <obj_property name="ObjectShortName">msg_fifo_wdata[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_litex/msg_fifo_wdata_endian">
+      <obj_property name="ElementShortName">msg_fifo_wdata_endian[31:0]</obj_property>
+      <obj_property name="ObjectShortName">msg_fifo_wdata_endian[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_litex/msg_fifo_we">
+      <obj_property name="ElementShortName">msg_fifo_we</obj_property>
+      <obj_property name="ObjectShortName">msg_fifo_we</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_litex/msg_fifo_wmask">
+      <obj_property name="ElementShortName">msg_fifo_wmask[31:0]</obj_property>
+      <obj_property name="ObjectShortName">msg_fifo_wmask[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_litex/msg_fifo_wmask_endian">
+      <obj_property name="ElementShortName">msg_fifo_wmask_endian[31:0]</obj_property>
+      <obj_property name="ObjectShortName">msg_fifo_wmask_endian[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_litex/msg_fifo_write_mask">
+      <obj_property name="ElementShortName">msg_fifo_write_mask[3:0]</obj_property>
+      <obj_property name="ObjectShortName">msg_fifo_write_mask[3:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_litex/fifo_empty">
+      <obj_property name="ElementShortName">fifo_empty</obj_property>
+      <obj_property name="ObjectShortName">fifo_empty</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_litex/fifo_full">
+      <obj_property name="ElementShortName">fifo_full</obj_property>
+      <obj_property name="ObjectShortName">fifo_full</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_litex/fifo_full_event">
+      <obj_property name="ElementShortName">fifo_full_event</obj_property>
+      <obj_property name="ObjectShortName">fifo_full_event</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_litex/fifo_full_q">
+      <obj_property name="ElementShortName">fifo_full_q</obj_property>
+      <obj_property name="ObjectShortName">fifo_full_q</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_litex/fifo_rdata">
+      <obj_property name="ElementShortName">fifo_rdata</obj_property>
+      <obj_property name="ObjectShortName">fifo_rdata</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_litex/fifo_rready">
+      <obj_property name="ElementShortName">fifo_rready</obj_property>
+      <obj_property name="ObjectShortName">fifo_rready</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_litex/fifo_rvalid">
+      <obj_property name="ElementShortName">fifo_rvalid</obj_property>
+      <obj_property name="ObjectShortName">fifo_rvalid</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_litex/fifo_wdata">
+      <obj_property name="ElementShortName">fifo_wdata</obj_property>
+      <obj_property name="ObjectShortName">fifo_wdata</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_litex/fifo_wdata.data">
+      <obj_property name="ElementShortName">.data[31:0]</obj_property>
+      <obj_property name="ObjectShortName">.data[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/sha2_litex/fifo_wdata.mask">
+      <obj_property name="ElementShortName">.mask[3:0]</obj_property>
+      <obj_property name="ObjectShortName">.mask[3:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_litex/fifo_wready">
+      <obj_property name="ElementShortName">fifo_wready</obj_property>
+      <obj_property name="ObjectShortName">fifo_wready</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sha2_litex/fifo_wvalid">
+      <obj_property name="ElementShortName">fifo_wvalid</obj_property>
+      <obj_property name="ObjectShortName">fifo_wvalid</obj_property>
+   </wvobject>
+</wave_config>
