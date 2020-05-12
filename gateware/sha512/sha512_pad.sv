@@ -7,7 +7,7 @@
 
 `include "prim_assert.sv"
 
-module sha2_pad import hmac512_pkg::*; (
+module sha512_pad import hmac512_pkg::*; (
   input clk_i,
   input rst_ni,
 

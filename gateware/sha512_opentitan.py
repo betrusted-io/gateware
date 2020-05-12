@@ -190,8 +190,8 @@ class Hmac(Module, AutoDoc, AutoCSR):
             o_fifo_full_event=fifo_full,
         )
 
+        platform.add_source(os.path.join("deps", "gateware", "gateware", "sha512", "hmac512_pkg.sv"))
         platform.add_source(os.path.join("deps", "gateware", "gateware", "sha512", "sha512.sv"))
         platform.add_source(os.path.join("deps", "gateware", "gateware", "sha512", "sha512_pad.sv"))
         platform.add_source(os.path.join("deps", "gateware", "gateware", "sha512", "prim_packer512.sv"))
-        platform.add_source(os.path.join("deps", "gateware", "gateware", "sha512", "hmac512_core.sv"))
         platform.add_source(os.path.join("deps", "gateware", "gateware", "sha512_litex.sv"))

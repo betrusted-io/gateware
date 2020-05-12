@@ -274,7 +274,7 @@ module sha512 import hmac512_pkg::*; (
   // complete_one_chunk
   assign complete_one_chunk = (round == (NumRound - 1));
 
-  sha2_pad u_pad (
+  sha512_pad u_pad (
     .clk_i,
     .rst_ni,
 
