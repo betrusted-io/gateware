@@ -6,33 +6,16 @@ module sha512_litex
   input clk_i,
   input rst_ni,
 
-  // Below Regster interface can be changed
-  input [63:0]    secret_key_0,
-  input [63:0]    secret_key_1,
-  input [63:0]    secret_key_2,
-  input [63:0]    secret_key_3,
-  input [63:0]    secret_key_4,
-  input [63:0]    secret_key_5,
-  input [63:0]    secret_key_6,
-  input [63:0]    secret_key_7,
-  input [7:0]     secret_key_re,
-
   // Control signals
   input reg_hash_start,     // this should be a 1-cycle pulse
   input reg_hash_process,   // this should be a 1-cycle pulse
 
   output ctrl_freeze,  // control registers need to be locked out of updating during HMAC processng
   input        sha_en,   // If disabled, it clears internal content.
-  input hmac_en,
   input endian_swap,
   input digest_swap,
 
-  output reg_hash_done,
   output sha_hash_done,
-
-  input wipe_secret_re,
-  input [63:0] wipe_secret_v,
-
 
   output [63:0] digest_0,
   output [63:0] digest_1,
@@ -44,8 +27,6 @@ module sha512_litex
   output [63:0] digest_7,
 
   output [63:0]  msg_length,  // actually 128 bits long, but we only report the bottom 64
-
-  output [31:0] error_code,
 
   // data write interface
   input [63:0] msg_fifo_wdata,
@@ -67,8 +48,6 @@ module sha512_litex
   input err_valid_pending,
   output reg fifo_full_event
 );
-
-  logic [511:0] secret_key;
 
   logic        fifo_rvalid;
   logic        fifo_rready;
@@ -101,35 +80,20 @@ module sha512_litex
   logic        reg_fifo_wvalid;
   sha_word_t   reg_fifo_wdata;
   sha_word_t   reg_fifo_wmask;
-  logic        hmac_fifo_wsel;
-  logic        hmac_fifo_wvalid;
-  logic [2:0]  hmac_fifo_wdata_sel;
 
   logic        shaf_rvalid;
   sha_fifo_t   shaf_rdata;
   logic        shaf_rready;
 
-  //logic        sha_en;
-  //logic        hmac_en;
-  //logic        endian_swap;
-  //logic        digest_swap;
-
-  //logic        reg_hash_start;
   logic        sha_hash_start;
   logic        hash_start;      // Valid hash_start_signal
-  //logic        reg_hash_process;
   logic        sha_hash_process;
 
-  //logic        reg_hash_done;
-  //logic        sha_hash_done;
 
   logic [127:0] sha_message_length;
   logic [127:0] message_length;   // bits but byte based
 
   // basic logic conversions
-  err_code_e err_code;
-  assign error_code = err_code;
-
   sha_word_t [7:0] digest;
   assign digest_0 = conv_endian(digest[0], digest_swap);
   assign digest_1 = conv_endian(digest[1], digest_swap);
@@ -142,42 +106,12 @@ module sha512_litex
 
   assign msg_length = message_length[63:0];  // return only the lower 64 bits
 
-  logic        wipe_secret;
-  assign wipe_secret = wipe_secret_re;
-  logic [63:0] wipe_v;
-  assign wipe_v = wipe_secret_v;
-
-  sha_word_t [7:0] key_adapter;
-  assign key_adapter[0] = secret_key_0;
-  assign key_adapter[1] = secret_key_1;
-  assign key_adapter[2] = secret_key_2;
-  assign key_adapter[3] = secret_key_3;
-  assign key_adapter[4] = secret_key_4;
-  assign key_adapter[5] = secret_key_5;
-  assign key_adapter[6] = secret_key_6;
-  assign key_adapter[7] = secret_key_7;
-
   logic                 cfg_block;  // Prevent changing config
   logic                 msg_allowed; // MSG_FIFO from software is allowed
 
   assign ctrl_freeze = cfg_block;
 
-  always_ff @(posedge clk_i or negedge rst_ni) begin
-    if (!rst_ni) begin
-      secret_key <= '0;
-    end else if (wipe_secret) begin
-      secret_key <= secret_key ^ {8{wipe_v}};
-    end else if (!cfg_block) begin
-      // Allow updating secret key only when the engine is in Idle.
-      for (int i = 0; i < 8; i++) begin
-        if (secret_key_re[i]) begin
-          secret_key[64*i+:64] <= key_adapter[7-i];
-        end
-      end
-    end
-  end
-
-  /////////////////////
+    /////////////////////
   // Control signals //
   /////////////////////
   assign hash_start = reg_hash_start & sha_en;
@@ -187,7 +121,7 @@ module sha512_litex
       cfg_block <= '0;
     end else if (hash_start) begin
       cfg_block <= 1'b 1;
-    end else if (reg_hash_done) begin
+    end else if (sha_hash_done) begin
       cfg_block <= 1'b 0;
     end
   end
@@ -223,7 +157,7 @@ module sha512_litex
   assign msg_fifo_rvalid = msg_fifo_req & ~msg_fifo_we;
   assign msg_fifo_rdata  = '1;  // Return all F
   assign msg_fifo_rerror = '1;  // Return error for read access
-  assign msg_fifo_gnt    = msg_fifo_req & ~hmac_fifo_wsel & packer_ready;
+  assign msg_fifo_gnt    = msg_fifo_req & packer_ready;
 
   // FIFO control
   sha_fifo_t reg_fifo_wentry;
@@ -235,13 +169,9 @@ module sha512_litex
       };
   assign fifo_full   = ~fifo_wready;
   assign fifo_empty  = ~fifo_rvalid;
-  assign fifo_wvalid = (hmac_fifo_wsel && fifo_wready) ? hmac_fifo_wvalid : reg_fifo_wvalid;
+  assign fifo_wvalid = reg_fifo_wvalid;
 
-  sha_fifo_t temp;
-  assign temp.data = digest[hmac_fifo_wdata_sel];
-  assign temp.mask = '1;
-  assign fifo_wdata  = (hmac_fifo_wsel) ? temp
-                                       : reg_fifo_wentry;
+  assign fifo_wdata  = reg_fifo_wentry;
 
   /// monkey patch in a fifo at the upper level
   assign local_fifo_wvalid = fifo_wvalid & sha_en;
@@ -256,7 +186,7 @@ module sha512_litex
   // TL-UL to MSG_FIFO byte write handling
   logic msg_write;
 
-  assign msg_write = msg_fifo_req & msg_fifo_we & ~hmac_fifo_wsel & msg_allowed;
+  assign msg_write = msg_fifo_req & msg_fifo_we & msg_allowed;
 
   logic [$clog2(64+1)-1:0] wmask_ones;
 
@@ -302,54 +232,21 @@ module sha512_litex
     .valid_o      (reg_fifo_wvalid),
     .data_o       (reg_fifo_wdata),
     .mask_o       (reg_fifo_wmask),
-    .ready_i      (fifo_wready & ~hmac_fifo_wsel),
+    .ready_i      (fifo_wready),
 
     .flush_i      (reg_hash_process),
     .flush_done_o (packer_flush_done) // ignore at this moment
   );
 
-
-  hmac512_core u_hmac512 (
-    .clk_i,
-    .rst_ni,
-
-    .secret_key,
-
-    .wipe_secret,
-    .wipe_v,
-
-    .hmac_en,
-
-    .reg_hash_start   (hash_start),
-    .reg_hash_process (packer_flush_done), // Trigger after all msg written
-    .hash_done      (reg_hash_done),
-    .sha_hash_start,
-    .sha_hash_process,
-    .sha_hash_done,
-
-    .sha_rvalid     (shaf_rvalid),
-    .sha_rdata      (shaf_rdata),
-    .sha_rready     (shaf_rready),
-
-    .fifo_rvalid,
-    .fifo_rdata,
-    .fifo_rready,
-
-    .fifo_wsel      (hmac_fifo_wsel),
-    .fifo_wvalid    (hmac_fifo_wvalid),
-    .fifo_wdata_sel (hmac_fifo_wdata_sel),
-    .fifo_wready,
-
-    .message_length,
-    .sha_message_length
-  );
-
+  assign  shaf_rvalid = fifo_rvalid;
+  assign  shaf_rdata = fifo_rdata;
+  assign  fifo_rready = shaf_rready;
+  assign sha_hash_start = hash_start;
+  assign sha_hash_process = reg_hash_process;
+  assign sha_message_length = message_length;
   sha512 u_sha512 (
     .clk_i,
     .rst_ni,
-
-    .wipe_secret,
-    .wipe_v,
 
     .fifo_rvalid      (shaf_rvalid),
     .fifo_rdata       (shaf_rdata),
@@ -364,55 +261,5 @@ module sha512_litex
 
     .digest
   );
-
-  /////////////////////////
-  // HMAC Error Handling //
-  /////////////////////////
-  logic msg_push_sha_disabled, hash_start_sha_disabled, update_seckey_inprocess;
-  assign msg_push_sha_disabled = msg_write & ~sha_en;
-  assign hash_start_sha_disabled = reg_hash_start & ~sha_en;
-
-  always_comb begin
-    update_seckey_inprocess = 1'b0;
-    if (cfg_block) begin
-      for (int i = 0 ; i < 8 ; i++) begin
-        if (secret_key_re[i]) begin
-          update_seckey_inprocess = update_seckey_inprocess | 1'b1;
-        end
-      end
-    end else begin
-      update_seckey_inprocess = 1'b0;
-    end
-  end
-
-
-  // Update ERR_CODE register and interrupt only when no pending interrupt.
-  // This ensures only the first event of the series of events can be seen to sw.
-  // It is recommended that the software reads ERR_CODE register when interrupt
-  // is pending to avoid any race conditions.
-  assign err_valid = ~err_valid_pending &
-                   ( msg_push_sha_disabled | hash_start_sha_disabled
-                   | update_seckey_inprocess);
-
-  always_comb begin
-    err_code = NoError;
-    unique case (1'b1)
-      msg_push_sha_disabled: begin
-        err_code = SwPushMsgWhenShaDisabled;
-      end
-      hash_start_sha_disabled: begin
-        err_code = SwHashStartWhenShaDisabled;
-      end
-
-      update_seckey_inprocess: begin
-        err_code = SwUpdateSecretKeyInProcess;
-      end
-
-      default: begin
-        err_code = NoError;
-      end
-    endcase
-  end
-
 
 endmodule

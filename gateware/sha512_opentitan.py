@@ -50,16 +50,10 @@ class Hmac(Module, AutoDoc, AutoCSR):
             bus.ack.eq( ~ack_lsb_r & ack_lsb | ~ack_msb_r & ack_msb )  # single-cycle acks only!
         ]
 
-        self.key_re = Signal(8)
-        for k in range(0, 8):
-            setattr(self, "key" + str(k), CSRStorage(64, name="key" + str(k), description="""secret key word {}""".format(k)))
-            self.key_re[k].eq(getattr(self, "key" + str(k)).re)
-
         self.config = CSRStorage(description="Configuration register for the HMAC block", fields=[
             CSRField("sha_en", size=1, description="Enable the SHA512 core"),
             CSRField("endian_swap", size=1, description="Swap the endianness on the input data"),
             CSRField("digest_swap", size=1, description="Swap the endianness on the output digest"),
-            CSRField("hmac_en", size=1, description="Enable the HMAC core"),
         ])
         control_latch = Signal(self.config.size)
         ctrl_freeze = Signal()
@@ -75,25 +69,20 @@ class Hmac(Module, AutoDoc, AutoCSR):
             CSRField("hash_process", size=1, description="Writing a 1 digests the hash data", pulse=True),
         ])
 
-        self.wipe = CSRStorage(64, description="wipe the secret key using the written value. Wipe happens upon write.")
-
         for k in range(0, 8):
             setattr(self, "digest" + str(k), CSRStatus(64, name="digest" + str(k), description="""digest word {}""".format(k)))
 
-        self.msg_length = CSRStatus(size=64, description="Length of digested message, in bits")
-        self.error_code = CSRStatus(size=32, description="Error code")
+        self.msg_length = CSRStatus(size=64, description="Bottom 64 bits of length of digested message, in bits")
 
         self.submodules.ev = EventManager()
         self.ev.err_valid = EventSourcePulse(description="Error flag was generated")
         self.ev.fifo_full = EventSourcePulse(description="FIFO is full")
-        self.ev.hash_done = EventSourcePulse(description="HMAC is done")
         self.ev.sha512_done = EventSourcePulse(description="SHA512 is done")
         self.ev.finalize()
         err_valid=Signal()
         err_valid_r=Signal()
         fifo_full=Signal()
         fifo_full_r=Signal()
-        hmac_hash_done=Signal()
         sha512_hash_done=Signal()
         self.sync += [
             err_valid_r.eq(err_valid),
@@ -102,7 +91,6 @@ class Hmac(Module, AutoDoc, AutoCSR):
         self.comb += [
             self.ev.err_valid.trigger.eq(~err_valid_r & err_valid),
             self.ev.fifo_full.trigger.eq(~fifo_full_r & fifo_full),
-            self.ev.hash_done.trigger.eq(hmac_hash_done),
             self.ev.sha512_done.trigger.eq(sha512_hash_done),
         ]
 
@@ -151,12 +139,6 @@ class Hmac(Module, AutoDoc, AutoCSR):
             o_ALMOSTEMPTY=self.fifo.fields.almost_empty,
         )
 
-        key_re_50 = Signal(8)
-        for k in range(0, 8):
-            setattr(self.submodules, 'keyre50_' + str(k), BlindTransfer("sys", "clk50"))
-            getattr(self, 'keyre50_' + str(k)).i.eq(getattr(self, 'key' + str(k)).re)
-            self.comb += key_re_50[k].eq(getattr(self, 'keyre50_' + str(k)).o)
-
         hash_start_50 = Signal()
         self.submodules.hashstart = BlindTransfer("sys", "clk50")
         self.comb += [ self.hashstart.i.eq(self.command.fields.hash_start), hash_start_50.eq(self.hashstart.o) ]
@@ -165,23 +147,9 @@ class Hmac(Module, AutoDoc, AutoCSR):
         self.submodules.hashproc = BlindTransfer("sys", "clk50")
         self.comb += [ self.hashproc.i.eq(self.command.fields.hash_process), hash_proc_50.eq(self.hashproc.o) ]
 
-        wipe_50 = Signal()
-        self.submodules.wipe50 = BlindTransfer("sys", "clk50")
-        self.comb += [ self.wipe50.i.eq(self.wipe.re), wipe_50.eq(self.wipe50.o) ]
-
         self.specials += Instance("sha512_litex",
             i_clk_i = ClockSignal("clk50"),
             i_rst_ni = ~ResetSignal("clk50"),
-
-            i_secret_key_0=self.key0.storage,
-            i_secret_key_1=self.key1.storage,
-            i_secret_key_2=self.key2.storage,
-            i_secret_key_3=self.key3.storage,
-            i_secret_key_4=self.key4.storage,
-            i_secret_key_5=self.key5.storage,
-            i_secret_key_6=self.key6.storage,
-            i_secret_key_7=self.key7.storage,
-            i_secret_key_re=key_re_50,
 
             i_reg_hash_start=hash_start_50,
             i_reg_hash_process=hash_proc_50,
@@ -190,13 +158,8 @@ class Hmac(Module, AutoDoc, AutoCSR):
             i_sha_en=control_latch[0],
             i_endian_swap=control_latch[1],
             i_digest_swap=control_latch[2],
-            i_hmac_en=control_latch[3],
 
-            o_reg_hash_done=hmac_hash_done,
             o_sha_hash_done=sha512_hash_done,
-
-            i_wipe_secret_re=wipe_50,
-            i_wipe_secret_v=self.wipe.storage,
 
             o_digest_0=self.digest0.status,
             o_digest_1=self.digest1.status,
@@ -208,7 +171,6 @@ class Hmac(Module, AutoDoc, AutoCSR):
             o_digest_7=self.digest7.status,
 
             o_msg_length=self.msg_length.status,
-            o_error_code=self.error_code.status,
 
             i_msg_fifo_wdata=wdata,
             i_msg_fifo_write_mask=wmask,
@@ -228,7 +190,6 @@ class Hmac(Module, AutoDoc, AutoCSR):
             o_fifo_full_event=fifo_full,
         )
 
-        platform.add_source(os.path.join("deps", "gateware", "gateware", "sha512", "hmac512_pkg.sv"))
         platform.add_source(os.path.join("deps", "gateware", "gateware", "sha512", "sha512.sv"))
         platform.add_source(os.path.join("deps", "gateware", "gateware", "sha512", "sha512_pad.sv"))
         platform.add_source(os.path.join("deps", "gateware", "gateware", "sha512", "prim_packer512.sv"))

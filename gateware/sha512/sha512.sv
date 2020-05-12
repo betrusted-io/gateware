@@ -9,9 +9,6 @@ module sha512 import hmac512_pkg::*; (
   input clk_i,
   input rst_ni,
 
-  input            wipe_secret,
-  input sha_word_t wipe_v,
-
   // FIFO read signal
   input             fifo_rvalid,
   input  sha_fifo_t fifo_rdata,
@@ -51,8 +48,6 @@ module sha512 import hmac512_pkg::*; (
   always_ff @(posedge clk_i or negedge rst_ni) begin : fill_w
     if (!rst_ni) begin
       w <= '0;
-    end else if (wipe_secret) begin
-      w <= w ^ {16{wipe_v}};
     end else if (!sha_en) begin
       w <= '0;
     end else if (!run_hash && update_w_from_fifo) begin
@@ -87,10 +82,6 @@ module sha512 import hmac512_pkg::*; (
   always_ff @(posedge clk_i or negedge rst_ni) begin : compress_round
     if (!rst_ni) begin
       hash <= '{default:'0};
-    end else if (wipe_secret) begin
-      for (int i = 0 ; i < 8 ; i++) begin
-        hash[i] <= hash[i] ^ wipe_v;
-      end
     end else if (init_hash) begin
       hash <= digest;
     end else if (run_hash) begin
@@ -102,10 +93,6 @@ module sha512 import hmac512_pkg::*; (
   always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
       digest <= '{default: '0};
-    end else if (wipe_secret) begin
-      for (int i = 0 ; i < 8 ; i++) begin
-        digest[i] <= digest[i] ^ wipe_v;
-      end
     end else if (hash_start) begin
       for (int i = 0 ; i < 8 ; i++) begin
         digest[i] <= InitHash[i];
@@ -290,9 +277,6 @@ module sha512 import hmac512_pkg::*; (
   sha2_pad u_pad (
     .clk_i,
     .rst_ni,
-
-    .wipe_secret,
-    .wipe_v,
 
     .fifo_rvalid,
     .fifo_rdata,

@@ -33,7 +33,6 @@ fn run(p: &pac::Peripherals) {
     let mut sha512: BtSha512 = BtSha512::new();
     report(p, 0x1000_0001);
     sha512.config = Sha512Config::ENDIAN_SWAP | Sha512Config::DIGEST_SWAP | Sha512Config::SHA512_EN; // Sha2Config::HMAC_EN; // Sha2Config::SHA256_EN;
-    sha512.keys = [0; 8];
 
     report(p, 0x1000_0002);
     sha512.init();

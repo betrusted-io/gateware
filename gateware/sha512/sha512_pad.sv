@@ -11,9 +11,6 @@ module sha2_pad import hmac512_pkg::*; (
   input clk_i,
   input rst_ni,
 
-  input            wipe_secret,
-  input sha_word_t wipe_v,
-
   // To actual FIFO
   input                 fifo_rvalid,
   input  sha_fifo_t     fifo_rdata,

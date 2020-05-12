@@ -7,7 +7,6 @@ bitflags! {
         const SHA512_EN   = 0b0000_0001;
         const ENDIAN_SWAP = 0b0000_0010;
         const DIGEST_SWAP = 0b0000_0100;
-        const HMAC_EN     = 0b0000_1000;
     }
 }
 
@@ -39,15 +38,13 @@ bitflags! {
     pub struct Sha512Event: u32 {
         const ERROR       = 0b0001;
         const FIFO_FULL   = 0b0010;
-        const HMAC_DONE   = 0b0100;
-        const SHA51256_DONE = 0b1000;
+        const SHA512_DONE = 0b0100;
     }
 }
 
 pub struct BtSha512 {
     p: sha512_pac::Peripherals,
     pub config: Sha512Config,
-    pub keys: [u64; 8],
 }
 
 impl BtSha512 {
@@ -56,26 +53,12 @@ impl BtSha512 {
             BtSha512 {
                 p: sha512_pac::Peripherals::steal(),
                 config: Sha512Config::NONE,
-                keys: [0; 8],
             }
         }
     }
 
     pub fn init(&mut self) -> bool {
         unsafe{ self.p.SHA512.config.write(|w|{ w.bits(self.config.bits()) }); }
-        for reg in 0..8 {
-            match reg {
-                0 => unsafe{ self.p.SHA512.key00.write(|w|{ w.bits((self.keys[0] >> 32) as u32)}); self.p.SHA512.key01.write(|w|{ w.bits((self.keys[0] & 0xFFFF_FFFF) as u32) }) },
-                1 => unsafe{ self.p.SHA512.key10.write(|w|{ w.bits((self.keys[0] >> 32) as u32)}); self.p.SHA512.key11.write(|w|{ w.bits((self.keys[0] & 0xFFFF_FFFF) as u32) }) },
-                2 => unsafe{ self.p.SHA512.key20.write(|w|{ w.bits((self.keys[0] >> 32) as u32)}); self.p.SHA512.key21.write(|w|{ w.bits((self.keys[0] & 0xFFFF_FFFF) as u32) }) },
-                3 => unsafe{ self.p.SHA512.key30.write(|w|{ w.bits((self.keys[0] >> 32) as u32)}); self.p.SHA512.key31.write(|w|{ w.bits((self.keys[0] & 0xFFFF_FFFF) as u32) }) },
-                4 => unsafe{ self.p.SHA512.key40.write(|w|{ w.bits((self.keys[0] >> 32) as u32)}); self.p.SHA512.key41.write(|w|{ w.bits((self.keys[0] & 0xFFFF_FFFF) as u32) }) },
-                5 => unsafe{ self.p.SHA512.key50.write(|w|{ w.bits((self.keys[0] >> 32) as u32)}); self.p.SHA512.key51.write(|w|{ w.bits((self.keys[0] & 0xFFFF_FFFF) as u32) }) },
-                6 => unsafe{ self.p.SHA512.key60.write(|w|{ w.bits((self.keys[0] >> 32) as u32)}); self.p.SHA512.key61.write(|w|{ w.bits((self.keys[0] & 0xFFFF_FFFF) as u32) }) },
-                7 => unsafe{ self.p.SHA512.key70.write(|w|{ w.bits((self.keys[0] >> 32) as u32)}); self.p.SHA512.key71.write(|w|{ w.bits((self.keys[0] & 0xFFFF_FFFF) as u32) }) },
-                _ => assert!(false),
-            }
-        }
         self.p.SHA512.command.write(|w|{ w.hash_start().set_bit() });
         true
     }
@@ -106,8 +89,8 @@ impl BtSha512 {
 
     pub fn digest(&mut self, digest: &mut [u64; 8]) {
         self.p.SHA512.command.write(|w|{ w.hash_process().set_bit()});
-        while (self.p.SHA512.ev_pending.read().bits() & (Sha512Event::SHA51256_DONE | Sha512Event::HMAC_DONE).bits()) == 0 {}
-        unsafe{ self.p.SHA512.ev_pending.write(|w| w.bits((Sha512Event::SHA51256_DONE | Sha512Event::HMAC_DONE).bits()) ); }
+        while (self.p.SHA512.ev_pending.read().bits() & (Sha512Event::SHA512_DONE).bits()) == 0 {}
+        unsafe{ self.p.SHA512.ev_pending.write(|w| w.bits((Sha512Event::SHA512_DONE).bits()) ); }
 
         for reg in 0..8 {
             match reg {
