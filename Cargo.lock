@@ -206,6 +206,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "hal-sha512"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "sha512-pac",
+ "spin",
+ "volatile",
+]
+
+[[package]]
 name = "hermit-abi"
 version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -514,6 +524,28 @@ dependencies = [
 
 [[package]]
 name = "sha2-pac"
+version = "0.0.1"
+dependencies = [
+ "bare-metal",
+ "svd2rust",
+ "vcell",
+ "vexriscv",
+]
+
+[[package]]
+name = "sha512"
+version = "0.1.0"
+dependencies = [
+ "hal-sha512",
+ "pac",
+ "sha512-pac",
+ "sim-bios",
+ "volatile",
+ "xous-nommu",
+]
+
+[[package]]
+name = "sha512-pac"
 version = "0.0.1"
 dependencies = [
  "bare-metal",

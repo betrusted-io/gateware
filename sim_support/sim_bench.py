@@ -101,6 +101,7 @@ class Sim(SoCCore):
         "memlcd"        : 0xb0000000,
         "audio"         : 0xe0000000,
         "sha2"          : 0xe0001000,
+        "sha512"        : 0xe0002000,
         "vexriscv_debug": 0xefff0000,
         "csr"           : 0xf0000000,
     }
