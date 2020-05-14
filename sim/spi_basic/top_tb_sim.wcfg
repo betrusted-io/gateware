@@ -11,15 +11,15 @@
       </db_ref>
    </db_ref_list>
    <zoom_setting>
-      <ZoomStartTime time="216101019fs"></ZoomStartTime>
-      <ZoomEndTime time="218681892fs"></ZoomEndTime>
-      <Cursor1Time time="217918410fs"></Cursor1Time>
+      <ZoomStartTime time="24479305fs"></ZoomStartTime>
+      <ZoomEndTime time="24929106fs"></ZoomEndTime>
+      <Cursor1Time time="24728705fs"></Cursor1Time>
    </zoom_setting>
    <column_width_setting>
       <NameColumnWidth column_width="378"></NameColumnWidth>
-      <ValueColumnWidth column_width="127"></ValueColumnWidth>
+      <ValueColumnWidth column_width="123"></ValueColumnWidth>
    </column_width_setting>
-   <WVObjectSize size="47" />
+   <WVObjectSize size="43" />
    <wvobject type="logic" fp_name="/top_tb/dut/sys_rst">
       <obj_property name="ElementShortName">sys_rst</obj_property>
       <obj_property name="ObjectShortName">sys_rst</obj_property>
@@ -168,26 +168,6 @@
       <obj_property name="ElementShortName">spimaster_spi_int_old_trigger</obj_property>
       <obj_property name="ObjectShortName">spimaster_spi_int_old_trigger</obj_property>
    </wvobject>
-   <wvobject type="logic" fp_name="/top_tb/dut/spimaster_wirq_status">
-      <obj_property name="ElementShortName">spimaster_wirq_status</obj_property>
-      <obj_property name="ObjectShortName">spimaster_wirq_status</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/top_tb/dut/spimaster_wirq_pending">
-      <obj_property name="ElementShortName">spimaster_wirq_pending</obj_property>
-      <obj_property name="ObjectShortName">spimaster_wirq_pending</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/top_tb/dut/spimaster_wirq_trigger">
-      <obj_property name="ElementShortName">spimaster_wirq_trigger</obj_property>
-      <obj_property name="ObjectShortName">spimaster_wirq_trigger</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/top_tb/dut/spimaster_wirq_clear">
-      <obj_property name="ElementShortName">spimaster_wirq_clear</obj_property>
-      <obj_property name="ObjectShortName">spimaster_wirq_clear</obj_property>
-   </wvobject>
-   <wvobject type="logic" fp_name="/top_tb/dut/spimaster_wirq_old_trigger">
-      <obj_property name="ElementShortName">spimaster_wirq_old_trigger</obj_property>
-      <obj_property name="ObjectShortName">spimaster_wirq_old_trigger</obj_property>
-   </wvobject>
    <wvobject type="array" fp_name="/top_tb/dut/spislave_rx_status">
       <obj_property name="ElementShortName">spislave_rx_status[15:0]</obj_property>
       <obj_property name="ObjectShortName">spislave_rx_status[15:0]</obj_property>
@@ -195,6 +175,10 @@
    <wvobject type="array" fp_name="/top_tb/dut/spislave_txrx">
       <obj_property name="ElementShortName">spislave_txrx[15:0]</obj_property>
       <obj_property name="ObjectShortName">spislave_txrx[15:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spimaster_tip">
+      <obj_property name="ElementShortName">spimaster_tip</obj_property>
+      <obj_property name="ObjectShortName">spimaster_tip</obj_property>
    </wvobject>
    <wvobject type="logic" fp_name="/top_tb/dut/spislave_tip">
       <obj_property name="ElementShortName">spislave_tip</obj_property>
