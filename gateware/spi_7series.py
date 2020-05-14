@@ -60,18 +60,13 @@ class SPIMaster(Module, AutoCSR, AutoDoc):
             i_S  = 0,
         )
 
-        self.tx = CSRStorage(16, name="tx", description="""Tx data, for MOSI.""")
-        # note to self: we can't auto-initiate on TX write because a 16-bit CSR is split into two 8-bit registers :(
-        # thus we need a "go" bit
+        self.tx = CSRStorage(16, name="tx", description="""Tx data, for MOSI. Note: 32-bit CSRs are required for this block to work!""")
         self.rx = CSRStatus(16, name="rx", description="""Rx data, from MISO""")
         self.control = CSRStorage(fields=[
-            CSRField("clrdone", description="Clear the done field", pulse=True),
-            CSRField("go", description="Initiates the SPI transaction", pulse=True),
             CSRField("intena", description="Enable interrupt on transaction finished"),
         ])
         self.status = CSRStatus(fields=[
             CSRField("tip", description="Set when transaction is in progress"),
-            CSRField("done", description="Set when transaction is finished, manually cleared"),
         ])
 
         self.submodules.ev = EventManager()
@@ -82,34 +77,32 @@ class SPIMaster(Module, AutoCSR, AutoDoc):
         # Replicate CSR into "spi" clock domain
         self.tx_r       = Signal(16)
         self.rx_r       = Signal(16)
-        self.tip_r      = Signal()
         self.go_r       = Signal()
         self.tx_written = Signal()
 
-        self.specials += MultiReg(self.tip_r, self.status.fields.tip)
+        setdone = Signal()
+        done_r      = Signal()
+        self.specials += MultiReg(setdone, done_r)
+        self.sync += [
+            If(self.tx.re,
+                self.status.fields.tip.eq(1)
+            ).Elif(done_r,
+                self.status.fields.tip.eq(0)
+            ).Else(
+                self.status.fields.tip.eq(self.status.fields.tip)
+            )
+        ]
 
         self.submodules.txwrite = PulseStretch() # Stretch the go signal to ensure it's picked up in the SPI domain
-        self.comb += self.txwrite.i.eq(self.control.fields.go)
+        self.comb += self.txwrite.i.eq(self.tx.re)
         self.comb += self.tx_written.eq(self.txwrite.o)
         tx_written_d = Signal()
         tx_go        = Signal()
         self.sync.spi += tx_written_d.eq(self.tx_written)
         self.comb += tx_go.eq(~self.tx_written & tx_written_d) # Falling edge of tx_written pulse, guarantees tx.storage is stable
 
-        setdone = Signal()
-        self.sync += [
-            If(self.control.fields.clrdone,
-                self.status.fields.done.eq(0)
-            ).Elif(setdone,
-                self.status.fields.done.eq(1)
-            ).Else(
-                self.status.fields.done.eq(self.status.fields.done)
-            )
-        ]
-
         self.csn_r = Signal(reset=1)
         self.comb += self.csn.eq(self.csn_r)
-        self.comb += self.rx.status.eq(self.rx_r) # Invalid while transaction is in progress
         fsm = FSM(reset_state="IDLE")
         fsm = ClockDomainsRenamer("spi")(fsm)
         self.submodules += fsm
@@ -120,12 +113,10 @@ class SPIMaster(Module, AutoCSR, AutoDoc):
                 NextValue(self.tx_r, Cat(0, self.tx.storage[:15])),
                 # Stability guaranteed so no synchronizer necessary
                 NextValue(spicount, 15),
-                NextValue(self.tip_r, 1),
                 NextValue(self.csn_r, 0),
                 NextValue(self.mosi, self.tx.storage[15]),
                 NextValue(self.rx_r, Cat(self.miso, self.rx_r[:15])),
             ).Else(
-                NextValue(self.tip_r, 0),
                 NextValue(self.csn_r, 1),
             )
         )
@@ -137,12 +128,12 @@ class SPIMaster(Module, AutoCSR, AutoDoc):
                 NextValue(self.rx_r, Cat(self.miso, self.rx_r[:15])),
             ).Else(
                 NextValue(self.csn_r, 1),
-                NextValue(self.tip_r, 0),
                 NextValue(spicount, 5),
                 NextState("WAIT"),
             ),
         )
         fsm.act("WAIT",  # guarantee a minimum CS_N high time after the transaction so slave can capture
+            NextValue(self.rx.status, self.rx_r),
             NextValue(spicount, spicount - 1),
             If(spicount == 0,
                 setdone.eq(1),

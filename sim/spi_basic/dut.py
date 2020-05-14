@@ -78,8 +78,8 @@ dutio = [
 additional clocks beyond the simulation defaults
 """
 local_clocks = {
-    "spi": [25e6, 0.0],
-    "sys": [12e6, 0.0],  # this overrides the default 100e6 -- simulate like we're an ICE40
+    "spi": [20e6, 0.0],
+#    "sys": [12e6, 0.0],  # this overrides the default 100e6 -- simulate like we're an ICE40
 }
 
 
@@ -91,7 +91,7 @@ class Dut(Sim):
         Sim.__init__(self, platform, custom_clocks=local_clocks, spiboot=spiboot, **kwargs) # SoC magic is in here
 
         # SPI interface
-        self.submodules.spimaster = spi_ice40.SpiMaster(platform.request("com"))
+        self.submodules.spimaster = spi_7series.SPIMaster(platform.request("com")) # replace with spi_ice40 to simulate the ice40 master
         self.add_csr("spimaster")
 
         self.submodules.spislave = spi_7series.SPISlave(platform.request("slave"))
