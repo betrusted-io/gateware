@@ -351,7 +351,7 @@ class SpiFifoSlave(Module, AutoCSR, AutoDoc):
                 rx.eq(Cat(self.mosi, self.txrx[0:15])),
                ).Else(
                 rx.eq(rx),
-                self.txrx.eq(self.tx_fifo.dout)
+                self.txrx.eq(tx_data)
             )
         ]
 
