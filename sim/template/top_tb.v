@@ -13,7 +13,7 @@ wire [3:0] bus;
 top dut (
     // don't touch these two lines
     .refclk(clk12),
-    .rst(0),
+    .rst(1'b0),
 
     // dut I/O goes here
     .template_pin(pin),
