@@ -170,7 +170,7 @@ class BiosHelper():
             sys.exit(1)  # fail the build
 
 class SimRunner():
-    def __init__(self, ci, os_cmds):
+    def __init__(self, ci, os_cmds, vex_verilog_path=VEX_CPU_PATH):
         os.system("mkdir -p run")
         os.system("rm -rf run/xsim.dir")
 
@@ -191,7 +191,7 @@ class SimRunner():
         os.system("cd run && xvlog ../../../sim_support/glbl.v")
         os.system("cd run && xvlog top.v -sv")
         os.system("cd run && xvlog top_tb.v -sv ")
-        os.system("cd run && xvlog {}".format("../" + VEX_CPU_PATH))
+        os.system("cd run && xvlog {}".format("../" + vex_verilog_path))
 
         # run user dependencies
         for cmd in os_cmds:
