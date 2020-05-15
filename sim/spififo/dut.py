@@ -105,6 +105,8 @@ class Dut(Sim):
 
         Sim.__init__(self, platform, custom_clocks=local_clocks, spiboot=spiboot, vex_verilog_path=VEX_CPU_PATH, **kwargs) # SoC magic is in here
 
+        # FIXME: the SpiFifoSlave core inside spi_ice40 is *not* the code used in the EC
+        # FIXME: the EC currently keeps it in an "rtl" directory. This should be fixed to point to "gateware"
         # SPI interface
         self.submodules.spimaster = ClockDomainsRenamer({"sys":"spi"})(spi_7series.SPIMaster(platform.request("com")))
         self.add_csr("spimaster")
