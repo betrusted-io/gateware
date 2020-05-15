@@ -35,6 +35,7 @@ from litex.soc.integration.doc import AutoDoc, ModuleDoc
 from litex.soc.interconnect.csr import *
 
 VEX_CPU_PATH = "../../gateware/cpu/VexRiscv_BetrustedSoC_Debug.v"
+TARGET = "riscv32imac-unknown-none-elf"
 
 benchio = [
     ("refclk", 0, Pins("X")),
@@ -109,7 +110,7 @@ class Sim(SoCCore):
     # custom_clocks is a dictionary of clock name to clock speed pairs to add to the CRG
     # spiboot sets the reset vector to either spiflash memory space, or rom memory space
     # NOTE: for spiboot to work, you must add a SPI ROM model mapped to the correct memory space
-    def __init__(self, platform, custom_clocks=None, spiboot=False, **kwargs):
+    def __init__(self, platform, custom_clocks=None, spiboot=False, vex_verilog_path=VEX_CPU_PATH, **kwargs):
         if custom_clocks:
             # copy custom clocks into the config array
             for key in custom_clocks.keys():
@@ -133,7 +134,7 @@ class Sim(SoCCore):
             cpu_reset_address=reset_address,
             **kwargs)
 
-        self.cpu.use_external_variant(VEX_CPU_PATH)
+        self.cpu.use_external_variant(vex_verilog_path)
 
         # instantiate the clock module
         self.submodules.crg = CRG(platform, crg_config)
@@ -147,7 +148,7 @@ class Sim(SoCCore):
         self.add_csr("simstatus")
 
 class BiosHelper():
-    def __init__(self, soc, spiboot, nightly=False):
+    def __init__(self, soc, spiboot, nightly=False, target=TARGET):
         sim_name = os.path.basename(os.getcwd())
 
         # setup the correct linker script for the BIOS build based on the SoC's boot vector settings
@@ -160,11 +161,11 @@ class BiosHelper():
         ret = 0
         os.system("mkdir -p run/software/bios") # make the directory if it doesn't exist
         if nightly:
-            ret += os.system("cd testbench && cargo +nightly build --target riscv32imac-unknown-none-elf --release")
+            ret += os.system("cd testbench && cargo +nightly build --target {} --release".format(target))
         else:
-            ret += os.system("cd testbench && cargo build --target riscv32imac-unknown-none-elf --release")
-        ret += os.system("riscv64-unknown-elf-objcopy -O binary ../../target/riscv32imac-unknown-none-elf/release/{} run/software/bios/bios.bin".format(sim_name))
-        ret += os.system("riscv64-unknown-elf-objdump -d ../../target/riscv32imac-unknown-none-elf/release/{} > run/bios.S".format(sim_name))
+            ret += os.system("cd testbench && cargo build --target {} --release".format(target))
+        ret += os.system("riscv64-unknown-elf-objcopy -O binary ../../target/{}/release/{} run/software/bios/bios.bin".format(target, sim_name))
+        ret += os.system("riscv64-unknown-elf-objdump -d ../../target/{}/release/{} > run/bios.S".format(target, sim_name))
         if ret != 0:
             sys.exit(1)  # fail the build
 
