@@ -9,6 +9,12 @@ use volatile::Volatile;
 #[used] // This is necessary to keep DBGSTR from being optimized out
 static mut DBGSTR: [u32; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
 
+pub fn report(p: &pac::Peripherals, data: u32) {
+    unsafe{
+        p.SIMSTATUS.report.write(|w| w.bits( data ));
+    }
+}
+
 #[sim_test]
 fn run(p: &pac::Peripherals) {
     let ram_ptr: *mut u32 = 0x0100_0000 as *mut u32;
@@ -35,7 +41,7 @@ fn run(p: &pac::Peripherals) {
         p.SIMSTATUS.report.write(|w| w.bits(0x00C0FFEE));
         p.SIMSTATUS.report.write(|w| w.bits(0xADDCACA0));
         p.SIMSTATUS.report.write(|w| w.bits(0x55555555));
-        p.SIMSTATUS.report.write(|w| w.bits(0xFEEDC0DE));
+        report(&p, 0xFEEDC0DE);
     }
 
     // set success to indicate to the CI framework that the test has passed
