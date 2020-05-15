@@ -75,26 +75,43 @@ dutio = [
 additional clocks beyond the simulation defaults
 """
 local_clocks = {
-    "spi": [24e6, 0.0],
+    "spi": [20e6, 0.0],
+    "sys": [18e6, 0.0],  # this overrides the default 100e6 -- simulate like we're an ICE40
     # add more clocks here, formatted as {"name" : [freq, phase]}
 }
 
 """
 add the submodules we're testing to the SoC, which is encapsulated in the Sim class
 """
+ICE40 = True
+# change these to toggle between ICE-40-like sim or Spartan-like sim
+if ICE40:
+    VEX_CPU_PATH = "../../../pythondata-cpu-vexriscv/pythondata_cpu_vexriscv/verilog/VexRiscv_MinDebug.v" # to simulate ICE-40 config
+    TARGET = "riscv32i-unknown-none-elf"
+else:
+    VEX_CPU_PATH = "../../gateware/cpu/VexRiscv_BetrustedSoC_Debug.v"
+    TARGET = "riscv32imac-unknown-none-elf"
+
 class Dut(Sim):
     def __init__(self, platform, spiboot=False, **kwargs):
-        SoCCore.mem_map["wifi"] = 0xe0010000
+        if ICE40:
+            SoCCore.mem_map = {}  # clear the default map provided by the simulation
+            SoCCore.mem_map["rom"] = 0x0
+            SoCCore.mem_map["sram"] = 0x01000000
+            SoCCore.mem_map["com"]  = 0xd0000000   # when simulating ICE40
+            SoCCore.mem_map["csr"]  = 0xe0000000
+        else:
+            SoCCore.mem_map["wifi"] = 0xe0010000  # when simulating 7-series
 
-        Sim.__init__(self, platform, custom_clocks=local_clocks, spiboot=spiboot, **kwargs) # SoC magic is in here
+        Sim.__init__(self, platform, custom_clocks=local_clocks, spiboot=spiboot, vex_verilog_path=VEX_CPU_PATH, **kwargs) # SoC magic is in here
 
         # SPI interface
-        self.submodules.spimaster = spi_7series.SPIMaster(platform.request("com"))
+        self.submodules.spimaster = ClockDomainsRenamer({"sys":"spi"})(spi_7series.SPIMaster(platform.request("com")))
         self.add_csr("spimaster")
 
         self.submodules.com = ClockDomainsRenamer({"spislave":"spi"})(spi_ice40.SpiFifoSlave(platform.request("slave")))
-        self.add_wb_slave(self.mem_map["wifi"], self.com.bus, 4)
-        self.add_memory_region("wifi", self.mem_map["wifi"], 4, type='io')
+        self.add_wb_slave(self.mem_map["com"], self.com.bus, 4)
+        self.add_memory_region("com", self.mem_map["com"], 4, type='io')
         self.add_csr("com")
         self.add_interrupt("com")
 
@@ -118,7 +135,7 @@ def generate_top():
     vns = builder.build(run=False)
     soc.do_exit(vns)
 
-    BiosHelper(soc, boot_from_spi) # marshals cargo to generate the BIOS from Rust files
+    BiosHelper(soc, boot_from_spi, target=TARGET) # marshals cargo to generate the BIOS from Rust files
 
     # pass #2 -- generate the SoC, incorporating the now-built BIOS
     platform = Platform(dutio)
@@ -141,7 +158,7 @@ before calling SimRunner
 def run_sim(ci=False):
     # add third-party modules via extra_cmds, eg. "cd run && xvlog ../MX66UM1G45G/MX66UM1G45G.v"
     extra_cmds = []
-    SimRunner(ci, extra_cmds)
+    SimRunner(ci, extra_cmds, vex_verilog_path=VEX_CPU_PATH)
 
 
 def main():

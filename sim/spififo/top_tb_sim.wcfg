@@ -1,0 +1,347 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wave_config>
+   <wave_state>
+   </wave_state>
+   <db_ref_list>
+      <db_ref path="top_tb_sim.wdb" id="1">
+         <top_modules>
+            <top_module name="glbl" />
+            <top_module name="top_tb" />
+         </top_modules>
+      </db_ref>
+   </db_ref_list>
+   <zoom_setting>
+      <ZoomStartTime time="0fs"></ZoomStartTime>
+      <ZoomEndTime time="213196146fs"></ZoomEndTime>
+      <Cursor1Time time="144362265fs"></Cursor1Time>
+   </zoom_setting>
+   <column_width_setting>
+      <NameColumnWidth column_width="376"></NameColumnWidth>
+      <ValueColumnWidth column_width="66"></ValueColumnWidth>
+   </column_width_setting>
+   <WVObjectSize size="81" />
+   <wvobject type="logic" fp_name="/top_tb/dut/sys_rst">
+      <obj_property name="ElementShortName">sys_rst</obj_property>
+      <obj_property name="ObjectShortName">sys_rst</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sys_clk">
+      <obj_property name="ElementShortName">sys_clk</obj_property>
+      <obj_property name="ObjectShortName">sys_clk</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/success">
+      <obj_property name="ElementShortName">success</obj_property>
+      <obj_property name="ObjectShortName">success</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/report">
+      <obj_property name="ElementShortName">report[31:0]</obj_property>
+      <obj_property name="ObjectShortName">report[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/miso">
+      <obj_property name="ElementShortName">miso</obj_property>
+      <obj_property name="ObjectShortName">miso</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/sclk">
+      <obj_property name="ElementShortName">sclk</obj_property>
+      <obj_property name="ObjectShortName">sclk</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/csn">
+      <obj_property name="ElementShortName">csn</obj_property>
+      <obj_property name="ObjectShortName">csn</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/mosi">
+      <obj_property name="ElementShortName">mosi</obj_property>
+      <obj_property name="ObjectShortName">mosi</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_INSTRUCTION">
+      <obj_property name="ElementShortName">decode_to_execute_INSTRUCTION[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_INSTRUCTION[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_PC">
+      <obj_property name="ElementShortName">decode_to_execute_PC[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_PC[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_RS1">
+      <obj_property name="ElementShortName">decode_to_execute_RS1[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_RS1[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_RS2">
+      <obj_property name="ElementShortName">decode_to_execute_RS2[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_RS2[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/shared_adr">
+      <obj_property name="ElementShortName">shared_adr[29:0]</obj_property>
+      <obj_property name="ObjectShortName">shared_adr[29:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/shared_dat_w">
+      <obj_property name="ElementShortName">shared_dat_w[31:0]</obj_property>
+      <obj_property name="ObjectShortName">shared_dat_w[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/shared_dat_r">
+      <obj_property name="ElementShortName">shared_dat_r[31:0]</obj_property>
+      <obj_property name="ObjectShortName">shared_dat_r[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/shared_sel">
+      <obj_property name="ElementShortName">shared_sel[3:0]</obj_property>
+      <obj_property name="ObjectShortName">shared_sel[3:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/shared_cyc">
+      <obj_property name="ElementShortName">shared_cyc</obj_property>
+      <obj_property name="ObjectShortName">shared_cyc</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/shared_stb">
+      <obj_property name="ElementShortName">shared_stb</obj_property>
+      <obj_property name="ObjectShortName">shared_stb</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/shared_ack">
+      <obj_property name="ElementShortName">shared_ack</obj_property>
+      <obj_property name="ObjectShortName">shared_ack</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/shared_we">
+      <obj_property name="ElementShortName">shared_we</obj_property>
+      <obj_property name="ObjectShortName">shared_we</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/shared_cti">
+      <obj_property name="ElementShortName">shared_cti[2:0]</obj_property>
+      <obj_property name="ObjectShortName">shared_cti[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/shared_bte">
+      <obj_property name="ElementShortName">shared_bte[1:0]</obj_property>
+      <obj_property name="ObjectShortName">shared_bte[1:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/shared_err">
+      <obj_property name="ElementShortName">shared_err</obj_property>
+      <obj_property name="ObjectShortName">shared_err</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/request">
+      <obj_property name="ElementShortName">request[1:0]</obj_property>
+      <obj_property name="ObjectShortName">request[1:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/grant">
+      <obj_property name="ElementShortName">grant</obj_property>
+      <obj_property name="ObjectShortName">grant</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/slave_sel">
+      <obj_property name="ElementShortName">slave_sel[3:0]</obj_property>
+      <obj_property name="ObjectShortName">slave_sel[3:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/slave_sel_r">
+      <obj_property name="ElementShortName">slave_sel_r[3:0]</obj_property>
+      <obj_property name="ObjectShortName">slave_sel_r[3:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/error">
+      <obj_property name="ElementShortName">error</obj_property>
+      <obj_property name="ObjectShortName">error</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/wait_1">
+      <obj_property name="ElementShortName">wait_1</obj_property>
+      <obj_property name="ObjectShortName">wait_1</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/done">
+      <obj_property name="ElementShortName">done</obj_property>
+      <obj_property name="ObjectShortName">done</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/count">
+      <obj_property name="ElementShortName">count[19:0]</obj_property>
+      <obj_property name="ObjectShortName">count[19:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_irq">
+      <obj_property name="ElementShortName">spififoslave_irq</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_irq</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_spi_event_status">
+      <obj_property name="ElementShortName">spififoslave_spi_event_status</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_spi_event_status</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_spi_event_pending">
+      <obj_property name="ElementShortName">spififoslave_spi_event_pending</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_spi_event_pending</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_spi_event_trigger">
+      <obj_property name="ElementShortName">spififoslave_spi_event_trigger</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_spi_event_trigger</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_spi_event_clear">
+      <obj_property name="ElementShortName">spififoslave_spi_event_clear</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_spi_event_clear</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_tip">
+      <obj_property name="ElementShortName">spififoslave_tip</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_tip</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/spififoslave_rx_level">
+      <obj_property name="ElementShortName">spififoslave_rx_level[11:0]</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_rx_level[11:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/spififoslave_tx_level">
+      <obj_property name="ElementShortName">spififoslave_tx_level[11:0]</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_tx_level[11:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/spififoslave_status_status">
+      <obj_property name="ElementShortName">spififoslave_status_status[31:0]</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_status_status[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_spi_err_status">
+      <obj_property name="ElementShortName">spififoslave_spi_err_status</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_spi_err_status</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_spi_err_pending">
+      <obj_property name="ElementShortName">spififoslave_spi_err_pending</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_spi_err_pending</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_spi_err_trigger">
+      <obj_property name="ElementShortName">spififoslave_spi_err_trigger</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_spi_err_trigger</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_spi_err_clear">
+      <obj_property name="ElementShortName">spififoslave_spi_err_clear</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_spi_err_clear</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/spififoslave_bus_adr">
+      <obj_property name="ElementShortName">spififoslave_bus_adr[29:0]</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_bus_adr[29:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/spififoslave_bus_dat_w">
+      <obj_property name="ElementShortName">spififoslave_bus_dat_w[31:0]</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_bus_dat_w[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/spififoslave_bus_dat_r">
+      <obj_property name="ElementShortName">spififoslave_bus_dat_r[31:0]</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_bus_dat_r[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/spififoslave_bus_sel">
+      <obj_property name="ElementShortName">spififoslave_bus_sel[3:0]</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_bus_sel[3:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_bus_cyc">
+      <obj_property name="ElementShortName">spififoslave_bus_cyc</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_bus_cyc</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_bus_stb">
+      <obj_property name="ElementShortName">spififoslave_bus_stb</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_bus_stb</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_bus_ack">
+      <obj_property name="ElementShortName">spififoslave_bus_ack</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_bus_ack</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_bus_we">
+      <obj_property name="ElementShortName">spififoslave_bus_we</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_bus_we</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/spififoslave_bus_cti">
+      <obj_property name="ElementShortName">spififoslave_bus_cti[2:0]</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_bus_cti[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/spififoslave_bus_bte">
+      <obj_property name="ElementShortName">spififoslave_bus_bte[1:0]</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_bus_bte[1:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_bus_err">
+      <obj_property name="ElementShortName">spififoslave_bus_err</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_bus_err</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_rd_ack">
+      <obj_property name="ElementShortName">spififoslave_rd_ack</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_rd_ack</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_wr_ack">
+      <obj_property name="ElementShortName">spififoslave_wr_ack</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_wr_ack</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_rx_fifo_re">
+      <obj_property name="ElementShortName">spififoslave_rx_fifo_re</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_rx_fifo_re</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_rx_fifo_readable">
+      <obj_property name="ElementShortName">spififoslave_rx_fifo_readable</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_rx_fifo_readable</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_rx_fifo_syncfifo_we">
+      <obj_property name="ElementShortName">spififoslave_rx_fifo_syncfifo_we</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_rx_fifo_syncfifo_we</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_rx_fifo_syncfifo_writable">
+      <obj_property name="ElementShortName">spififoslave_rx_fifo_syncfifo_writable</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_rx_fifo_syncfifo_writable</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_rx_fifo_syncfifo_re">
+      <obj_property name="ElementShortName">spififoslave_rx_fifo_syncfifo_re</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_rx_fifo_syncfifo_re</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_rx_fifo_syncfifo_readable">
+      <obj_property name="ElementShortName">spififoslave_rx_fifo_syncfifo_readable</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_rx_fifo_syncfifo_readable</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/spififoslave_rx_fifo_syncfifo_din">
+      <obj_property name="ElementShortName">spififoslave_rx_fifo_syncfifo_din[15:0]</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_rx_fifo_syncfifo_din[15:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/spififoslave_rx_fifo_syncfifo_dout">
+      <obj_property name="ElementShortName">spififoslave_rx_fifo_syncfifo_dout[15:0]</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_rx_fifo_syncfifo_dout[15:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/spififoslave_rx_fifo_level0">
+      <obj_property name="ElementShortName">spififoslave_rx_fifo_level0[10:0]</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_rx_fifo_level0[10:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_rx_fifo_replace">
+      <obj_property name="ElementShortName">spififoslave_rx_fifo_replace</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_rx_fifo_replace</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/spififoslave_rx_fifo_produce">
+      <obj_property name="ElementShortName">spififoslave_rx_fifo_produce[10:0]</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_rx_fifo_produce[10:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/spififoslave_rx_fifo_consume">
+      <obj_property name="ElementShortName">spififoslave_rx_fifo_consume[10:0]</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_rx_fifo_consume[10:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/spififoslave_rx_fifo_wrport_adr">
+      <obj_property name="ElementShortName">spififoslave_rx_fifo_wrport_adr[10:0]</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_rx_fifo_wrport_adr[10:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/spififoslave_rx_fifo_wrport_dat_r">
+      <obj_property name="ElementShortName">spififoslave_rx_fifo_wrport_dat_r[15:0]</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_rx_fifo_wrport_dat_r[15:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_rx_fifo_wrport_we">
+      <obj_property name="ElementShortName">spififoslave_rx_fifo_wrport_we</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_rx_fifo_wrport_we</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/spififoslave_rx_fifo_wrport_dat_w">
+      <obj_property name="ElementShortName">spififoslave_rx_fifo_wrport_dat_w[15:0]</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_rx_fifo_wrport_dat_w[15:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_rx_fifo_do_read">
+      <obj_property name="ElementShortName">spififoslave_rx_fifo_do_read</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_rx_fifo_do_read</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/spififoslave_rx_fifo_rdport_adr">
+      <obj_property name="ElementShortName">spififoslave_rx_fifo_rdport_adr[10:0]</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_rx_fifo_rdport_adr[10:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/spififoslave_rx_fifo_rdport_dat_r">
+      <obj_property name="ElementShortName">spififoslave_rx_fifo_rdport_dat_r[15:0]</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_rx_fifo_rdport_dat_r[15:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_rx_fifo_rdport_re">
+      <obj_property name="ElementShortName">spififoslave_rx_fifo_rdport_re</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_rx_fifo_rdport_re</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/spififoslave_rx_fifo_level1">
+      <obj_property name="ElementShortName">spififoslave_rx_fifo_level1[10:0]</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_rx_fifo_level1[10:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_rx_under_flag">
+      <obj_property name="ElementShortName">spififoslave_rx_under_flag</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_rx_under_flag</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_rx_under_bit">
+      <obj_property name="ElementShortName">spififoslave_rx_under_bit</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_rx_under_bit</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/spififoslave_rx_under_clear">
+      <obj_property name="ElementShortName">spififoslave_rx_under_clear</obj_property>
+      <obj_property name="ObjectShortName">spififoslave_rx_under_clear</obj_property>
+   </wvobject>
+</wave_config>

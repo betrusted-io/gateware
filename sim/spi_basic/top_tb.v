@@ -15,7 +15,7 @@ wire mosi;
 top dut (
     // don't touch these two lines
     .refclk(clk12),
-    .rst(0),
+    .rst(1'b0),
 
     // dut I/O goes here
     .com_sclk(sclk),

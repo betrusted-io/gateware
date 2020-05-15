@@ -161,13 +161,14 @@ class StickyBit(Module):
             )
         ]
 
+
 class SpiFifoSlave(Module, AutoCSR, AutoDoc):
     def __init__(self, pads):
         self.intro = ModuleDoc("""Simple soft SPI slave module optimized for Betrusted-EC (UP5K arch) use
 
         Assumes a free-running sclk and csn performs the function of framing bits
         Thus csn must go high between each frame, you cannot hold csn low for burst transfers.
-        
+
         A free-running clock is necessitated because the FIFO primitive used here is synchronous
         to the sysclk domain, not the SPICLK domain. An async FIFO would take too many gates; a sync
         FIFO can use ICESTORM_RAMs efficiently. However, the price is that in order to synchronize from
@@ -176,7 +177,7 @@ class SpiFifoSlave(Module, AutoCSR, AutoDoc):
         edge detect on that in sysclk). This need is driven in part by the fact that we anticipate that
         SPICLK may run (much) faster than sysclk -- it's constrained to 24MHz in the design but 
         it looks like we could run it much, much faster. 
-        
+
         Capturing the data with no sync overhead would require either a fancier state machine and/or
         async fifos, both which burn gates. Thus the call here is to incur some packet-to-packet overhead on 
         the SPI bus by imposing a sync penalty after each packet received, but on the upside the bus can
@@ -191,8 +192,9 @@ class SpiFifoSlave(Module, AutoCSR, AutoDoc):
 
         self.control = CSRStorage(fields=[
             CSRField("clrerr", description="Clear FIFO error flags", pulse=True),
-            CSRField("host_int", description="0->1 raises an interrupt to the COM host"), # rising edge triggered on other side
-            CSRField("pump", description="Drain one element from TX fifo per write of `1`. Used to clear TX FIFO in case of master/slave phase mismatch.", pulse=True),
+            CSRField("host_int", description="0->1 raises an interrupt to the COM host"),
+            # rising edge triggered on other side
+            CSRField("reset", description="Reset the fifos", pulse=True),
         ])
         self.comb += pads.irq.eq(self.control.fields.host_int)
         self.status = CSRStatus(fields=[
@@ -205,30 +207,35 @@ class SpiFifoSlave(Module, AutoCSR, AutoDoc):
             CSRField("tx_empty", description="Set when Tx FIFO is empty"),
             CSRField("tx_level", size=12, description="Level of Tx FIFO"),
             CSRField("tx_over", description="Set when Tx FIFO overflows"),
-            CSRField("tx_under", description = "Set when Tx FIFO underflows"),
+            CSRField("tx_under", description="Set when Tx FIFO underflows"),
         ])
         self.submodules.ev = EventManager()
-        self.ev.spi_avail = EventSourcePulse(description="Triggered when Rx FIFO leaves empty state")  # rising edge triggered
-        self.ev.spi_event = EventSourceProcess(description="Triggered every time a packet completes")  # falling edge triggered
-        self.ev.spi_err = EventSourcePulse(description="Triggered when any error condition occurs") # rising edge
+        self.ev.spi_avail = EventSourcePulse(
+            description="Triggered when Rx FIFO leaves empty state")  # rising edge triggered
+        self.ev.spi_event = EventSourceProcess(
+            description="Triggered every time a packet completes")  # falling edge triggered
+        self.ev.spi_err = EventSourcePulse(description="Triggered when any error condition occurs")  # rising edge
         self.ev.finalize()
         self.comb += self.ev.spi_avail.trigger.eq(self.status.fields.rx_avail)
         self.comb += self.ev.spi_event.trigger.eq(self.status.fields.tip)
-        self.comb += self.ev.spi_err.trigger.eq(self.status.fields.rx_over | self.status.fields.rx_under | self.status.fields.tx_over | self.status.fields.tx_under)
+        self.comb += self.ev.spi_err.trigger.eq(
+            self.status.fields.rx_over | self.status.fields.rx_under | self.status.fields.tx_over | self.status.fields.tx_under)
 
         self.bus = bus = wishbone.Interface()
         rd_ack = Signal()
         wr_ack = Signal()
-        self.comb +=[
+        self.comb += [
             If(bus.we,
-               bus.ack.eq(wr_ack),
+                bus.ack.eq(wr_ack),
             ).Else(
                 bus.ack.eq(rd_ack),
             )
         ]
 
         # read/rx subsystemx
-        self.submodules.rx_fifo = rx_fifo = SyncFIFOBuffered(16, 1280) # should infer SB_RAM256x16's. 2560 depth > 2312 bytes = wifi MTU
+        self.submodules.rx_fifo = rx_fifo = ResetInserter(["sys"])(
+            SyncFIFOBuffered(16, 1280))  # should infer SB_RAM256x16's. 2560 depth > 2312 bytes = wifi MTU
+        self.comb += self.rx_fifo.reset_sys.eq(self.control.fields.reset | ResetSignal())
         self.submodules.rx_under = StickyBit()
         self.comb += [
             self.status.fields.rx_level.eq(rx_fifo.level),
@@ -236,7 +243,6 @@ class SpiFifoSlave(Module, AutoCSR, AutoDoc):
             self.rx_under.clear.eq(self.control.fields.clrerr),
             self.status.fields.rx_under.eq(self.rx_under.bit),
         ]
-
 
         bus_read = Signal()
         bus_read_d = Signal()
@@ -266,7 +272,8 @@ class SpiFifoSlave(Module, AutoCSR, AutoDoc):
         ]
 
         # tx/write spislave
-        self.submodules.tx_fifo = tx_fifo = SyncFIFOBuffered(16, 1280)
+        self.submodules.tx_fifo = tx_fifo = ResetInserter(["sys"])(SyncFIFOBuffered(16, 1280))
+        self.comb += self.tx_fifo.reset_sys.eq(self.control.fields.reset | ResetSignal())
         self.submodules.tx_over = StickyBit()
         self.comb += [
             self.tx_over.clear.eq(self.control.fields.clrerr),
@@ -276,18 +283,22 @@ class SpiFifoSlave(Module, AutoCSR, AutoDoc):
             self.status.fields.tx_level.eq(tx_fifo.level),
         ]
 
+        write_gate = Signal()
         self.sync += [
             If(bus.cyc & bus.stb & bus.we & ~bus.ack,
                 If(tx_fifo.writable,
                     tx_fifo.din.eq(bus.dat_w),
-                    tx_fifo.we.eq(1),
+                    tx_fifo.we.eq(~write_gate),  # ensure write is just single cycle
                     wr_ack.eq(1),
+                    write_gate.eq(1),
                 ).Else(
                     self.tx_over.flag.eq(1),
                     tx_fifo.we.eq(0),
                     wr_ack.eq(0),
+                    write_gate.eq(0),
                 )
                ).Else(
+                write_gate.eq(0),
                 tx_fifo.we.eq(0),
                 wr_ack.eq(0),
             )
@@ -325,20 +336,24 @@ class SpiFifoSlave(Module, AutoCSR, AutoDoc):
         self.comb += [
             self.rx_fifo.din.eq(rx),
             self.rx_fifo.we.eq(donepulse),
-            self.tx_fifo.re.eq(donepulse | self.control.fields.pump),
+            self.tx_fifo.re.eq(donepulse),
         ]
 
+        tx_data = Signal(16)
+        self.comb += [
+            If(self.tx_fifo.readable, tx_data.eq(self.tx_fifo.dout)
+            ).Else(tx_data.eq(0xDDDD))  # in case of underflow send an error code
+        ]
         self.sync.spislave += [
             # "Sloppy" clock boundary crossing allowed because rx is, in theory, static when donepulse happens
             If(self.csn == 0,
-               self.txrx.eq(Cat(self.mosi, self.txrx[0:15])),
+                self.txrx.eq(Cat(self.mosi, self.txrx[0:15])),
                 rx.eq(Cat(self.mosi, self.txrx[0:15])),
-            ).Else(
+               ).Else(
                 rx.eq(rx),
-               self.txrx.eq(self.tx_fifo.dout)
+                self.txrx.eq(self.tx_fifo.dout)
             )
         ]
-
 
 
 class SpiSlave(Module, AutoCSR, AutoDoc):

@@ -15,7 +15,7 @@ wire mosi;
 top dut (
     // don't touch these two lines
     .refclk(clk12),
-    .rst(0),
+    .rst(1'b0),
 
     // dut I/O goes here
     .com_sclk(sclk),
@@ -51,6 +51,6 @@ initial begin
 end
 
 // DUT-specific end condition to make sure it eventually stops running for CI mode
-initial #800_000 $finish;
+initial #8_000_000 $finish;
 
 endmodule
