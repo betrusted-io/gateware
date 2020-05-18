@@ -8,6 +8,11 @@ use volatile::Volatile;
 #[used] // This is necessary to keep DBGSTR from being optimized out
 static mut DBGSTR: [u32; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
 
+pub fn report(p: &pac::Peripherals, data: u32) {
+    unsafe {
+        p.SIMSTATUS.report.write(|w| w.bits( data ));
+    }
+}
 #[sim_test]
 fn run(p: &pac::Peripherals) {
     const FIFODEPTH: usize = 8;
@@ -37,7 +42,7 @@ fn run(p: &pac::Peripherals) {
     for j in 0..FIFODEPTH*2 {
         audio[j] = ((j << 16) | (FIFODEPTH-j)) as u32;
     }
-    
+
     for j in 0..FIFODEPTH*2 {
         unsafe {
             (*duplex).write(audio[j]);
@@ -51,7 +56,7 @@ fn run(p: &pac::Peripherals) {
 
     // test a read when FIFO is empty
     unsafe{ DBGSTR[0] = (*duplex).read(); }
-    
+
     let mut count: usize = 0;
     let mut sample: u32 = 0;
     loop {
@@ -59,13 +64,14 @@ fn run(p: &pac::Peripherals) {
             for _ in 0 ..FIFODEPTH {
                 unsafe {
                     sample = (*duplex).read();
+                    report(&p, sample);
                     (*duplex).write(sample + 0x2000_3000);
                     (*spkr).write(sample + 0x4000_5000);
                 }
             }
             count += 1;
             if count > 4 {
-                break;            
+                break;
             }
         }
     }
