@@ -37,7 +37,7 @@ from litex.soc.integration.doc import AutoDoc, ModuleDoc
 from litex.soc.interconnect.csr import *
 
 # specific to a given DUT
-from litex.soc.cores.i2s import S7I2SSlave
+from litex.soc.cores.i2s import S7I2S as S7I2SSlave
 
 """
 set boot_from_spi to change the reset vector and linking location of BIOS
