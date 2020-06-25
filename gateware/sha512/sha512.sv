@@ -18,6 +18,7 @@ module sha512 import hmac512_pkg::*; (
   input        sha_en,   // If disabled, it clears internal content.
   input        hash_start,
   input        hash_process,
+  input        hash_select_256,  // 0 = sha512, 1 = sha512/256
   output logic hash_done,
 
   input        [127:0] message_length,   // bits but byte based
@@ -95,7 +96,11 @@ module sha512 import hmac512_pkg::*; (
       digest <= '{default: '0};
     end else if (hash_start) begin
       for (int i = 0 ; i < 8 ; i++) begin
-        digest[i] <= InitHash[i];
+        if (hash_select_256) begin
+           digest[i] <= InitHash256[i];
+          end else begin
+           digest[i] <= InitHash[i];
+        end
       end
     end else if (!sha_en || clear_digest) begin
       digest <= '0;

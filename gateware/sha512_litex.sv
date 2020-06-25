@@ -14,6 +14,7 @@ module sha512_litex
   input        sha_en,   // If disabled, it clears internal content.
   input endian_swap,
   input digest_swap,
+  input hash_select_256,
 
   output sha_hash_done,
 
@@ -256,10 +257,11 @@ module sha512_litex
     .hash_start       (sha_hash_start),
     .hash_process     (sha_hash_process),
     .hash_done        (sha_hash_done),
+    .hash_select_256  (hash_select_256),
 
     .message_length   (sha_message_length),
 
     .digest
   );
 
-endmodule
+endmodule : sha512_litex

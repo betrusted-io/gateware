@@ -54,6 +54,7 @@ class Hmac(Module, AutoDoc, AutoCSR):
             CSRField("sha_en", size=1, description="Enable the SHA512 core"),
             CSRField("endian_swap", size=1, description="Swap the endianness on the input data"),
             CSRField("digest_swap", size=1, description="Swap the endianness on the output digest"),
+            CSRField("select_256", size=1, description="Select SHA512/256 IV constants when set to `1`")
         ])
         control_latch = Signal(self.config.size)
         ctrl_freeze = Signal()
@@ -158,6 +159,7 @@ class Hmac(Module, AutoDoc, AutoCSR):
             i_sha_en=control_latch[0],
             i_endian_swap=control_latch[1],
             i_digest_swap=control_latch[2],
+            i_hash_select_256=control_latch[3],
 
             o_sha_hash_done=sha512_hash_done,
 

@@ -28,6 +28,11 @@ package hmac512_pkg;
     64'h510e527fade682d1, 64'h9b05688c2b3e6c1f, 64'h1f83d9abfb41bd6b, 64'h5be0cd19137e2179
   };
 
+  localparam sha_word_t InitHash256 [8]= '{
+    64'h22312194fc2bf72c, 64'h9f555fa3c84c64c2, 64'h2393b86b6f53b151, 64'h963877195940eabd,
+    64'h96283ee2a88effe3, 64'hbe5e1e2553863992, 64'h2b0199fc2c85b8aa, 64'h0eb72ddc81c52ca2
+  };
+
   localparam sha_word_t CubicRootPrime [80] = '{
     64'h428a2f98d728ae22, 64'h7137449123ef65cd, 64'hb5c0fbcfec4d3b2f, 64'he9b5dba58189dbbc, 64'h3956c25bf348b538,
     64'h59f111f1b605d019, 64'h923f82a4af194f9b, 64'hab1c5ed5da6d8118, 64'hd807aa98a3030242, 64'h12835b0145706fbe,

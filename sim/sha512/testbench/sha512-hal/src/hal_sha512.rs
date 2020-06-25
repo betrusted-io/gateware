@@ -7,6 +7,7 @@ bitflags! {
         const SHA512_EN   = 0b0000_0001;
         const ENDIAN_SWAP = 0b0000_0010;
         const DIGEST_SWAP = 0b0000_0100;
+        const SHA512_256  = 0b0000_1000;
     }
 }
 
@@ -105,5 +106,25 @@ impl BtSha512 {
                 _ => assert!(false),
             }
         }
+        self.config = self.config & !Sha512Config::SHA512_EN; // clear the SHA512_EN flag
+        unsafe{ self.p.SHA512.config.write(|w|{ w.bits(self.config.bits()) }); } // commit to config
+    }
+
+    pub fn digest256(&mut self, digest: &mut [u64; 4]) {
+        self.p.SHA512.command.write(|w|{ w.hash_process().set_bit()});
+        while (self.p.SHA512.ev_pending.read().bits() & (Sha512Event::SHA512_DONE).bits()) == 0 {}
+        unsafe{ self.p.SHA512.ev_pending.write(|w| w.bits((Sha512Event::SHA512_DONE).bits()) ); }
+
+        for reg in 0..4 {
+            match reg {
+                0 => digest[reg] = self.p.SHA512.digest00.read().bits() as u64 | (self.p.SHA512.digest01.read().bits() as u64) << 32,
+                1 => digest[reg] = self.p.SHA512.digest10.read().bits() as u64 | (self.p.SHA512.digest11.read().bits() as u64) << 32,
+                2 => digest[reg] = self.p.SHA512.digest20.read().bits() as u64 | (self.p.SHA512.digest21.read().bits() as u64) << 32,
+                3 => digest[reg] = self.p.SHA512.digest30.read().bits() as u64 | (self.p.SHA512.digest31.read().bits() as u64) << 32,
+                _ => assert!(false),
+            }
+        }
+        self.config = self.config & !Sha512Config::SHA512_EN; // clear the SHA512_EN flag
+        unsafe{ self.p.SHA512.config.write(|w|{ w.bits(self.config.bits()) }); } // commit to config
     }
 }
