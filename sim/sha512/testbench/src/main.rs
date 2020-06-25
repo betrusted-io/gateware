@@ -56,22 +56,28 @@ fn run(p: &pac::Peripherals) {
             pass = false;
         }
     }
-    report(p, 0x1000_0006);
+    if pass {
+        report(p, 0x1000_0006);
+    } else {
+        report(p, 0xDEAD_0006);
+    }
 
     // test sha512/256
     report(p, 0x1000_0007);
-    sha512.config = Sha512Config::ENDIAN_SWAP | Sha512Config::DIGEST_SWAP | Sha512Config::SHA512_EN | Sha512Config::SHA512_256;
+    let mut sha512b: BtSha512 = BtSha512::new();
+    sha512b.config = Sha512Config::ENDIAN_SWAP | Sha512Config::DIGEST_SWAP | Sha512Config::SHA512_EN | Sha512Config::SHA512_256;
 
     report(p, 0x1000_0008);
-    sha512.init();
+    sha512b.init();
+
     report(p, 0x1000_0009);
-    sha512.update(kData);
+    sha512b.update(kData);
     report(p, 0x1000_000A);
     let mut digest256: [u64; 4] = [0; 4];
-    sha512.digest256(&mut digest256); // this should also reset the block
+    sha512b.digest256(&mut digest256); // this should also reset the block
     report(p, 0x1000_000B);
 
-    let mut pass: bool = true;
+    pass = true;
     for i in 0..4 {
         report(p, digest256[i] as u32);
         report(p, kExpectedDigest256[i] as u32);
@@ -81,7 +87,11 @@ fn run(p: &pac::Peripherals) {
             pass = false;
         }
     }
-    report(p, 0x1000_000C);
+    if pass {
+        report(p, 0x1000_000C);
+    } else {
+        report(p, 0xDEAD_000C);
+    }
 
     // set success to indicate to the CI framework that the test has passed
     p.SIMSTATUS.simstatus.modify(|_r, w| w.success().bit(pass));
