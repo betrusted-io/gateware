@@ -31,7 +31,7 @@ end
 
 wire tx0, tx1;
 
-top dut (
+sim_bench dut (
     // don't touch these two lines
     .refclk(clk12),
     .rst(fpga_reset),

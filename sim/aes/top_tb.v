@@ -10,7 +10,7 @@ module top_tb();
 wire pin;
 wire [3:0] bus;
 
-top dut (
+sim_bench dut (
     // don't touch these two lines
     .refclk(clk12),
     .rst(0),

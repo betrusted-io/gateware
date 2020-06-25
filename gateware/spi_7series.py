@@ -29,9 +29,9 @@ class PulseStretch(Module):
         self.comb += self.o.eq(count != 0)
 
 
-class SPIMaster(Module, AutoCSR, AutoDoc):
+class SPIController(Module, AutoCSR, AutoDoc):
     def __init__(self, pads):
-        self.intro = ModuleDoc("""Simple soft SPI master module optimized for Betrusted applications
+        self.intro = ModuleDoc("""Simple soft SPI Controller module optimized for Betrusted applications
 
         Requires a clock domain 'spi', which runs at the speed of the SPI bus.
 
@@ -39,8 +39,8 @@ class SPIMaster(Module, AutoCSR, AutoDoc):
         which is about 15Mbps system-level performance, assuming the receiver can keep up.
         """)
 
-        self.miso = pads.miso
-        self.mosi = pads.mosi
+        self.cipo = pads.cipo
+        self.copi = pads.copi
         self.sclk = pads.sclk
         self.csn  = pads.csn
 
@@ -60,8 +60,8 @@ class SPIMaster(Module, AutoCSR, AutoDoc):
             i_S  = 0,
         )
 
-        self.tx = CSRStorage(16, name="tx", description="""Tx data, for MOSI. Note: 32-bit CSRs are required for this block to work!""")
-        self.rx = CSRStatus(16, name="rx", description="""Rx data, from MISO""")
+        self.tx = CSRStorage(16, name="tx", description="""Tx data, for COPI. Note: 32-bit CSRs are required for this block to work!""")
+        self.rx = CSRStatus(16, name="rx", description="""Rx data, from CIPO""")
         self.control = CSRStorage(fields=[
             CSRField("intena", description="Enable interrupt on transaction finished"),
         ])
@@ -114,25 +114,25 @@ class SPIMaster(Module, AutoCSR, AutoDoc):
                 # Stability guaranteed so no synchronizer necessary
                 NextValue(spicount, 15),
                 NextValue(self.csn_r, 0),
-                NextValue(self.mosi, self.tx.storage[15]),
-                NextValue(self.rx_r, Cat(self.miso, self.rx_r[:15])),
+                NextValue(self.copi, self.tx.storage[15]),
+                NextValue(self.rx_r, Cat(self.cipo, self.rx_r[:15])),
             ).Else(
                 NextValue(self.csn_r, 1),
             )
         )
         fsm.act("RUN",
             If(spicount > 0,
-                NextValue(self.mosi, self.tx_r[15]),
+                NextValue(self.copi, self.tx_r[15]),
                 NextValue(self.tx_r, Cat(0, self.tx_r[:15])),
                 NextValue(spicount, spicount - 1),
-                NextValue(self.rx_r, Cat(self.miso, self.rx_r[:15])),
+                NextValue(self.rx_r, Cat(self.cipo, self.rx_r[:15])),
             ).Else(
                 NextValue(self.csn_r, 1),
                 NextValue(spicount, 5),
                 NextState("WAIT"),
             ),
         )
-        fsm.act("WAIT",  # guarantee a minimum CS_N high time after the transaction so slave can capture
+        fsm.act("WAIT",  # guarantee a minimum CS_N high time after the transaction so Peripheral can capture
             NextValue(self.rx.status, self.rx_r),
             NextValue(spicount, spicount - 1),
             If(spicount == 0,
@@ -142,25 +142,25 @@ class SPIMaster(Module, AutoCSR, AutoDoc):
         )
 
 
-class SPISlave(Module, AutoCSR, AutoDoc):
+class SPIPeripheral(Module, AutoCSR, AutoDoc):
     def __init__(self, pads):
-        self.intro = ModuleDoc("""Simple soft SPI slave module optimized for Betrusted-EC (UP5K arch) use
+        self.intro = ModuleDoc("""Simple soft SPI Peripheral module optimized for Betrusted-EC (UP5K arch) use
 
         Assumes a free-running sclk and csn performs the function of framing bits
         Thus csn must go high between each frame, you cannot hold csn low for burst transfers
         """)
 
-        self.miso = pads.miso
-        self.mosi = pads.mosi
+        self.cipo = pads.cipo
+        self.copi = pads.copi
         self.sclk = pads.sclk
         self.csn  = pads.csn
 
         ### FIXME: stand-in for SPI clock input
-        self.clock_domains.cd_spislave = ClockDomain()
-        self.comb += self.cd_spislave.clk.eq(self.sclk)
+        self.clock_domains.cd_spi_peripheral = ClockDomain()
+        self.comb += self.cd_spi_peripheral.clk.eq(self.sclk)
 
-        self.tx = CSRStorage(16, name="tx", description="""Tx data, to MISO""")
-        self.rx = CSRStatus(16,  name="rx", description="""Rx data, from MOSI""")
+        self.tx = CSRStorage(16, name="tx", description="""Tx data, to CIPO""")
+        self.rx = CSRStatus(16,  name="rx", description="""Rx data, from COPI""")
         self.control = CSRStorage(fields=[
             CSRField("intena", description="Enable interrupt on transaction finished"),
             CSRField("clrerr", description="Clear Rx overrun error", pulse=True),
@@ -213,13 +213,13 @@ class SPISlave(Module, AutoCSR, AutoDoc):
             )
         ]
 
-        self.comb += self.miso.eq(self.txrx[15])
+        self.comb += self.cipo.eq(self.txrx[15])
         csn_d = Signal()
-        self.sync.spislave += [
+        self.sync.spi_peripheral += [
             csn_d.eq(self.csn),
             # "Sloppy" clock boundary crossing allowed because "rxfull" is synchronized and CPU should grab data based on that
             If(self.csn == 0,
-                self.txrx.eq(Cat(self.mosi, self.txrx[0:15])),
+                self.txrx.eq(Cat(self.copi, self.txrx[0:15])),
                 self.rx.status.eq(self.rx.status),
             ).Else(
                 If(self.csn & ~csn_d,

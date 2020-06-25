@@ -11,7 +11,7 @@ wire si;
 wire sclk;
 wire scs;
 
-top dut (
+sim_bench dut (
     .refclk(clk12),
     .rst(0),
     .lcd_sclk(sclk),

@@ -14,7 +14,7 @@ wire sram_oe_n;
 wire [31:0] sram_d;
 wire [21:0] sram_adr;
 
-top dut (
+sim_bench dut (
     // don't touch these two lines
     .refclk(clk12),
     .rst(0),

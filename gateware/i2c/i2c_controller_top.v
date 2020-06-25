@@ -1,6 +1,6 @@
 /////////////////////////////////////////////////////////////////////
 ////                                                             ////
-////  WISHBONE revB.2 compliant I2C Master controller Top-level  ////
+////  WISHBONE revB.2 compliant I2C controller controller Top-level  ////
 ////                                                             ////
 ////                                                             ////
 ////  Author: Richard Herveille                                  ////
@@ -37,7 +37,7 @@
 
 //  CVS Log
 //
-//  $Id: i2c_master_top.v,v 1.12 2009-01-19 20:29:26 rherveille Exp $
+//  $Id: i2c_controller_top.v,v 1.12 2009-01-19 20:29:26 rherveille Exp $
 //
 //  $Date: 2009-01-19 20:29:26 $
 //  $Revision: 1.12 $
@@ -60,7 +60,7 @@
 //               Small code simplifications
 //
 //               Revision 1.7  2002/12/26 15:02:32  rherveille
-//               Core is now a Multimaster I2C controller
+//               Core is now a Multicontroller I2C controller
 //
 //               Revision 1.6  2002/11/30 22:24:40  rherveille
 //               Cleaned up code
@@ -73,9 +73,9 @@
 `timescale 1ns / 10ps
 // synopsys translate_on
 
-`include "i2c_master_defines.v"
+`include "i2c_controller_defines.v"
 
-module i2c_master_top(
+module i2c_controller_top(
 	wb_clk_i, wb_rst_i, arst_i, wb_adr_i, wb_dat_i, wb_dat_o,
 	wb_we_i, wb_stb_i, wb_cyc_i, wb_ack_o, wb_inta_o,
 	scl_pad_i, scl_pad_o, scl_padoen_o, sda_pad_i, sda_pad_o, sda_padoen_o );
@@ -88,7 +88,7 @@ module i2c_master_top(
 	//
 
 	// wishbone signals
-	input        wb_clk_i;     // master clock input
+	input        wb_clk_i;     // controller clock input
 	input        wb_rst_i;     // synchronous active high reset
 	input        arst_i;       // asynchronous reset
 	input  [2:0] wb_adr_i;     // lower address bits
@@ -137,7 +137,7 @@ module i2c_master_top(
 
 	// status register signals
 	wire irxack;
-	reg  rxack;       // received aknowledge from slave
+	reg  rxack;       // received aknowledge from peripheral
 	reg  tip;         // transfer in progress
 	reg  irq_flag;    // interrupt pending flag
 	wire i2c_busy;    // bus busy (start signal detected)
@@ -231,7 +231,7 @@ module i2c_master_top(
 	assign ien = ctr[6];
 
 	// hookup byte controller block
-	i2c_master_byte_ctrl byte_controller (
+	i2c_controller_byte_ctrl byte_controller (
 		.clk      ( wb_clk_i     ),
 		.rst      ( wb_rst_i     ),
 		.nReset   ( rst_i        ),

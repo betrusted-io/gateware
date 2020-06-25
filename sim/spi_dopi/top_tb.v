@@ -40,7 +40,7 @@ MX66UM1G45G rom(
 
 always #2.5 dqs_delay = dqs;  // this inserts the equivalent FPGA input clock buffer delay
 
-top dut (
+sim_bench dut (
     .refclk(clk12),
     .rst(fpga_reset),
 

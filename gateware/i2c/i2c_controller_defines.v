@@ -1,6 +1,6 @@
 /////////////////////////////////////////////////////////////////////
 ////                                                             ////
-////  WISHBONE rev.B2 compliant I2C Master controller defines    ////
+////  WISHBONE rev.B2 compliant I2C controller controller defines    ////
 ////                                                             ////
 ////                                                             ////
 ////  Author: Richard Herveille                                  ////
@@ -37,7 +37,7 @@
 
 //  CVS Log
 //
-//  $Id: i2c_master_defines.v,v 1.3 2001-11-05 11:59:25 rherveille Exp $
+//  $Id: i2c_controller_defines.v,v 1.3 2001-11-05 11:59:25 rherveille Exp $
 //
 //  $Date: 2001-11-05 11:59:25 $
 //  $Revision: 1.3 $

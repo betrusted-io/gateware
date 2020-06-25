@@ -7,27 +7,27 @@ module top_tb();
 
 /////////// DUT code below here
 
-wire miso;
+wire cipo;
 wire sclk;
 wire csn;
-wire mosi;
+wire copi;
 
-top dut (
+sim_bench dut (
     // don't touch these two lines
     .refclk(clk12),
     .rst(1'b0),
 
     // dut I/O goes here
     .com_sclk(sclk),
-    .com_mosi(mosi),
-    .com_miso(miso),
+    .com_copi(copi),
+    .com_cipo(cipo),
     .com_csn(csn),
     .com_wirq(0),   // not testing this here
 
-    .slave_sclk(sclk),
-    .slave_mosi(mosi),
-    .slave_miso(miso),
-    .slave_csn(csn),
+    .peripheral_sclk(sclk),
+    .peripheral_copi(copi),
+    .peripheral_cipo(cipo),
+    .peripheral_csn(csn),
 
     // don't touch these three lines
     .sim_success(success),
@@ -36,18 +36,18 @@ top dut (
 );
 
 // reg [15:0] value;
-// initial miso = 1'b0;
+// initial cipo = 1'b0;
 // initial value = 16'ha503;
 // always @(posedge sclk) begin
-//    miso <= value[15];
+//    cipo <= value[15];
 //    value <= {value[14:0],value[15]};
 // end
 
 // add extra variables for CI watching here   
 initial begin
    $dumpvars(0, sclk);
-   $dumpvars(0, miso);
-   $dumpvars(0, mosi);
+   $dumpvars(0, cipo);
+   $dumpvars(0, copi);
    $dumpvars(0, csn);
 end
 

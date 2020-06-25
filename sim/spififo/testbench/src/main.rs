@@ -31,12 +31,12 @@ fn run(p: &pac::Peripherals) {
 
         (*com).write(0x0f0f);
 
-        p.SPIMASTER.tx.write(|w| w.bits(0xf055));
+        p.SPICONTROLLER.tx.write(|w| w.bits(0xf055));
 
 
         while p.COM.status.read().rx_avail().bit() == false { }
 
-        (*(ram.add(0))).write( p.SPIMASTER.rx.read().bits() );
+        (*(ram.add(0))).write( p.SPICONTROLLER.rx.read().bits() );
         report(&p, 0x8000_0001);
         (*(ram.add(1))).write( (*com).read() );
         report(&p, 0x8000_0002);
@@ -49,9 +49,9 @@ fn run(p: &pac::Peripherals) {
 
         // write performance benchmark
         for i in 0..16 {
-            p.SPIMASTER.tx.write(|w| w.bits(i + 0x4c00));
+            p.SPICONTROLLER.tx.write(|w| w.bits(i + 0x4c00));
 
-            while p.SPIMASTER.status.read().tip().bit() { }
+            while p.SPICONTROLLER.status.read().tip().bit() { }
         }
 
         // split read
@@ -65,10 +65,10 @@ fn run(p: &pac::Peripherals) {
             (*com).write( i + 0xFAF0 );
         }
         for i in 0..4 {
-            p.SPIMASTER.tx.write(|w| w.bits(i + 0x6960));
+            p.SPICONTROLLER.tx.write(|w| w.bits(i + 0x6960));
 
       	    // simulations show the below is critical in poll loops for sysclk=100MHz, spclk=25MHz
-            while p.SPIMASTER.status.read().tip().bit() { }
+            while p.SPICONTROLLER.status.read().tip().bit() { }
         }
 
         if true {
@@ -94,7 +94,7 @@ fn run(p: &pac::Peripherals) {
         report(&p, (*(ram.add(50))).read());
 
         // test what happens if we have a SPI transaction but no actual data
-        p.SPIMASTER.tx.write(|w| w.bits(0xDEAD));
+        p.SPICONTROLLER.tx.write(|w| w.bits(0xDEAD));
 
         // quick post-amble so we can quickly recognize the end of the simulation staring at the waveforms
         for i in 0..3 {

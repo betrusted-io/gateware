@@ -189,7 +189,7 @@ class SimRunner():
         os.system("cd run && cp gateware/*.init .")
         os.system("cd run && cp gateware/*.v .")
         os.system("cd run && xvlog ../../../sim_support/glbl.v")
-        os.system("cd run && xvlog top.v -sv")
+        os.system("cd run && xvlog sim_bench.v -sv")
         os.system("cd run && xvlog top_tb.v -sv ")
         os.system("cd run && xvlog {}".format("../" + vex_verilog_path))
 

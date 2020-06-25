@@ -15,7 +15,7 @@ always #400 lpclk = ~lpclk;   // speed up faster than real-time, but still much 
 wire [8:0] row;
 wire [9:0] col;
 
-top dut (
+sim_bench dut (
     // don't touch these two lines
     .refclk(clk12),
     .rst(0),

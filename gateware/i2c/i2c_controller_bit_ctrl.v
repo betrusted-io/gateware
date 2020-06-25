@@ -1,6 +1,6 @@
 /////////////////////////////////////////////////////////////////////
 ////                                                             ////
-////  WISHBONE rev.B2 compliant I2C Master bit-controller        ////
+////  WISHBONE rev.B2 compliant I2C controller bit-controller        ////
 ////                                                             ////
 ////                                                             ////
 ////  Author: Richard Herveille                                  ////
@@ -37,7 +37,7 @@
 
 //  CVS Log
 //
-//  $Id: i2c_master_bit_ctrl.v,v 1.14 2009-01-20 10:25:29 rherveille Exp $
+//  $Id: i2c_controller_bit_ctrl.v,v 1.14 2009-01-20 10:25:29 rherveille Exp $
 //
 //  $Date: 2009-01-20 10:25:29 $
 //  $Revision: 1.14 $
@@ -49,7 +49,7 @@
 //               $Log: $
 //               Revision 1.14  2009/01/20 10:25:29  rherveille
 //               Added clock synchronization logic
-//               Fixed slave_wait signal
+//               Fixed peripheral_wait signal
 //
 //               Revision 1.13  2009/01/19 20:29:26  rherveille
 //               Fixed synopsys miss spell (synopsis)
@@ -59,10 +59,10 @@
 //
 //               Revision 1.12  2006/09/04 09:08:13  rherveille
 //               fixed short scl high pulse after clock stretch
-//               fixed slave model not returning correct '(n)ack' signal
+//               fixed peripheral model not returning correct '(n)ack' signal
 //
 //               Revision 1.11  2004/05/07 11:02:26  rherveille
-//               Fixed a bug where the core would signal an arbitration lost (AL bit set), when another master controls the bus and the other master generates a STOP bit.
+//               Fixed a bug where the core would signal an arbitration lost (AL bit set), when another controller controls the bus and the other controller generates a STOP bit.
 //
 //               Revision 1.10  2003/08/09 07:01:33  rherveille
 //               Fixed a bug in the Arbitration Lost generation caused by delay on the (external) sda line.
@@ -78,7 +78,7 @@
 //               Small code simplifications
 //
 //               Revision 1.6  2002/12/26 15:02:32  rherveille
-//               Core is now a Multimaster I2C controller
+//               Core is now a Multicontroller I2C controller
 //
 //               Revision 1.5  2002/11/30 22:24:40  rherveille
 //               Cleaned up code
@@ -138,9 +138,9 @@
 `timescale 1ns / 10ps
 // synopsys translate_on
 
-`include "i2c_master_defines.v"
+`include "i2c_controller_defines.v"
 
-module i2c_master_bit_ctrl (
+module i2c_controller_bit_ctrl (
     input             clk,      // system clock
     input             rst,      // synchronous active high reset
     input             nReset,   // asynchronous active low reset
@@ -174,9 +174,9 @@ module i2c_master_bit_ctrl (
     reg        sSCL, sSDA;      // filtered and synchronized SCL and SDA inputs
     reg        dSCL, dSDA;      // delayed versions of sSCL and sSDA
     reg        dscl_oen;        // delayed scl_oen
-    reg        sda_chk;         // check SDA output (Multi-master arbitration)
+    reg        sda_chk;         // check SDA output (Multi-controller arbitration)
     reg        clk_en;          // clock generation signals
-    reg        slave_wait;      // slave inserts wait states
+    reg        peripheral_wait;      // peripheral inserts wait states
     reg [15:0] cnt;             // clock divider counter (synthesis)
     reg [13:0] filter_cnt;      // clock divider for filter
 
@@ -188,19 +188,19 @@ module i2c_master_bit_ctrl (
     // module body
     //
 
-    // whenever the slave is not ready it can delay the cycle by pulling SCL low
+    // whenever the peripheral is not ready it can delay the cycle by pulling SCL low
     // delay scl_oen
     always @(posedge clk)
       dscl_oen <= #1 scl_oen;
 
-    // slave_wait is asserted when master wants to drive SCL high, but the slave pulls it low
-    // slave_wait remains asserted until the slave releases SCL
+    // peripheral_wait is asserted when controller wants to drive SCL high, but the peripheral pulls it low
+    // peripheral_wait remains asserted until the peripheral releases SCL
     always @(posedge clk or negedge nReset)
-      if (!nReset) slave_wait <= 1'b0;
-      else         slave_wait <= (scl_oen & ~dscl_oen & ~sSCL) | (slave_wait & ~sSCL);
+      if (!nReset) peripheral_wait <= 1'b0;
+      else         peripheral_wait <= (scl_oen & ~dscl_oen & ~sSCL) | (peripheral_wait & ~sSCL);
 
-    // master drives SCL high, but another master pulls it low
-    // master start counting down its low cycle now (clock synchronization)
+    // controller drives SCL high, but another controller pulls it low
+    // controller start counting down its low cycle now (clock synchronization)
     wire scl_sync   = dSCL & ~sSCL & scl_oen;
 
 
@@ -216,7 +216,7 @@ module i2c_master_bit_ctrl (
           cnt    <= #1 clk_cnt;
           clk_en <= #1 1'b1;
       end
-      else if (slave_wait)
+      else if (peripheral_wait)
       begin
           cnt    <= #1 cnt;
           clk_en <= #1 1'b0;    
@@ -334,7 +334,7 @@ module i2c_master_bit_ctrl (
 
     // generate arbitration lost signal
     // aribitration lost when:
-    // 1) master drives SDA high, but the i2c bus is low
+    // 1) controller drives SDA high, but the i2c bus is low
     // 2) stop detected while not requested
     reg cmd_stop;
     always @(posedge clk or negedge nReset)

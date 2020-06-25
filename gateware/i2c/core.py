@@ -12,7 +12,7 @@ class RTLI2C(Module, AutoCSR, AutoDoc):
     """Verilog RTL-based Portable I2C Core"""
     def __init__(self, platform, pads):
         self.intro = ModuleDoc("""RTLI2C: A verilog RTL-based I2C core
-        RTLI2C is an RTL-based I2C core derived from the OpenCores I2C master IP.
+        RTLI2C is an RTL-based I2C core derived from the OpenCores I2C controller IP.
         """)
         self.sda = TSTriple(1)
         self.scl = TSTriple(1)
@@ -103,7 +103,7 @@ class RTLI2C(Module, AutoCSR, AutoDoc):
         sda_i   = Signal()
         sda_o   = Signal()
         sda_oen = Signal()
-        self.specials += Instance("i2c_master_byte_ctrl",
+        self.specials += Instance("i2c_controller_byte_ctrl",
             i_clk      = ClockSignal(),
             i_rst      = ResetSignal(),
             i_nReset   = 1,
@@ -127,9 +127,9 @@ class RTLI2C(Module, AutoCSR, AutoDoc):
             o_sda_o    = sda_o,
             o_sda_oen  = sda_oen,
         )
-        platform.add_source(os.path.join("deps", "gateware", "gateware", "i2c", "i2c_master_defines.v"))
-        platform.add_source(os.path.join("deps", "gateware", "gateware", "i2c", "i2c_master_bit_ctrl.v"))
-        platform.add_source(os.path.join("deps", "gateware", "gateware", "i2c", "i2c_master_byte_ctrl.v"))
+        platform.add_source(os.path.join("deps", "gateware", "gateware", "i2c", "i2c_controller_defines.v"))
+        platform.add_source(os.path.join("deps", "gateware", "gateware", "i2c", "i2c_controller_bit_ctrl.v"))
+        platform.add_source(os.path.join("deps", "gateware", "gateware", "i2c", "i2c_controller_byte_ctrl.v"))
         self.comb += [
             sda_i.eq(self.sda.i),
             self.sda.o.eq(sda_o),

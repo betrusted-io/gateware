@@ -60,8 +60,8 @@ dutio = [
      ),
     ("spiflash_1x", 0,  # clock needs to be accessed through STARTUPE2
      Subsignal("cs_n", Pins("M13")),
-     Subsignal("mosi", Pins("K17")),
-     Subsignal("miso", Pins("K18")),
+     Subsignal("copi", Pins("K17")),
+     Subsignal("cipo", Pins("K18")),
      Subsignal("wp", Pins("L14")),  # provisional
      Subsignal("hold", Pins("M15")),  # provisional
      IOStandard("LVCMOS18")
@@ -112,10 +112,10 @@ class Dut(Sim):
         SPI_FLASH_SIZE=128 * 1024 * 1024
         sclk_instance_name = "SCLK_ODDR"
         iddr_instance_name = "SPI_IDDR"
-        miso_instance_name = "MISO_FDRE"
+        cipo_instance_name = "cipo_FDRE"
         self.submodules.spinor = S7SPIOPI(platform.request("spiflash_8x"),
                                                sclk_name=sclk_instance_name, iddr_name=iddr_instance_name,
-                                               miso_name=miso_instance_name, sim=True)
+                                               cipo_name=cipo_instance_name, sim=True)
         platform.add_source("../../gateware/spimemio.v") ### NOTE: this actually doesn't help for SIM, but it reminds us to scroll to the bottom of this file and add it to the xvlog imports
         self.register_mem("spiflash", self.mem_map["spiflash"], self.spinor.bus, size=SPI_FLASH_SIZE)
         self.add_csr("spinor")

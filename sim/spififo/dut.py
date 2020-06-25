@@ -53,19 +53,19 @@ boot_from_spi=False
 top-level IOs specific to the DUT
 """
 dutio = [
-    # COM to UP5K (maste0)
+    # COM to UP5K (controller)
     ("com", 0,
      Subsignal("csn", Pins("T15"), IOStandard("LVCMOS18")),
-     Subsignal("miso", Pins("P16"), IOStandard("LVCMOS18")),
-     Subsignal("mosi", Pins("N18"), IOStandard("LVCMOS18")),
+     Subsignal("cipo", Pins("P16"), IOStandard("LVCMOS18")),
+     Subsignal("copi", Pins("N18"), IOStandard("LVCMOS18")),
      Subsignal("sclk", Pins("R16"), IOStandard("LVCMOS18")),
      ),
 
-    # slave interface for testing UP5K side
-    ("slave", 0,
+    # peripheral interface for testing UP5K side
+    ("peripheral", 0,
      Subsignal("csn", Pins("dummy0")),
-     Subsignal("miso", Pins("dummy1")),
-     Subsignal("mosi", Pins("dummy2")),
+     Subsignal("cipo", Pins("dummy1")),
+     Subsignal("copi", Pins("dummy2")),
      Subsignal("sclk", Pins("dummy3")),
      Subsignal("irq", Pins("dummy4")),
      ),
@@ -105,18 +105,17 @@ class Dut(Sim):
 
         Sim.__init__(self, platform, custom_clocks=local_clocks, spiboot=spiboot, vex_verilog_path=VEX_CPU_PATH, **kwargs) # SoC magic is in here
 
-        # FIXME: the SpiFifoSlave core inside spi_ice40 is *not* the code used in the EC
+        # FIXME: the SpiFifoPeripheral core inside spi_ice40 is *not* the code used in the EC
         # FIXME: the EC currently keeps it in an "rtl" directory. This should be fixed to point to "gateware"
         # SPI interface
-        self.submodules.spimaster = ClockDomainsRenamer({"sys":"spi"})(spi_7series.SPIMaster(platform.request("com")))
-        self.add_csr("spimaster")
+        self.submodules.spicontroller = ClockDomainsRenamer({"sys":"spi"})(spi_7series.SPIController(platform.request("com")))
+        self.add_csr("spicontroller")
 
-        self.submodules.com = ClockDomainsRenamer({"spislave":"spi"})(spi_ice40.SpiFifoSlave(platform.request("slave")))
+        self.submodules.com = ClockDomainsRenamer({"spi_peripheral":"spi"})(spi_ice40.SpiFifoPeripheral(platform.request("peripheral")))
         self.add_wb_slave(self.mem_map["com"], self.com.bus, 4)
         self.add_memory_region("com", self.mem_map["com"], 4, type='io')
         self.add_csr("com")
         self.add_interrupt("com")
-
 
 """
 generate all the files necessary to run xsim

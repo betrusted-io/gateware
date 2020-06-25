@@ -14,7 +14,7 @@ initial begin
     assign tdo = 1'b1; // just return an 0x3F for now
 end
 
-top dut (
+sim_bench dut (
     // don't touch these two lines
     .refclk(clk12),
     .rst(0),
