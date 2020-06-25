@@ -77,7 +77,6 @@ fn run(p: &pac::Peripherals) {
     sha512b.digest256(&mut digest256); // this should also reset the block
     report(p, 0x1000_000B);
 
-    pass = true;
     for i in 0..4 {
         report(p, digest256[i] as u32);
         report(p, kExpectedDigest256[i] as u32);
@@ -91,6 +90,55 @@ fn run(p: &pac::Peripherals) {
         report(p, 0x1000_000C);
     } else {
         report(p, 0xDEAD_000C);
+    }
+
+    // test a hard reset part way through
+    report(p, 0x1000_000D);
+    let mut sha512c: BtSha512 = BtSha512::new();
+    sha512c.config = Sha512Config::ENDIAN_SWAP | Sha512Config::DIGEST_SWAP | Sha512Config::SHA512_EN | Sha512Config::SHA512_256;
+
+    report(p, 0x1000_000E);
+    sha512c.init();
+
+    report(p, 0x1000_000F);
+    sha512c.update(kData);
+
+    report(p, 0x1000_FFFF);
+
+    ///////// do the hash reset!
+    p.SHA512.command.write(|w|{ w.hash_process().set_bit()});
+    while (p.SHA512.ev_pending.read().bits() & (Sha512Event::SHA512_DONE).bits()) == 0 {}
+    unsafe{ p.SHA512.ev_pending.write(|w| w.bits((Sha512Event::SHA512_DONE).bits()) ); }
+    unsafe{ p.SHA512.config.write(|w|{ w.bits(0) }); }
+
+    // now restart the hash
+    report(p, 0x1000_0010);
+    let mut sha512d: BtSha512 = BtSha512::new();
+    sha512d.config = Sha512Config::ENDIAN_SWAP | Sha512Config::DIGEST_SWAP | Sha512Config::SHA512_EN;
+
+    report(p, 0x1000_0011);
+    sha512d.init();
+
+    report(p, 0x1000_0012);
+    sha512d.update(kData);
+    report(p, 0x1000_0013);
+    let mut digest3: [u64; 8] = [0; 8];
+    sha512d.digest(&mut digest3); // this should also reset the block
+    report(p, 0x1000_0014);
+
+    for i in 0..8 {
+        report(p, digest3[i] as u32);
+        report(p, kExpectedDigest[i] as u32);
+        report(p, (digest3[i] >> 32) as u32);
+        report(p, (kExpectedDigest[i] >> 32) as u32);
+        if digest3[i] != kExpectedDigest[i] {
+            pass = false;
+        }
+    }
+    if pass {
+        report(p, 0x1000_0015);
+    } else {
+        report(p, 0xDEAD_0015);
     }
 
     // set success to indicate to the CI framework that the test has passed

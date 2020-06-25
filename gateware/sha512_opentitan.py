@@ -58,12 +58,14 @@ class Hmac(Module, AutoDoc, AutoCSR):
         ])
         control_latch = Signal(self.config.size)
         ctrl_freeze = Signal()
+        sha_en_50 = Signal()
         self.sync.clk50 += [
             If(ctrl_freeze,
                 control_latch.eq(control_latch)
             ).Else(
                 control_latch.eq(self.config.storage)
-            )
+            ),
+            sha_en_50.eq(self.config.fields.sha_en),
         ]
         self.command = CSRStorage(description="Command register for the HMAC block", fields=[
             CSRField("hash_start", size=1, description="Writing a 1 indicates the beginning of hash data", pulse=True),
@@ -156,7 +158,7 @@ class Hmac(Module, AutoDoc, AutoCSR):
             i_reg_hash_process=hash_proc_50,
 
             o_ctrl_freeze=ctrl_freeze,
-            i_sha_en=control_latch[0],
+            i_sha_en=sha_en_50,
             i_endian_swap=control_latch[1],
             i_digest_swap=control_latch[2],
             i_hash_select_256=control_latch[3],
