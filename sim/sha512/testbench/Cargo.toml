@@ -14,3 +14,4 @@ volatile = "0.2.6"
 sha512-pac = { path = "sha512-pac" }
 sha512-hal = { path = "sha512-hal" }
 digest = "0.9"
+hkdf = "0.9"

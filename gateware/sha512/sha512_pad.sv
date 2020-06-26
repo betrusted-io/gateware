@@ -220,7 +220,7 @@ module sha512_pad import hmac512_pkg::*; (
 
         fifo_rready = shaf_rready && |message_length[5:3]; // Only when partial
 
-        if (fifo_rvalid) begin
+        if (fifo_rvalid || !(|message_length[5:3])) begin  // if not partial, move ahead
           shaf_rvalid = 1'b1;
           // exactly 96 bits left, do not need to pad00's
           if (shaf_rready && txcnt_eq_340) begin

@@ -30,6 +30,6 @@ initial begin
 end
 
 // DUT-specific end condition to make sure it eventually stops running for CI mode
-initial #800_000 $finish;
+initial #2_000_000 $finish;
 
 endmodule

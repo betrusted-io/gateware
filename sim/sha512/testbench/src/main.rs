@@ -7,6 +7,7 @@ extern crate digest;
 use digest::Digest;
 extern crate sha512_hal;
 use sha512_hal::hal_sha512::{Sha512, Sha512Trunc256};
+use hkdf::*;
 
 const K_DATA: &'static [u8; 142] = b"Every one suspects himself of at least one of the cardinal virtues, and this is mine: I am one of the few honest people that I have ever known";
 const K_EXPECTED_DIGEST: [u64; 8] =    [0x02fc78c0d16b727a, 0x18570a3279e6c97b, 0x113b8871b2e92051, 0x4c0947b20169fedf, 0x1a67094ad04ad031, 0xab5f8cc340125001, 0xffbd7d7af36d3a3a, 0xf7e8465d73bbd86d];
@@ -132,6 +133,21 @@ fn run(p: &pac::Peripherals) {
     } else {
         report(p, 0xDEAD_000E);
     }
+
+    ////// test length
+    report(p, 0x1000_000F);
+    let mut key = [0; 64];
+    let info = b"foobar!";
+    let salt: &[u8; 64] = &[0; 64];
+    let ikm: &[u8; 32] = &[0x42; 32];
+
+    let hkdf_obj = Hkdf::<Sha512>::new(Some(salt), ikm);
+
+    report(p, 0x1000_0010);
+
+    hkdf_obj.expand(&info[..], &mut key).unwrap();
+
+    report(p, 0x1000_0011);
 
     // set success to indicate to the CI framework that the test has passed
     p.SIMSTATUS.simstatus.modify(|_r, w| w.success().bit(pass));
