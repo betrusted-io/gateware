@@ -167,6 +167,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "digest"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3dd60d1080a57a05ab032377049e0591415d2b31afd7028356dbf3cc6dcb066"
+dependencies = [
+ "generic-array",
+]
+
+[[package]]
 name = "either"
 version = "1.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -196,21 +205,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "generic-array"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac746a5f3bbfdadd6106868134545e684693d54d9d44f6e9588a7d54af0bf980"
+dependencies = [
+ "typenum",
+ "version_check",
+]
+
+[[package]]
 name = "hal-sha2"
 version = "0.1.0"
 dependencies = [
  "bitflags",
  "sha2-pac",
- "spin",
- "volatile",
-]
-
-[[package]]
-name = "hal-sha512"
-version = "0.1.0"
-dependencies = [
- "bitflags",
- "sha512-pac",
  "spin",
  "volatile",
 ]
@@ -536,12 +545,24 @@ dependencies = [
 name = "sha512"
 version = "0.1.0"
 dependencies = [
- "hal-sha512",
+ "digest",
  "pac",
+ "sha512-hal",
  "sha512-pac",
  "sim-bios",
  "volatile",
  "xous-nommu",
+]
+
+[[package]]
+name = "sha512-hal"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "digest",
+ "pac",
+ "spin",
+ "volatile",
 ]
 
 [[package]]
@@ -745,6 +766,12 @@ checksum = "d40c6d1b69745a6ec6fb1ca717914848da4b44ae29d9b3080cbee91d72a69b14"
 dependencies = [
  "lazy_static",
 ]
+
+[[package]]
+name = "typenum"
+version = "1.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "373c8a200f9e67a0c95e62a4f52fbf80c23b4381c05a17845531982fa99e6b33"
 
 [[package]]
 name = "unicode-width"

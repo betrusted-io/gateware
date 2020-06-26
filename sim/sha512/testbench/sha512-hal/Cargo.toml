@@ -1,5 +1,5 @@
 [package]
-name = "hal-sha512"
+name = "sha512-hal"
 version = "0.1.0"
 authors = ["bunnie <bunnie@kosagi.com>"]
 edition = "2018"
@@ -7,10 +7,11 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-sha512-pac = { path = "../sha512-pac" }
+pac = { path = "../../../../sim_support/rust/pac" }
 spin = "0.5.2"
 bitflags = "1.2.1"
 volatile = "0.2.6"
+digest = "0.9"
 
 [features]
 evt = []

@@ -170,7 +170,7 @@ module sha512_pad import hmac512_pkg::*; (
 
       StFifoReceive: begin
         sel_data = FifoIn;
-
+/*
         if (fifo_partial && fifo_rvalid) begin
           // End of the message, assume hash_process_flag is set
           shaf_rvalid  = 1'b0; // Update entry at StPad80
@@ -197,6 +197,21 @@ module sha512_pad import hmac512_pkg::*; (
           inc_txcount = shaf_rready; // 0 always
 
           st_d = StFifoReceive;
+        end*/
+
+        if (!hash_process_flag) begin
+          fifo_rready = shaf_rready;
+          shaf_rvalid  = fifo_rvalid;
+          inc_txcount = shaf_rready;
+
+          st_d = StFifoReceive;
+        end else begin
+          // process flag set
+          shaf_rvalid  = 1'b0;
+          inc_txcount = 1'b0;
+          fifo_rready = 1'b0;
+
+          st_d = StPad80;
         end
       end
 

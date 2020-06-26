@@ -2,6 +2,7 @@
 
 extern crate bitflags;
 extern crate volatile;
+extern crate digest;
 
 pub mod hal_sha512;
 

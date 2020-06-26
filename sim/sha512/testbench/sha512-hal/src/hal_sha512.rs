@@ -1,6 +1,9 @@
 use bitflags::*;
 use volatile::Volatile;
 
+use digest::consts::{U128, U32, U64};
+use digest::{BlockInput, FixedOutputDirty, Reset, Update};
+
 bitflags! {
     pub struct Sha512Config: u32 {
         const NONE        = 0b0000_0000;
@@ -43,42 +46,75 @@ bitflags! {
     }
 }
 
-pub struct BtSha512 {
-    p: sha512_pac::Peripherals,
-    pub config: Sha512Config,
+type BlockSize = U128;
+
+pub enum Sha512Type {
+    Sha512,
+    Sha512Trunc256,
 }
 
-impl BtSha512 {
-    pub fn new() -> Self {
+struct Engine512 {
+    p: pac::Peripherals,
+    pub config: Sha512Config,
+    state: [u64; 8],
+}
+
+impl Clone for Engine512 {
+    fn clone(&self) -> Engine512 {
         unsafe {
-            BtSha512 {
-                p: sha512_pac::Peripherals::steal(),
-                config: Sha512Config::NONE,
+            Engine512 {
+                p: pac::Peripherals::steal(),
+                config: self.config,
+                state: self.state,
             }
         }
     }
+}
 
-    pub fn init(&mut self) -> bool {
-        unsafe{ self.p.SHA512.config.write(|w|{ w.bits(self.config.bits()) }); }
-        self.p.SHA512.command.write(|w|{ w.hash_start().set_bit() });
-        true
+impl Engine512 {
+    fn new(which: Sha512Type) -> Engine512 {
+        let ret : Engine512 =
+            match which {
+                Sha512Type::Sha512 => unsafe {
+                    Engine512 {
+                        p: pac::Peripherals::steal(),
+                        config: Sha512Config::ENDIAN_SWAP | Sha512Config::DIGEST_SWAP | Sha512Config::SHA512_EN,
+                        state: [0; 8],
+                    }
+                },
+                Sha512Type::Sha512Trunc256 => unsafe {
+                    Engine512 {
+                        p: pac::Peripherals::steal(),
+                        config: Sha512Config::ENDIAN_SWAP | Sha512Config::DIGEST_SWAP | Sha512Config::SHA512_256 | Sha512Config::SHA512_EN,
+                        state: [0; 8],
+                    }
+                },
+            };
+        // commit the config + enable
+        unsafe{ ret.p.SHA512.config.write(|w|{ w.bits(ret.config.bits()) }); }
+        // the "hash_start" bit puts us in a mode ready to auto-accept digest data
+        ret.p.SHA512.command.write(|w|{ w.hash_start().set_bit() });
+
+        // enable "done" events
+        unsafe{ ret.p.SHA512.ev_enable.write(|w| {w.enable().bits(Sha512Event::SHA512_DONE.bits() as u8)}); }
+        ret
     }
 
-    pub fn update(&mut self, data: &[u8]) {
+
+    fn update(&mut self, input: &[u8]) {
         let sha_ptr: *mut u32 = 0xe0002000 as *mut u32;
         let sha = sha_ptr as *mut Volatile<u32>;
         let sha_byte_ptr: *mut u8 = 0xe0002000 as *mut u8;
         let sha_byte = sha_byte_ptr as *mut Volatile<u8>;
 
-        for (_reg, chunk) in data.chunks(8).enumerate() {
-            let mut temp: [u8; 8] = Default::default();
-            if chunk.len() == 8 {
+        for (_reg, chunk) in input.chunks(4).enumerate() {
+            let mut temp: [u8; 4] = Default::default();
+            if chunk.len() == 4 {
                 temp.copy_from_slice(chunk);
-                let dword: u64 = u64::from_le_bytes(temp);
+                let dword: u32 = u32::from_le_bytes(temp);
 
                 while self.p.SHA512.fifo.read().almost_full().bit() {}
-                unsafe { (*sha.add(1)).write((dword >> 32) as u32); }
-                unsafe { (*sha).write(dword as u32); }
+                unsafe { (*sha).write(dword); }
             } else {
                 for index in 0..chunk.len() {
                     while self.p.SHA512.fifo.read().almost_full().bit() {}
@@ -88,43 +124,130 @@ impl BtSha512 {
         }
     }
 
-    pub fn digest(&mut self, digest: &mut [u64; 8]) {
+    fn finish(&mut self) {
         self.p.SHA512.command.write(|w|{ w.hash_process().set_bit()});
         while (self.p.SHA512.ev_pending.read().bits() & (Sha512Event::SHA512_DONE).bits()) == 0 {}
         unsafe{ self.p.SHA512.ev_pending.write(|w| w.bits((Sha512Event::SHA512_DONE).bits()) ); }
-
         for reg in 0..8 {
             match reg {
-                0 => digest[reg] = self.p.SHA512.digest00.read().bits() as u64 | (self.p.SHA512.digest01.read().bits() as u64) << 32,
-                1 => digest[reg] = self.p.SHA512.digest10.read().bits() as u64 | (self.p.SHA512.digest11.read().bits() as u64) << 32,
-                2 => digest[reg] = self.p.SHA512.digest20.read().bits() as u64 | (self.p.SHA512.digest21.read().bits() as u64) << 32,
-                3 => digest[reg] = self.p.SHA512.digest30.read().bits() as u64 | (self.p.SHA512.digest31.read().bits() as u64) << 32,
-                4 => digest[reg] = self.p.SHA512.digest40.read().bits() as u64 | (self.p.SHA512.digest41.read().bits() as u64) << 32,
-                5 => digest[reg] = self.p.SHA512.digest50.read().bits() as u64 | (self.p.SHA512.digest51.read().bits() as u64) << 32,
-                6 => digest[reg] = self.p.SHA512.digest60.read().bits() as u64 | (self.p.SHA512.digest61.read().bits() as u64) << 32,
-                7 => digest[reg] = self.p.SHA512.digest70.read().bits() as u64 | (self.p.SHA512.digest71.read().bits() as u64) << 32,
+                0 => self.state[reg] = (self.p.SHA512.digest01.read().bits() as u64) << 32 | self.p.SHA512.digest00.read().bits() as u64,
+                1 => self.state[reg] = (self.p.SHA512.digest11.read().bits() as u64) << 32 | self.p.SHA512.digest10.read().bits() as u64,
+                2 => self.state[reg] = (self.p.SHA512.digest21.read().bits() as u64) << 32 | self.p.SHA512.digest20.read().bits() as u64,
+                3 => self.state[reg] = (self.p.SHA512.digest31.read().bits() as u64) << 32 | self.p.SHA512.digest30.read().bits() as u64,
+                4 => self.state[reg] = (self.p.SHA512.digest41.read().bits() as u64) << 32 | self.p.SHA512.digest40.read().bits() as u64,
+                5 => self.state[reg] = (self.p.SHA512.digest51.read().bits() as u64) << 32 | self.p.SHA512.digest50.read().bits() as u64,
+                6 => self.state[reg] = (self.p.SHA512.digest61.read().bits() as u64) << 32 | self.p.SHA512.digest60.read().bits() as u64,
+                7 => self.state[reg] = (self.p.SHA512.digest71.read().bits() as u64) << 32 | self.p.SHA512.digest70.read().bits() as u64,
                 _ => assert!(false),
             }
         }
-        self.config = self.config & !Sha512Config::SHA512_EN; // clear the SHA512_EN flag
-        unsafe{ self.p.SHA512.config.write(|w|{ w.bits(self.config.bits()) }); } // commit to config
+        unsafe{ self.p.SHA512.config.write(|w|{ w.bits(0x0) }); } // this should reset/disable the unit
+        // do we need to introduce a delay at all??
+        // delay_ms(&self.p, 2);
+        unsafe{ self.p.SHA512.config.write(|w|{ w.bits(self.config.bits()) }); }
+        // the "hash_start" bit puts us in a mode ready to auto-accept digest data
+        self.p.SHA512.command.write(|w|{ w.hash_start().set_bit() });
     }
 
-    pub fn digest256(&mut self, digest: &mut [u64; 4]) {
+    fn reset(&mut self, which: Sha512Type) {
+        // a reset happens only by enabling "process", discarding the output, and then re-initializing
         self.p.SHA512.command.write(|w|{ w.hash_process().set_bit()});
         while (self.p.SHA512.ev_pending.read().bits() & (Sha512Event::SHA512_DONE).bits()) == 0 {}
         unsafe{ self.p.SHA512.ev_pending.write(|w| w.bits((Sha512Event::SHA512_DONE).bits()) ); }
 
-        for reg in 0..4 {
-            match reg {
-                0 => digest[reg] = self.p.SHA512.digest00.read().bits() as u64 | (self.p.SHA512.digest01.read().bits() as u64) << 32,
-                1 => digest[reg] = self.p.SHA512.digest10.read().bits() as u64 | (self.p.SHA512.digest11.read().bits() as u64) << 32,
-                2 => digest[reg] = self.p.SHA512.digest20.read().bits() as u64 | (self.p.SHA512.digest21.read().bits() as u64) << 32,
-                3 => digest[reg] = self.p.SHA512.digest30.read().bits() as u64 | (self.p.SHA512.digest31.read().bits() as u64) << 32,
-                _ => assert!(false),
-            }
+        unsafe{ self.p.SHA512.config.write(|w|{ w.bits(0) }); } // clear all config bits, including EN, which resets the unit
+        match which {
+            Sha512Type::Sha512 => self.config = Sha512Config::ENDIAN_SWAP | Sha512Config::DIGEST_SWAP,
+            Sha512Type::Sha512Trunc256 => self.config = Sha512Config::ENDIAN_SWAP | Sha512Config::DIGEST_SWAP | Sha512Config::SHA512_256,
         }
-        self.config = self.config & !Sha512Config::SHA512_EN; // clear the SHA512_EN flag
-        unsafe{ self.p.SHA512.config.write(|w|{ w.bits(self.config.bits()) }); } // commit to config
+        // commit the config + enable
+        unsafe{ self.p.SHA512.config.write(|w|{ w.bits(self.config.bits()) }); }
+        // the "hash_start" bit puts us in a mode ready to auto-accept digest data
+        self.p.SHA512.command.write(|w|{ w.hash_start().set_bit() });
+    }
+}
+
+/// The SHA-512 hash algorithm with the SHA-512 initial hash value.
+#[derive(Clone)]
+pub struct Sha512 {
+    engine: Engine512,
+}
+
+impl Default for Sha512 {
+    fn default() -> Self {
+        Sha512 {
+            engine: Engine512::new(Sha512Type::Sha512),
+        }
+    }
+}
+
+impl BlockInput for Sha512 {
+    type BlockSize = BlockSize;
+}
+
+impl Update for Sha512 {
+    fn update(&mut self, input: impl AsRef<[u8]>) {
+        self.engine.update(input.as_ref());
+    }
+}
+
+impl FixedOutputDirty for Sha512 {
+    type OutputSize = U64;
+
+    fn finalize_into_dirty(&mut self, out: &mut digest::Output<Self>) {
+        self.engine.finish();
+        let s = self.engine.state;
+        for (chunk, v) in out.chunks_exact_mut(8).zip(s.iter()) {
+            chunk.copy_from_slice(&v.to_be_bytes());
+        }
+    }
+}
+
+impl Reset for Sha512 {
+    fn reset(&mut self) {
+        self.engine.reset(Sha512Type::Sha512);
+    }
+}
+
+/// The SHA-512 hash algorithm with the SHA-512/256 initial hash value. The
+/// result is truncated to 256 bits.
+#[derive(Clone)]
+pub struct Sha512Trunc256 {
+    engine: Engine512,
+}
+
+impl Default for Sha512Trunc256 {
+    fn default() -> Self {
+        Sha512Trunc256 {
+            engine: Engine512::new(Sha512Type::Sha512Trunc256),
+        }
+    }
+}
+
+impl BlockInput for Sha512Trunc256 {
+    type BlockSize = BlockSize;
+}
+
+impl Update for Sha512Trunc256 {
+    fn update(&mut self, input: impl AsRef<[u8]>) {
+        self.engine.update(input.as_ref());
+    }
+}
+
+impl FixedOutputDirty for Sha512Trunc256 {
+    type OutputSize = U32;
+
+    fn finalize_into_dirty(&mut self, out: &mut digest::Output<Self>) {
+        self.engine.finish();
+        let s = &self.engine.state[..4];
+        for (chunk, v) in out.chunks_exact_mut(8).zip(s.iter()) {
+            chunk.copy_from_slice(&v.to_be_bytes());
+        }
+    }
+}
+
+impl Reset for Sha512Trunc256 {
+    fn reset(&mut self) {
+        self.engine.reset(Sha512Type::Sha512Trunc256);
     }
 }
