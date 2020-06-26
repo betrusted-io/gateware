@@ -179,8 +179,8 @@ module sha512_pad import hmac512_pkg::*; (
 
           st_d = StPad80;
         end else if (!hash_process_flag) begin
-          fifo_rready = shaf_rready;
           shaf_rvalid  = fifo_rvalid;
+          fifo_rready = shaf_rready;
           inc_txcount = shaf_rready;
 
           st_d = StFifoReceive;
@@ -218,20 +218,26 @@ module sha512_pad import hmac512_pkg::*; (
       StPad80: begin
         sel_data = Pad80;
 
-        shaf_rvalid = 1'b1;
         fifo_rready = shaf_rready && |message_length[5:3]; // Only when partial
 
-        // exactly 96 bits left, do not need to pad00's
-        if (shaf_rready && txcnt_eq_340) begin
-          st_d = StLenHi;
-          inc_txcount = 1'b1;
-        // it does not matter if value is < or > than 416 bits.  If it's the former, 00 pad until
-        // length field.  If >, then the next chunk will contain the length field with appropriate
-        // 0 padding.
-        end else if (shaf_rready && !txcnt_eq_340) begin
-          st_d = StPad00;
-          inc_txcount = 1'b1;
+        if (fifo_rvalid) begin
+          shaf_rvalid = 1'b1;
+          // exactly 96 bits left, do not need to pad00's
+          if (shaf_rready && txcnt_eq_340) begin
+            st_d = StLenHi;
+            inc_txcount = 1'b1;
+          // it does not matter if value is < or > than 416 bits.  If it's the former, 00 pad until
+          // length field.  If >, then the next chunk will contain the length field with appropriate
+          // 0 padding.
+          end else if (shaf_rready && !txcnt_eq_340) begin
+            st_d = StPad00;
+            inc_txcount = 1'b1;
+          end else begin
+            st_d = StPad80;
+            inc_txcount = 1'b0;
+          end
         end else begin
+          shaf_rvalid = 1'b0;
           st_d = StPad80;
           inc_txcount = 1'b0;
         end

@@ -29,12 +29,13 @@ bitflags! {
 
 bitflags! {
     pub struct Sha512Fifo: u32 {
-        const READ_COUNT_MASK  = 0b0000_0000_0000_0011_1111;
-        const WRITE_COUNT_MASK = 0b0000_1111_1111_1100_0000;
-        const READ_ERROR       = 0b0001_0000_0000_0000_0000;
-        const WRITE_ERROR      = 0b0010_0000_0000_0000_0000;
-        const ALMOST_FULL      = 0b0100_0000_0000_0000_0000;
-        const ALMOST_EMPTY     = 0b1000_0000_0000_0000_0000;
+        const READ_COUNT_MASK  = 0b0000_0000_0000_0000_0001_1111_1111;
+        const WRITE_COUNT_MASK = 0b0000_0011_1111_1111_1110_0000_0000;
+        const READ_ERROR       = 0b0000_0100_0000_0000_0000_0000_0000;
+        const WRITE_ERROR      = 0b0000_1000_0000_0000_0000_0000_0000;
+        const ALMOST_FULL      = 0b0001_0000_0000_0000_0000_0000_0000;
+        const ALMOST_EMPTY     = 0b0010_0000_0000_0000_0000_0000_0000;
+        const ENGINE_RUNNING   = 0b0100_0000_0000_0000_0000_0000_0000;
     }
 }
 
@@ -90,6 +91,23 @@ impl Engine512 {
                     }
                 },
             };
+
+        // TODO: add mutex around the SHA engine, for now, just take control
+
+        // if the engine is already running, terminate its current operation and reset it
+        if ret.p.SHA512.fifo.read().running().bit() {
+            let sha_ptr: *mut u32 = 0xe0002000 as *mut u32;
+            let sha = sha_ptr as *mut Volatile<u32>;
+            unsafe { (*sha).write(0x0); } // stuff a dummy byte in in case the hash is empty
+
+            // a reset happens only by enabling "process", discarding the output, and then re-initializing
+            ret.p.SHA512.command.write(|w|{ w.hash_process().set_bit()});
+            while (ret.p.SHA512.ev_pending.read().bits() & (Sha512Event::SHA512_DONE).bits()) == 0 {}
+            unsafe{ ret.p.SHA512.ev_pending.write(|w| w.bits((Sha512Event::SHA512_DONE).bits()) ); }
+
+            unsafe{ ret.p.SHA512.config.write(|w|{ w.bits(0) }); } // clear all config bits, including EN, which resets the unit
+        }
+
         // commit the config + enable
         unsafe{ ret.p.SHA512.config.write(|w|{ w.bits(ret.config.bits()) }); }
         // the "hash_start" bit puts us in a mode ready to auto-accept digest data
@@ -150,6 +168,10 @@ impl Engine512 {
     }
 
     fn reset(&mut self, which: Sha512Type) {
+        let sha_ptr: *mut u32 = 0xe0002000 as *mut u32;
+        let sha = sha_ptr as *mut Volatile<u32>;
+        unsafe { (*sha).write(0x0); } // stuff a dummy byte in in case the hash is empty
+
         // a reset happens only by enabling "process", discarding the output, and then re-initializing
         self.p.SHA512.command.write(|w|{ w.hash_process().set_bit()});
         while (self.p.SHA512.ev_pending.read().bits() & (Sha512Event::SHA512_DONE).bits()) == 0 {}

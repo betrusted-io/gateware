@@ -5,7 +5,7 @@ from litex.soc.integration.doc import AutoDoc
 from litex.soc.interconnect.csr import *
 from litex.soc.interconnect.csr_eventmanager import *
 from litex.soc.interconnect import wishbone
-from migen.genlib.cdc import BlindTransfer
+from migen.genlib.cdc import BlindTransfer, MultiReg
 
 class Hmac(Module, AutoDoc, AutoCSR):
     def __init__(self, platform):
@@ -109,7 +109,12 @@ class Hmac(Module, AutoDoc, AutoCSR):
             CSRField("write_error", size=1, description="write error occurred"),
             CSRField("almost_full", size=1, description="almost full"),
             CSRField("almost_empty", size=1, description="almost empty"),
+            CSRField("running", size=1, description="hash engine is running and controls are locked out"),
         ])
+        ctrl_freeze_sys = Signal()
+        self.specials += MultiReg(ctrl_freeze, ctrl_freeze_sys)
+        self.comb += self.fifo.fields.running.eq(ctrl_freeze_sys)
+
         fifo_rvalid = Signal()
         fifo_empty = Signal()
         fifo_wready=Signal()
