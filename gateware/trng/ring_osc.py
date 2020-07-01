@@ -24,6 +24,9 @@ enough, the fix is to slow down the target_freq parameter.
             device_root = device_root + devstr[1]
 
         self.trng_raw = Signal()  # raw TRNG output bitstream
+        self.trng_aux1r = Signal() # aux streams for more decorrelated data
+        self.trng_aux2r = Signal()
+        self.trng_aux3r = Signal()
         self.trng_out_sync = Signal()  # single-bit output, synchronized to sysclk
         self.ctl = CSRStorage(fields=[
             CSRField("ena", size=1, description="Enable the TRNG; 0 puts the TRNG into full powerdown", reset=0)
@@ -66,6 +69,9 @@ enough, the fix is to slow down the target_freq parameter.
         if device_root == 'xc7s50':
             stage_delay = 1.7  # rough delay of each ring oscillator stage (incl routing) in ns
             fast_stages = 1
+            aux1_stages = 3
+            aux2_stages = 5
+            aux3_stages = 7
 
             # routing oscillator slightly through core logic adds more noise, but can impact performance
             x_min = 53     # 0
@@ -94,6 +100,9 @@ enough, the fix is to slow down the target_freq parameter.
             stages = stages + 1
         ring_cw = Signal(stages+1) # ring oscillator clockwise
         ring_ccw = Signal(fast_stages+1) # ring oscillator counter-clockwise (fast)
+        ring_aux1r = Signal(aux1_stages+1)
+        ring_aux2r = Signal(aux2_stages+1)
+        ring_aux3r = Signal(aux3_stages+1)
 
         x = x_min
         y = y_min
@@ -121,6 +130,37 @@ enough, the fix is to slow down the target_freq parameter.
                                      o_O=ring_ccw[stage+1],
                                      # attr=("KEEP", "DONT_TOUCH")
                                  )
+                if stage < aux1_stages:
+                    stagename = 'RO_AUX1R' + str(stage)
+                    # run this one around the chip a bit
+                    platform.toolchain.attr_translate[stagename + 'LOCK'] = ("LOC", "SLICE_X" + str(x) + 'Y' + str(y))
+                    self.specials += Instance("LUT1",
+                        name=stagename,
+                        p_INIT=1,
+                        i_I0=ring_aux1r[stage],
+                        o_O=ring_aux1r[stage+1],
+                        attr=("KEEP", "DONT_TOUCH", stagename + 'LOCK'),
+                    )
+                if stage < aux2_stages:
+                    stagename = 'RO_AUX2R' + str(stage)
+                    # this one is local
+                    self.specials += Instance("LUT1",
+                        name=stagename,
+                        p_INIT=1,
+                        i_I0=ring_aux2r[stage],
+                        o_O=ring_aux2r[stage+1],
+                        attr=("KEEP", "DONT_TOUCH"),
+                    )
+                if stage < aux3_stages:
+                    stagename = 'RO_AUX3R' + str(stage)
+                    # this one is local
+                    self.specials += Instance("LUT1",
+                        name=stagename,
+                        p_INIT=1,
+                        i_I0=ring_aux3r[stage],
+                        o_O=ring_aux3r[stage+1],
+                        attr=("KEEP", "DONT_TOUCH"),
+                    )
 
 
             elif device_root == 'ice40up5k':
@@ -180,16 +220,43 @@ enough, the fix is to slow down the target_freq parameter.
         # close the rings with a power gate
         self.comb += ring_cw[stages].eq(ring_cw[0] & self.ctl.fields.ena)
         self.comb += ring_ccw[0].eq(ring_ccw[fast_stages] & self.ctl.fields.ena)
+        if device_root == 'xc7s50':
+            self.comb += ring_aux1r[0].eq(ring_aux1r[aux1_stages] & self.ctl.fields.ena)
+            self.comb += ring_aux2r[0].eq(ring_aux2r[aux2_stages] & self.ctl.fields.ena)
+            self.comb += ring_aux3r[0].eq(ring_aux3r[aux3_stages] & self.ctl.fields.ena)
 
         # instantiate the noise slicing flip flop explicitly, don't leave it up to synthesizer to pick a part
-        if device_root == 'xc7s50':
-            self.specials += Instance("FDCE", name="RO_FDCE", # name it so it doesn't get pulled into pblock, helps decorrelate noise
-                         i_C=ring_cw[int(stages//2)],
-                         i_D=ring_ccw[0],
+            if device_root == 'xc7s50':
+                self.specials += Instance("FDCE", name="RO_FDCE",
+                # name it so it doesn't get pulled into pblock, helps decorrelate noise
+                i_C=ring_cw[int(stages // 2)],
+                i_D=ring_ccw[0],
+                i_CE=self.ctl.fields.ena,
+                i_CLR=0,
+                o_Q=self.trng_raw,
+            )
+            self.specials += Instance("FDCE", name="RO_AUX1_FDCE",
+                         i_C=ring_cw[int(stages//4)],
+                         i_D=ring_aux1r[0],
                          i_CE=self.ctl.fields.ena,
                          i_CLR=0,
-                         o_Q=self.trng_raw,
+                         o_Q=self.trng_aux1r,
                          )
+            self.specials += Instance("FDCE", name="RO_AUX2_FDCE",
+                # name it so it doesn't get pulled into pblock, helps decorrelate noise
+                i_C=ring_cw[int(stages // 3)],
+                i_D=ring_aux2r[0],
+                i_CE=self.ctl.fields.ena,
+                i_CLR=0,
+                o_Q=self.trng_aux2r,
+            )
+            self.specials += Instance("FDCE", name="RO_AUX3_FDCE",
+                i_C=ring_cw[int(3 * (stages // 5))],
+                i_D=ring_aux3r[0],
+                i_CE=self.ctl.fields.ena,
+                i_CLR=0,
+                o_Q=self.trng_aux3r,
+            )
         elif device_root == 'ice40up5k':
             self.specials += Instance("SB_DFFE",
                          i_C=ring_cw[int(stages//2)],
@@ -200,7 +267,18 @@ enough, the fix is to slow down the target_freq parameter.
 
         # add multi-regs to synchronize the noise to sysclk
         self.specials += MultiReg(ring_cw[int(stages // 2)], rand_strobe)
-        self.specials += MultiReg(self.trng_raw, self.trng_out_sync)
+        if device_root == 'ice40up5k':
+            self.specials += MultiReg(self.trng_raw, self.trng_out_sync)
+        elif device_root == 'xc7s50':
+            ro0 = Signal()
+            ro1 = Signal()
+            ro2 = Signal()
+            ro3 = Signal()
+            self.specials += MultiReg(self.trng_raw, ro0)
+            self.specials += MultiReg(self.trng_aux1r, ro1)
+            self.specials += MultiReg(self.trng_aux2r, ro2)
+            self.specials += MultiReg(self.trng_aux3r, ro3)
+            self.comb += self.trng_out_sync.eq(ro0 ^ ro1 ^ ro2 ^ ro3)
 
         # wire up debug
         self.comb += [
@@ -217,3 +295,6 @@ enough, the fix is to slow down the target_freq parameter.
         if device_root == 'xc7s50':
             platform.add_platform_command("set_disable_timing -from I0 -to O RINGOSC_CW2")
             platform.add_platform_command("set_disable_timing -from I0 -to O RO_CCW0")
+            platform.add_platform_command("set_disable_timing -from I0 -to O RO_AUX1R0")
+            platform.add_platform_command("set_disable_timing -from I0 -to O RO_AUX2R0")
+            platform.add_platform_command("set_disable_timing -from I0 -to O RO_AUX3R0")
