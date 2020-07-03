@@ -16,3 +16,11 @@ REGION_ALIAS("REGION_HEAP", SRAM);
 REGION_ALIAS("REGION_STACK", SRAM);
 
 _heap_size = LENGTH(SRAM) - 32k;
+
+SECTIONS
+{
+    /DISCARD/ :
+    {
+       *(.eh_frame_hdr)
+    }
+}
