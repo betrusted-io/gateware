@@ -133,7 +133,7 @@ as an independent variable, so I think the paper's core idea still works.
 
         self.trng_slow = Signal()
         self.trng_fast = Signal()
-        self.sync += [self.trng_fast.eq(self.ro_fbk0), self.trng_slow.eq(self.rand[0])]
+        self.sync += [self.trng_fast.eq(self.ro_fbk0), self.trng_slow.eq(rand[0])]
 
         dwell_cnt = Signal(self.ctl.fields.dwell.size)
         delay_cnt = Signal(self.ctl.fields.delay.size)
