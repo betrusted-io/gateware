@@ -7,9 +7,9 @@ from litex.soc.integration.doc import AutoDoc, ModuleDoc
 class TrngRingOsc(Module, AutoCSR, AutoDoc):
     def __init__(self, platform, target_freq=1e6, rng_shift_width=32, make_pblock=False):
         self.intro = ModuleDoc("""
-TrngRingOsc builds a pair of ring oscillators. One is the "slow" oscillator, which circumscribes
-the die, and attempts to hit the target_freq supplied as a parameter. The other is a "fast" oscillator,
-which is typically targeted to run in the 50-100MHz range (primarily for power reasons). The idea
+TrngRingOsc builds a set of ring oscillators. One is the "slow" oscillator, which circumscribes
+the die, and attempts to hit the target_freq supplied as a parameter. The others are a "fast" oscillator,
+which is typically targeted to run in the 50-300MHz range. The idea
 is to have the "fast" oscillator sample at a period that is faster than the average jitter picked
 up by the slow oscillator as it circumscribes the die. Thus, if the quality of entropy is not good
 enough, the fix is to slow down the target_freq parameter.
