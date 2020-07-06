@@ -39,31 +39,35 @@ as an independent variable, so I think the paper's core idea still works.
             but longer times also means more coupling of the deterministic sysclk noise into the rings.""", reset=8)
         ])
         self.rand = CSRStatus(fields=[
-            CSRField("rand", size=ro_elements-1, description="Random data shifted into a register for easier collection. Width set by rng_shift_width parameter.")
+            CSRField("rand", size=ro_elements-1, description="Random data shifted into a register for easier collection.", reset=0xDEADBEEF)
         ])
         self.status = CSRStatus(fields=[
             CSRField("fresh", size=1, description="When set, the rand register contains a fresh set of bits to be read; cleaned by reading the `rand` register")
         ])
+        shift_rand = Signal()
         rand = Signal(ro_elements-1)
-        self.comb += self.rand.fields.rand.eq(rand)
 
         dwell_now = Signal()   # level-signal to indicate dwell or measure
         sample_now = Signal()  # single-sysclk wide pulse to indicate sampling time (after leaving dwell)
-        rand_cnt = Signal(max=self.rand.size)
+        rand_cnt = Signal(max=self.rand.size+1)
         # keep track of how many bits have been shifted in since the last read-out
         self.sync += [
             If(self.rand.we,
-               rand_cnt.eq(0),
-               self.status.fields.fresh.eq(0)
+               self.status.fields.fresh.eq(0),
+               self.rand.fields.rand.eq(0xDEADBEEF),
             ).Else(
-                If(sample_now,
-                    If(rand_cnt < self.rand.size - 1,
+                If(shift_rand,
+                    If(rand_cnt < self.rand.size+1, # +1 because the very first bit never got sample entropy, just dwell, so we throw it away
                        rand_cnt.eq(rand_cnt + 1),
-                       self.status.fields.fresh.eq(0)
                     ).Else(
-                       self.status.fields.fresh.eq(1)
+                       self.rand.fields.rand.eq(rand),
+                       self.status.fields.fresh.eq(1),
+                       rand_cnt.eq(0),
                     )
-                )
+                ).Else(
+                    self.status.fields.fresh.eq(self.status.fields.fresh),
+                    self.rand.fields.rand.eq(self.rand.fields.rand),
+                ),
             )
         ]
 
@@ -83,22 +87,7 @@ as an independent variable, so I think the paper's core idea still works.
                 platform.add_platform_command("set_disable_timing -from I0 -to O [get_cells " + stagename + "]")
                 platform.add_platform_command("set_false_path -through [get_pins " + stagename + "/O]")
             # add "gang" sampler to pull out extra entropy during dwell mode
-            if element == 0:
-                self.specials += Instance("FDCE", name='FDCE_E' + str(element),
-                    i_D=getattr(self, "ro_elem" + str(element))[0],
-                    i_C=ClockSignal(),
-                    i_CE=1, # element 0 is never gated
-                    i_CLR=0,
-                    o_Q=getattr(self, "ro_samp" + str(element))
-                )
-                self.sync += [
-                    If(sample_now,
-                        rand[0].eq(getattr(self, "ro_samp" + str(element))),
-                    ).Else(
-                        rand[0].eq(rand[0] ^ (getattr(self, "ro_samp" + str(element)) & self.ctl.fields.gang)),
-                    )
-                ]
-            elif element < 32:
+            if element != 32: # element 32 is a special case, handled at end of loop
                 self.specials += Instance("FDCE", name='FDCE_E' + str(element),
                     i_D=getattr(self, "ro_elem" + str(element))[0],
                     i_C=ClockSignal(),
@@ -106,6 +95,7 @@ as an independent variable, so I think the paper's core idea still works.
                     i_CLR=0,
                     o_Q=getattr(self, "ro_samp" + str(element))
                 )
+            if (element != 0) & (element != 32): # element 0 is a special case, handled at end of loop
                 self.sync += [
                     If(sample_now,
                        rand[element].eq(rand[element-1]),
@@ -119,6 +109,22 @@ as an independent variable, so I think the paper's core idea still works.
                 getattr(self, "ro_fbk" + str(element)).eq(getattr(self, "ro_elem" + str(element))[ro_stages]
                                                           & self.ctl.fields.ena),
             ]
+
+        # build the input tap
+        self.specials += Instance("FDCE", name='FDCE_E32',
+            i_D=getattr(self, "ro_elem32")[0],
+            i_C=ClockSignal(),
+            i_CE=1, # element 32 is not part of the gang, it's the output element of the "big loop"
+            i_CLR=0,
+            o_Q=getattr(self, "ro_samp32")
+        )
+        self.sync += [
+            If(sample_now,
+                rand[0].eq(getattr(self, "ro_samp32")), # shift in sample entropy from a tap on the one stage that's not already wired to a gang mixer
+            ).Else(
+                rand[0].eq(rand[0] ^ (getattr(self, "ro_samp0") & self.ctl.fields.gang)),
+            )
+        ]
 
         # create the switchable meta-ring by muxing on dwell_now
         for element in range(ro_elements):
@@ -151,6 +157,9 @@ as an independent variable, so I think the paper's core idea still works.
             If(dwell_cnt > 0,
                 NextValue(dwell_cnt, dwell_cnt - 1),
             ).Else(
+                shift_rand.eq(1),  # we want to shift randomness after a dwell, otherwise in gang mode rand[0] doesn't get any dwell entropy
+                # however, this means after a reset the 1st bit generated won't have the large-ring sample entropy, so always throw that away
+                # (this is handled in the shifting loop)
                 NextState("DELAY")
             )
         )
