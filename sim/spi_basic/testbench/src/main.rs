@@ -21,73 +21,73 @@ fn run(p: &pac::Peripherals) {
     let ram = ram_ptr as *mut Volatile<u32>;
 
     unsafe { // it's all unsafe
-        p.SPISLAVE.control.write(|w| w.intena().bit(true));
+        p.SPIPERIPHERAL.control.write(|w| w.intena().bit(true));
 
-        p.SPISLAVE.tx.write(|w| w.bits(0x0F0F));
-        p.SPIMASTER.tx.write(|w| w.bits(0xF055));
-        // p.SPIMASTER.control.write(|w| w.go().bit(true));
+        p.SPIPERIPHERAL.tx.write(|w| w.bits(0x0F0F));
+        p.SPICONTROLLER.tx.write(|w| w.bits(0xF055));
+        // p.SPICONTROLLER.control.write(|w| w.go().bit(true));
     	// note: if spiclk > cpuclock, the below line should be commented out on all transactons
-        // while !p.SPIMASTER.status.read().tip().bit() { }
-        while p.SPIMASTER.status.read().tip().bit() { }
-        (*ram.add(0)).write( p.SPIMASTER.rx.read().bits() );
-        (*ram.add(1)).write( p.SPISLAVE.rx.read().bits() );
+        // while !p.SPICONTROLLER.status.read().tip().bit() { }
+        while p.SPICONTROLLER.status.read().tip().bit() { }
+        (*ram.add(0)).write( p.SPICONTROLLER.rx.read().bits() );
+        (*ram.add(1)).write( p.SPIPERIPHERAL.rx.read().bits() );
         report(&p, (*ram.add(0)).read());
         report(&p, (*ram.add(1)).read());
 
-        p.SPISLAVE.tx.write(|w| w.bits(0x1234));
-        p.SPIMASTER.tx.write(|w| w.bits(0x90F1));
-        //p.SPIMASTER.control.write(|w| w.go().bit(true));
+        p.SPIPERIPHERAL.tx.write(|w| w.bits(0x1234));
+        p.SPICONTROLLER.tx.write(|w| w.bits(0x90F1));
+        //p.SPICONTROLLER.control.write(|w| w.go().bit(true));
     	// note: if spiclk > cpuclock, the below line should be commented out on all transactons
-        // while !p.SPIMASTER.status.read().tip().bit() { }
-        while p.SPIMASTER.status.read().tip().bit() { }
-        (*ram.add(2)).write( p.SPIMASTER.rx.read().bits() );
-        // (*ram.add(3)).write( p.SPISLAVE.rx.read().bits() );     // test overrun flag
+        // while !p.SPICONTROLLER.status.read().tip().bit() { }
+        while p.SPICONTROLLER.status.read().tip().bit() { }
+        (*ram.add(2)).write( p.SPICONTROLLER.rx.read().bits() );
+        // (*ram.add(3)).write( p.SPIPERIPHERAL.rx.read().bits() );     // test overrun flag
         report(&p, (*ram.add(2)).read());
 
 
-        p.SPISLAVE.tx.write(|w| w.bits(0x89ab));
-        p.SPIMASTER.tx.write(|w| w.bits(0xbabe));
-        //p.SPIMASTER.control.write(|w| w.go().bit(true));
+        p.SPIPERIPHERAL.tx.write(|w| w.bits(0x89ab));
+        p.SPICONTROLLER.tx.write(|w| w.bits(0xbabe));
+        //p.SPICONTROLLER.control.write(|w| w.go().bit(true));
     	// note: if spiclk > cpuclock, the below line should be commented out on all transactons
-        // while !p.SPIMASTER.status.read().tip().bit() { }
-        while p.SPIMASTER.status.read().tip().bit() { }
-        (*ram.add(4)).write( p.SPIMASTER.rx.read().bits() );
-        (*ram.add(5)).write( p.SPISLAVE.rx.read().bits() );
+        // while !p.SPICONTROLLER.status.read().tip().bit() { }
+        while p.SPICONTROLLER.status.read().tip().bit() { }
+        (*ram.add(4)).write( p.SPICONTROLLER.rx.read().bits() );
+        (*ram.add(5)).write( p.SPIPERIPHERAL.rx.read().bits() );
         report(&p, (*ram.add(4)).read());
         report(&p, (*ram.add(5)).read());
 
 
-        p.SPISLAVE.tx.write(|w| w.bits(0xcdef));
-        p.SPIMASTER.tx.write(|w| w.bits(0x3c06));
-        //p.SPIMASTER.control.write(|w| w.go().bit(true));
+        p.SPIPERIPHERAL.tx.write(|w| w.bits(0xcdef));
+        p.SPICONTROLLER.tx.write(|w| w.bits(0x3c06));
+        //p.SPICONTROLLER.control.write(|w| w.go().bit(true));
     	// note: if spiclk > cpuclock, the below line should be commented out on all transactons
-        // while !p.SPIMASTER.status.read().tip().bit() { }
-        while p.SPIMASTER.status.read().tip().bit() { }
-        (*ram.add(6)).write( p.SPIMASTER.rx.read().bits() );
-        (*ram.add(7)).write( p.SPISLAVE.rx.read().bits() );
+        // while !p.SPICONTROLLER.status.read().tip().bit() { }
+        while p.SPICONTROLLER.status.read().tip().bit() { }
+        (*ram.add(6)).write( p.SPICONTROLLER.rx.read().bits() );
+        (*ram.add(7)).write( p.SPIPERIPHERAL.rx.read().bits() );
         report(&p, (*ram.add(6)).read());
         report(&p, (*ram.add(7)).read());
 
 
-        p.SPISLAVE.tx.write(|w| w.bits(0xff00));
-        p.SPIMASTER.tx.write(|w| w.bits(0x5a5a));
-        //p.SPIMASTER.control.write(|w| w.go().bit(true));
+        p.SPIPERIPHERAL.tx.write(|w| w.bits(0xff00));
+        p.SPICONTROLLER.tx.write(|w| w.bits(0x5a5a));
+        //p.SPICONTROLLER.control.write(|w| w.go().bit(true));
     	// note: if spiclk > cpuclock, the below line should be commented out on all transactons
-        // while !p.SPIMASTER.status.read().tip().bit() { }
-        while p.SPIMASTER.status.read().tip().bit() { }
-        (*ram.add(8)).write( p.SPIMASTER.rx.read().bits() );
-        (*ram.add(9)).write( p.SPISLAVE.rx.read().bits() );
+        // while !p.SPICONTROLLER.status.read().tip().bit() { }
+        while p.SPICONTROLLER.status.read().tip().bit() { }
+        (*ram.add(8)).write( p.SPICONTROLLER.rx.read().bits() );
+        (*ram.add(9)).write( p.SPIPERIPHERAL.rx.read().bits() );
         report(&p, (*ram.add(8)).read());
         report(&p, (*ram.add(9)).read());
 
         // write performance benchmark
         for i in 0..16 {
-            p.SPIMASTER.tx.write(|w| w.bits(i + 0x4c00));
-            //p.SPIMASTER.control.write(|w| w.go().bit(true));
+            p.SPICONTROLLER.tx.write(|w| w.bits(i + 0x4c00));
+            //p.SPICONTROLLER.control.write(|w| w.go().bit(true));
             // note: if spiclk > cpuclock, the below line should be commented out on all transactons
-            // while !p.SPIMASTER.status.read().tip().bit() { }
-            while p.SPIMASTER.status.read().tip().bit() { }
-            (*ram.add(10 + i as usize)).write( p.SPISLAVE.rx.read().bits() );
+            // while !p.SPICONTROLLER.status.read().tip().bit() { }
+            while p.SPICONTROLLER.status.read().tip().bit() { }
+            (*ram.add(10 + i as usize)).write( p.SPIPERIPHERAL.rx.read().bits() );
             report(&p, (*ram.add(10 + i as usize)).read());
         }
     }

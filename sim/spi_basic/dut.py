@@ -53,11 +53,11 @@ boot_from_spi=False
 top-level IOs specific to the DUT
 """
 dutio = [
-    # COM to UP5K (maste0)
+    # COM to UP5K (controller)
     ("com", 0,
      Subsignal("csn", Pins("T15"), IOStandard("LVCMOS18")),
-     Subsignal("miso", Pins("P16"), IOStandard("LVCMOS18")),
-     Subsignal("mosi", Pins("N18"), IOStandard("LVCMOS18")),
+     Subsignal("cipo", Pins("P16"), IOStandard("LVCMOS18")),
+     Subsignal("copi", Pins("N18"), IOStandard("LVCMOS18")),
      Subsignal("sclk", Pins("R16"), IOStandard("LVCMOS18")),
      Subsignal("pa_enable", Pins("A")),
      Subsignal("wakeup", Pins("B")),
@@ -66,10 +66,10 @@ dutio = [
      ),
 
     # slave interface for testing UP5K side
-    ("slave", 0,
+    ("peripheral", 0,
      Subsignal("csn", Pins("dummy0")),
-     Subsignal("miso", Pins("dummy1")),
-     Subsignal("mosi", Pins("dummy2")),
+     Subsignal("cipo", Pins("dummy1")),
+     Subsignal("copi", Pins("dummy2")),
      Subsignal("sclk", Pins("dummy3")),
      ),
 ]
@@ -91,11 +91,11 @@ class Dut(Sim):
         Sim.__init__(self, platform, custom_clocks=local_clocks, spiboot=spiboot, **kwargs) # SoC magic is in here
 
         # SPI interface
-        self.submodules.spimaster = spi_7series.SPIMaster(platform.request("com")) # replace with spi_ice40 to simulate the ice40 master
-        self.add_csr("spimaster")
+        self.submodules.spicontroller = spi_7series.SPIController(platform.request("com")) # replace with spi_ice40 to simulate the ice40 controller
+        self.add_csr("spicontroller")
 
-        self.submodules.spislave = spi_7series.SPISlave(platform.request("slave"))
-        self.add_csr("spislave")
+        self.submodules.spiperipheral = spi_7series.SPIPeripheral(platform.request("peripheral"))
+        self.add_csr("spiperipheral")
 
 
 """
