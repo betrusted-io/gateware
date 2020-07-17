@@ -176,6 +176,7 @@ def main():
     generate_top()
 
     # generate a .init file for the SPINOR memory based on the BIOS we want to boot
+    os.system("rm -f run/simspi.init")  # the "w" argument is not replacing the file for some reason, it's appending. delete it.
     with open("run/software/bios/bios.bin", "rb") as ifile:
         with open("run/simspi.init", "w") as ofile:
             binfile = ifile.read()
