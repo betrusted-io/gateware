@@ -17,7 +17,7 @@ pub fn report(p: &pac::Peripherals, data: u32) {
 fn run(p: &pac::Peripherals) {
     const FIFODEPTH: usize = 8;
 
-    let duplex_ptr: *mut u32 = 0xe000_0020 as *mut u32;
+    let duplex_ptr: *mut u32 = 0xe000_1000 as *mut u32;
     let duplex = duplex_ptr as *mut Volatile<u32>;
 
     let spkr_ptr: *mut u32 = 0xe000_0000 as *mut u32; // called "audio" in the RTL
@@ -59,20 +59,24 @@ fn run(p: &pac::Peripherals) {
 
     let mut count: usize = 0;
     let mut sample: u32 = 0;
+    let mut idle: u32 = 0;
     loop {
-        if p.I2S_DUPLEX.tx_stat.read().free().bit() {
+        report( &p, idle | 0x5000_0000);
+        idle += 1;
+        if p.I2S_DUPLEX.rx_stat.read().dataready().bit() {
+            report(&p, count as u32 | 0xA000_0000);
             for _ in 0 ..FIFODEPTH {
                 unsafe {
                     sample = (*duplex).read();
-                    report(&p, sample);
                     (*duplex).write(sample + 0x2000_3000);
                     (*spkr).write(sample + 0x4000_5000);
+                    report(&p, sample);
                 }
             }
             count += 1;
-            if count > 4 {
-                break;
-            }
+        }
+        if count > 3 { // terminate simulation after we've run through a few rounds of data
+            break;
         }
     }
 

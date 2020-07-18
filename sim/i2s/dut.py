@@ -35,6 +35,7 @@ from litex.soc.integration.soc_core import *
 from litex.soc.cores.clock import *
 from litex.soc.integration.doc import AutoDoc, ModuleDoc
 from litex.soc.interconnect.csr import *
+from litex.soc.integration.soc import SoCRegion
 
 # specific to a given DUT
 from litex.soc.cores.i2s import S7I2S
@@ -85,18 +86,16 @@ class Dut(Sim):
         Sim.__init__(self, platform, custom_clocks=local_clocks, spiboot=spiboot, **kwargs) # SoC magic is in here
 
         # add a key for the i2s_duplex sim block
-        SoCCore.mem_map["i2s_duplex"] = 0xe0000020
+        SoCCore.mem_map["i2s_duplex"] = 0xe0001000
 
         # shallow fifodepth allows us to work the end points a bit faster in simulation
         self.submodules.i2s_duplex = S7I2S(platform.request("i2s", 0), fifo_depth=8)
-        self.add_wb_slave(self.mem_map["i2s_duplex"], self.i2s_duplex.bus, 0x4)
-        self.add_memory_region("i2s_duplex", self.mem_map["i2s_duplex"], 4, type='io')
+        self.bus.add_slave("i2s_duplex", self.i2s_duplex.bus, SoCRegion(origin=self.mem_map["i2s_duplex"], size=0x4, cached=False))
         self.add_csr("i2s_duplex")
         self.add_interrupt("i2s_duplex")
 
         self.submodules.audio = S7I2S(platform.request("i2s", 1), fifo_depth=8)
-        self.add_wb_slave(self.mem_map["audio"], self.audio.bus, 0x4)
-        self.add_memory_region("audio", self.mem_map["audio"], 4, type='io')
+        self.bus.add_slave("audio", self.audio.bus, SoCRegion(origin=self.mem_map["audio"], size=0x4, cached=False))
         self.add_csr("audio")
         self.add_interrupt("audio")
 
