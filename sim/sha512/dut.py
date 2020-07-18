@@ -35,6 +35,7 @@ from litex.soc.integration.soc_core import *
 from litex.soc.cores.clock import *
 from litex.soc.integration.doc import AutoDoc, ModuleDoc
 from litex.soc.interconnect.csr import *
+from litex.soc.integration.soc import SoCRegion
 
 # specific to a given DUT
 from gateware import sha512_opentitan as sha512
@@ -78,8 +79,7 @@ class Dut(Sim):
         self.submodules.sha512 = sha512.Hmac(platform)
         self.add_csr("sha512")
         self.add_interrupt("sha512")
-        self.add_wb_slave(self.mem_map["sha512"], self.sha512.bus, 8)
-        self.add_memory_region("sha512", self.mem_map["sha512"], 8, type='io')
+        self.bus.add_slave("sha512", self.sha512.bus, SoCRegion(origin=self.mem_map["sha512"], size=0x8, cached=False))
 
 
 """

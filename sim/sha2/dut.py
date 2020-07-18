@@ -26,6 +26,7 @@ from migen import *
 import litex.soc.doc as lxsocdoc
 from litex.build.generic_platform import *
 from litex.soc.integration.builder import *
+from litex.soc.integration.soc import SoCRegion
 
 # pull in the common objects from sim_bench
 from sim_support.sim_bench import Sim, Platform, BiosHelper, CheckSim, SimRunner
@@ -78,8 +79,7 @@ class Dut(Sim):
         self.submodules.sha2 = sha2.Hmac(platform)
         self.add_csr("sha2")
         self.add_interrupt("sha2")
-        self.add_wb_slave(self.mem_map["sha2"], self.sha2.bus, 4)
-        self.add_memory_region("sha2", self.mem_map["sha2"], 4, type='io')
+        self.bus.add_slave("sha2", self.sha2.bus, SoCRegion(origin=self.mem_map["sha2"], size=0x4, cached=False))
 
 """
 generate all the files necessary to run xsim
