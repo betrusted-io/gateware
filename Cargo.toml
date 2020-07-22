@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "sim/curve_engine/testbench",
     "sim/sha512/testbench",
     "sim/sha2/testbench",
     "sim/aes/testbench",

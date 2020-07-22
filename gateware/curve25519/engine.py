@@ -6,14 +6,21 @@ from litex.soc.integration.doc import AutoDoc, ModuleDoc
 from litex.soc.interconnect import wishbone
 from litex.soc.interconnect.csr_eventmanager import *
 
-from enum import IntEnum
-
-class Opcode(IntEnum):
-    UNDEFINED = -1  # used for initializing records
-    PASS_A = 0
-    PASS_B = 1
-    MAX_OP = 2  # all encodings must be less than this
-
+opcode_bits = 6  # number of bits used to encode the opcode field
+opcodes = {  # mnemonic : [bit coding, docstring]
+    "UDF" : [-1, "Undefined opcodes"],
+    "PSA" : [0, "Wd <- Ra  # pass A"],
+    "PSB" : [1, "Wd <- Rb  # pass B"],
+    "MSK" : [2, "Replicate(Ra[0], 256) & Rb  # for doing cswap()"],
+    "XOR" : [3, "XOR", "Wd <- Ra ^ Rb  # bitwise XOR"],
+    "NOT" : [4, "Wd <- ~Ra   # binary invert"],
+    "ADD" : [5, "Wd <- Ra + Rb  # 256-bit binary add, must be followed by TRD,SUB"],
+    "SUB" : [6, "Wd <- Ra - Rb  # 256-bit binary subtraction, must be followed by TRD,SUB"],
+    "MUL" : [7, "Wd <- Ra * Rb  # multiplication in F(2^255-19) - result is normalized"],
+    "TRD" : [8, "If Ra >= 2^255-19 then Wd <- 2^255-19, else Wd <- 0  # Test reduce"],
+    "BRZ" : [9, "If Ra == 0 then mpc[9:0] <- mpc[9:0] + Rb[9:0], else mpc <- mpc + 1  # Branch if zero"],
+    "MAX" : [10, "Maximum opcode number"]
+}
 
 class RegisterFile(Module, AutoDoc):
     def __init__(self, depth=512, width=256):
@@ -66,19 +73,19 @@ an address width of 9 bits.
         rf_adr = Signal(log2_int(depth))
         self.comb += [
             If(~phase,
-                rf_adr.eq(self.ra_a),
+                rf_adr.eq(self.ra_adr),
             ).Else(
-                rf_adr.eq(self.rb_a),
+                rf_adr.eq(self.rb_adr),
             )
         ]
         rf_dat = Signal(width)
         self.sync.rf_clk += [
-            If(~phase,
-                self.rda_dat.eq(rf_dat),
-                self.rdb_dat.eq(self.rdb_dat),
+            If(phase,
+                self.ra_dat.eq(rf_dat),
+                self.rb_dat.eq(self.rb_dat),
             ).Else(
-                self.rda_dat.eq(self.rda_dat),
-                self.rdb_dat.eq(rf_dat),
+                self.ra_dat.eq(self.ra_dat),
+                self.rb_dat.eq(rf_dat),
             ),
             If(eng_sync,
                 phase.eq(0),
@@ -88,27 +95,26 @@ an address width of 9 bits.
         ]
 
         for word in range(int(256/64)):
-            self.specials += Instance("RAMB36E1", name="RF_RAMB" + str(word),
-                p_WRITE_MODE_A = "READ_FIRST",
-                p_RAM_MODE = "SDP",
-                p_WRITE_WIDTH_A = "72",  # 72 bit width only available in SDP mode
-                p_WRITE_WIDTH_B = "0", # WB not available in SDP
-                p_READ_WIDTH_A = "72",
-                p_READ_WIDTH_B = "0", # RB not available in SDP
-                p_DOA_REG = "0", p_DOB_REG = "0",
-                p_RDADDR_COLLISION_HWCONFIG = "DELAYED_WRITE",  # "PERFORMANCE" can be used at expense of collision problems
-                i_CLKARDCLK = ClockSignal("rf_clk"),
-                i_CLKBWRCLK = ClockSignal("rf_clk"),
-                i_ADDRARDADDR = rf_adr,
-                i_ADDRBWRADDR = self.wd_adr,
-                i_DIADI = self.wd_dat[word*64 : word*64 + 32],
-                i_DIBDI = self.wd_dat[word*64 + 32 : word*64 + 64],
-                o_DOADO = rf_dat[word*64 : word*64 + 32],
-                o_DOBDO = rf_dat[word*64 + 32 : word*64 + 64],
-                i_ENARDEN = 1,
-                i_ENBWREN = phase & self.we,
-                i_RSTRAMARSTRAM = eng_sync,
-                i_WEBWE = self.wd_bwe[word*8 : word*8 + 8],
+            self.specials += Instance("BRAM_SDP_MACRO", name="RF_RAMB" + str(word),
+                p_BRAM_SIZE = "36Kb",
+                p_DEVICE = "7SERIES",
+                p_WRITE_WIDTH = 64,
+                p_READ_WIDTH = 64,
+                p_DO_REG = 0,
+                p_INIT_FILE = "NONE",
+                p_SIM_COLLISION_CHECK = "ALL", # "WARNING_ONLY", "GENERATE_X_ONLY", "NONE"
+                p_SRVAL = 0,
+                p_WRITE_MODE = "READ_FIRST",
+                i_RDCLK = ClockSignal("rf_clk"),
+                i_WRCLK = ClockSignal("rf_clk"),
+                i_RDADDR = rf_adr,
+                i_WRADDR = self.wd_adr,
+                i_DI = self.wd_dat[word*64 : word*64 + 64],
+                o_DO = rf_dat[word*64 : word*64 + 64],
+                i_RDEN = 1,
+                i_WREN = phase & self.we,
+                i_RST = eng_sync,
+                i_WE = self.wd_bwe[word*8 : word*8 + 8],
             )
 
         # create an internal reset signal that synchronizes the "eng" to the "rf" domains
@@ -130,56 +136,135 @@ an address width of 9 bits.
 
 class Curve25519Const(Module, AutoDoc):
     def __init__(self):
+        constant_defs = {
+            0: [0, "zero", "The number zero"],
+            1: [121665, "a24", "The value A-2/4"],
+            2: [0x7FFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFED, "field", "Binary coding of 2^255-19"],
+            3: [0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF, "neg1", "Binary -1"],
+            4: [1, "one", "The number one"],
+        }
         self.intro = ModuleDoc("""
 This module encodes the constants that can be substituted for any register
 value. Up to 32 constants can be encoded in this ROM.
         """)
         self.adr = Signal(5)
         self.const = Signal(256)
-        self.comb += [
-            If(self.adr == 1, # A+2/4 constant
-                self.const.eq(121665),
-            ).Else(
-                self.const.eq(0),
-            )
-        ]
+        for code, const in constant_defs.items():
+            self.comb += [
+                If(self.adr == code,
+                    self.const.eq(const[0]),
+                )
+            ]
+            setattr(self, const[1], ModuleDoc(const[2]))
 
-# superclass template for execution units
-class ExecUnit(Module):
-    def __init__(self, width=256, opcode=Opcode.UNDEFINED):
-        # basic API for an exec unit:
-        # `a` and `b` are the inputs. `q` is the output.
-        # `start` is a single-clock signal which indicates processing should start
-        # `q_valid` is a single cycle pulse that indicates that the `q` result is valid
+# ------------------------------------------------------------------------ EXECUTION UNITS
+class ExecUnit(Module, AutoDoc):
+    def __init__(self, width=256, opcode_list=["UDF"]):
+        self.intro = ModuleDoc("""
+ExecUnit is the superclass template for execution units.
+
+Configuration Arguments:
+  - opcode_list is the list of opcodes that an ExecUnit can process
+  - width is the bit-width of the execution pathway
+
+Signal API for an exec unit:
+  - `a` and `b` are the inputs. `q` is the output.
+  - `start` is a single-clock signal which indicates processing should start
+  - `q_valid` is a single cycle pulse that indicates that the `q` result is valid
+  - `opcode` is the current opcode being executed (for finer-grained decode of multi-functional units)
+        """)
         self.a = Signal(width)
         self.b = Signal(width)
         self.q = Signal(width)
         self.start = Signal()
         self.q_valid = Signal()
 
-        self.opcode = opcode
+        self.opcode_list = opcode_list
+        self.opcode = Signal(opcode_bits)
 
-# execution units
-class ExecPassThroughA(ExecUnit):
+class ExecMask(ExecUnit):
     def __init__(self, width=256):
-        ExecUnit.__init__(self, width, Opcode.PASS_A)
+        ExecUnit.__init__(self, width, ["MSK"])
 
         self.sync.eng_clk += [
-            self.q.eq(self.a),
             self.q_valid.eq(self.start),
+            self.q.eq(self.b & Replicate(self.a[0], width))
         ]
 
-class ExecPassThroughB(ExecUnit):
+class ExecLogic(ExecUnit):
     def __init__(self, width=256):
-        ExecUnit.__init__(self, width, Opcode.PASS_B)
+        ExecUnit.__init__(self, width, ["XOR", "NOT", "PSA", "PSB"])
 
         self.sync.eng_clk += [
-            self.q.eq(self.b),
             self.q_valid.eq(self.start),
+            If(self.opcode == opcodes["XOR"][0],
+               self.q.eq(self.a ^ self.b)
+            ).Elif(self.opcode == opcodes["NOT"][0],
+               self.q.eq(~self.a)
+            ).Elif(self.opcode == opcodes["PSA"][0],
+                self.q.eq(self.a),
+            ).Elif(self.opcode == opcodes["PSB"][0],
+                self.q.eq(self.b),
+            )
         ]
+
+class ExecAddSub(ExecUnit):
+    def __init__(self, width=256):
+        ExecUnit.__init__(self, width, ["ADD", "SUB"])
+
+        self.sync.eng_clk += [
+            self.q_valid.eq(self.start),
+            If(self.opcode == opcodes["ADD"][0],
+               self.q.eq(self.a + self.b),
+            ).Elif(self.opcode == opcodes["SUB"][0],
+               self.q.eq(self.a - self.b),
+            )
+        ]
+
+class ExecTestReduce(ExecUnit, AutoDoc):
+    def __init__(self, width=256):
+        ExecUnit.__init__(self, width, ["TRD"])
+
+        self.notes = ModuleDoc("""
+First, observe that 2^n-19 is 0xFF....FFED.
+Next, observe that arithmetic in the field 2^255-19 will never
+the 256th bit. 
+
+Modular reduction must happen when an arithmetic operation
+overflows the bounds of the modulus. When this happens, one must
+subtract the modulus (in this case 2^255-19). 
+
+The reduce operation is done in two halves. The first half is
+to check if a reduction must happen. The second is to do the subtraction.
+In order to allow for constant-time operation, we always do the subtraction,
+even if it is not strictly necessary. 
+
+We use this to our advantage, and compute a reduction using
+a test operator that produces a residue, and a subtraction operation.
+
+It's up to the programmer to ensure that the two instruction sequence
+is never broken up.
+
+Thus the reduction algorithm is as follows:
+
+1. TestReduce
+  - If the 256th bit is set (e.g, ra[255]), then return 2^255-19
+  - If bits ra[255:5] are all 1, and bits ra[4:0] are greater than or equal to 0x1D, then return 2^255-19
+  - Otherwise return 0
+2. Subtract
+  - Subtract the return value of TestReduce from the tested value
+        """)
+        self.sync.eng_clk += [
+            If( (self.a[255] == 1) | ((self.a[5:256] == Replicate(1, 251) & (self.a[:5] >= 0x1D))),
+                self.q.eq(0x7FFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFED)
+            ).Else(
+                self.q.eq(0x0)
+            )
+        ]
+
 
 class Engine(Module, AutoCSR, AutoDoc):
-    def __init__(self, platform):
+    def __init__(self, platform, prefix):
         self.intro = ModuleDoc("""
 The Curve25519 engine is a microcoded hardware accelerator for Curve25519 operations.
 The Engine loosely resembles a Harvard architecture microcoded CPU, with a single 
@@ -212,7 +297,7 @@ Offset:
         num_registers = 32
 
         instruction_layout = [
-            ("opcode", 6), # opcode to be executed
+            ("opcode", opcode_bits), # opcode to be executed
             ("ra", log2_int(num_registers)),  # operand A read register
             ("ca", 1), # substitute constant table value for A
             ("rb", log2_int(num_registers)), # operand B read register
@@ -254,7 +339,7 @@ Offset:
         running_r = Signal()
         ill_op_r = Signal()
         self.sync += [
-            running_r.eq(running),
+        running_r.eq(running),
             ill_op_r.eq(illegal_opcode),
         ]
         self.comb += [
@@ -264,11 +349,12 @@ Offset:
 
         ### microcode memory - 1rd/1wr dedicated to wishbone, 1rd for execution
         microcode = Memory(microcode_width, microcode_depth)
-        micro_wrport = microcode.get_port(write_capable=True)
-        micro_rdport = microcode.get_port()
-        micro_runport = microcode.get_port()
+        self.specials += microcode
+        micro_wrport = microcode.get_port(write_capable=True, mode=READ_FIRST) # READ_FIRST allows BRAM inference
         self.specials += micro_wrport
+        micro_rdport = microcode.get_port(mode=READ_FIRST)
         self.specials += micro_rdport
+        micro_runport = microcode.get_port(mode=READ_FIRST)
         self.specials += micro_runport
 
         mpc = Signal(log2_int(microcode_depth))  # the microcode program counter
@@ -288,17 +374,18 @@ Offset:
         ### wishbone bus interface: decode the two address spaces and dispatch accordingly
         self.bus = bus = wishbone.Interface()
         wdata = Signal(32)
-        wadr = Signal(log2_int(rf_depth_raw))
+        wadr = Signal(log2_int(rf_depth_raw) + 3) # wishbone bus is 32-bits wide, so 3 extra bits to select the sub-words out of the 256-bit registers
         wmask = Signal(4)
         wdata_we = Signal()
         rdata_re = Signal()
         rdata_ack = Signal()
         rdata_req = Signal()
-        radr = Signal(log2_int(rf_depth_raw))
+        radr = Signal(log2_int(rf_depth_raw) + 3)
 
-        micro_rdack = Signal()
+        micro_rd_waitstates = 2
+        micro_rdack = Signal(max=(micro_rd_waitstates+1))
         self.sync += [
-            If( (bus.adr & ((0xFFFF_C000) >> 2)) == (0x1_0000 >> 2),
+            If( ((bus.adr & ((0xFFFF_C000) >> 2)) >= ((prefix | 0x1_0000) >> 2)) & (((bus.adr & ((0xFFFF_C000) >> 2)) < ((prefix | 0x1_4000) >> 2))),
                 # fully decode register file address to avoid aliasing
                 If(bus.cyc & bus.stb & bus.we & ~bus.ack,
                     If(~running,
@@ -306,14 +393,15 @@ Offset:
                         wadr.eq(bus.adr[:wadr.nbits]),
                         wmask.eq(bus.sel),
                         wdata_we.eq(1),
-                        bus.ack.eq(1),
+                        If(~rf.phase,
+                            bus.ack.eq(1),
+                        ).Else(
+                            bus.ack.eq(0),
+                        ),
                     ).Else(
                         wdata_we.eq(0),
                         bus.ack.eq(0),
                     )
-                   ).Else(
-                    bus.ack.eq(0),
-                    wdata_we.eq(0),
                 ).Elif(bus.cyc & bus.stb & ~bus.we & ~bus.ack,
                     If(~running,
                         radr.eq(bus.adr[:radr.nbits]),
@@ -326,8 +414,13 @@ Offset:
                         bus.ack.eq(0),
                         rdata_req.eq(0),
                     )
+                ).Else(
+                    wdata_we.eq(0),
+                    bus.ack.eq(0),
+                    rdata_req.eq(0),
+                    rdata_re.eq(0),
                 )
-            ).Elif( (bus.adr & ((0xFFFF_F000) >> 2)) == 0x0,
+            ).Elif( (bus.adr & ((0xFFFF_F000) >> 2)) == ((0x0 | prefix) >> 2),
                 # fully decode microcode address to avoid aliasing
                 If(bus.cyc & bus.stb & bus.we & ~bus.ack,
                     micro_wrport.adr.eq(bus.adr),
@@ -339,16 +432,28 @@ Offset:
                     micro_rdport.adr.eq(bus.adr),
                     bus.dat_r.eq(micro_rdport.dat_r),
 
-                    If(micro_rdack, # 1 cycle delay for read to occur
+                    If(micro_rdack == 0, # 1 cycle delay for read to occur
                         bus.ack.eq(1),
                     ).Else(
                         bus.ack.eq(0),
-                        micro_rdack.eq(1),
+                        micro_rdack.eq(micro_rdack - 1),
                     )
                 ).Else(
                     micro_wrport.we.eq(0),
-                    micro_rdack.eq(0),
+                    micro_rdack.eq(micro_rd_waitstates),
+                    bus.ack.eq(0),
                 )
+            ).Else(
+                # handle all mis-target reads not explicitly decoded
+                If(bus.cyc & bus.stb & ~bus.we & ~bus.ack,
+                    bus.dat_r.eq(0xC0DE_BADD),
+                    bus.ack.eq(1),
+                ).Elif(bus.cyc & bus.stb & bus.we & ~bus.ack,
+                    bus.ack.eq(1), # ignore writes -- but don't hang the bus
+                ).Else(
+                    bus.ack.eq(0),
+                )
+
             )
         ]
 
@@ -372,15 +477,15 @@ Offset:
             self.rb_const_rom.adr.eq(rb_adr),
 
             If(running,
-                rf.ra_adr.eq(Cat(ra_adr, self.window.fileds.window)),
+                rf.ra_adr.eq(Cat(ra_adr, self.window.fields.window)),
                 rf.rb_adr.eq(Cat(rb_adr, self.window.fields.window)),
                 rf.wd_adr.eq(Cat(wd_adr, self.window.fields.window)),
                 rf.wd_dat.eq(wd_dat),
                 rf.wd_bwe.eq(0xFFFF_FFFF), # enable all bytes
                 rf.we.eq(rf_write),
             ).Else(
-                rf.ra_adr.eq(radr),
-                rf.wd_adr.eq(wadr),
+                rf.ra_adr.eq(radr >> 3),
+                rf.wd_adr.eq(wadr >> 3),
                 rf.wd_dat.eq(Cat(wdata,wdata,wdata,wdata,wdata,wdata,wdata,wdata)), # replicate; use byte-enable to multiplex
                 rf.wd_bwe.eq(0xF << ((wadr & 0x7) * 4)), # select the byte
                 rf.we.eq(wdata_we),
@@ -396,8 +501,9 @@ Offset:
                 rb_dat.eq(self.rb_const_rom.const)
             )
         ]
-        # simple machine to wait 4 RF clock cycles for data to propagate out of the register file and back to the host
-        bus_rd_wait = Signal(max=4)
+        # simple machine to wait 2 RF clock cycles for data to propagate out of the register file and back to the host
+        rd_wait_states=2
+        bus_rd_wait = Signal(max=(rd_wait_states+1))
         self.sync.rf_clk += [
             If(rdata_req,
                 If(~running,
@@ -409,7 +515,7 @@ Offset:
                 )
             ).Else(
                 rdata_ack.eq(0),
-                bus_rd_wait.eq(4),
+                bus_rd_wait.eq(rd_wait_states),
             )
         ]
 
@@ -417,11 +523,11 @@ Offset:
         ### constant time operation is a defense against timing attacks.
         engine_go = Signal()
         self.submodules.gosync = BlindTransfer("sys", "eng_clk")
-        self.comb += [ self.gosync.i.eq(self.control.go), engine_go.eq(self.gosync.o)]
+        self.comb += [ self.gosync.i.eq(self.control.fields.go), engine_go.eq(self.gosync.o)]
 
         self.submodules.seq = seq = ClockDomainsRenamer("eng_clk")(FSM(reset_state="IDLE"))
         mpc_stop = Signal(log2_int(microcode_depth))
-        window_latch = Signal(self.window.fields.window.n_bits)
+        window_latch = Signal(self.window.fields.window.size)
         exec = Signal()  # indicates to execution units to start running
         done = Signal()  # indicates when the given execution units are done (as-muxed from subunits)
         seq.act("IDLE",
@@ -440,7 +546,9 @@ Offset:
             NextState("EXEC"),
         )
         seq.act("EXEC",
-            If(instruction.opcode < Opcode.MAX_OP, # check if the opcode is legal before running it
+            If(instruction.opcode == opcodes["BRZ"][0],
+                NextState("DO_BRZ"),
+            ).Elif(instruction.opcode < opcodes["MAX"][0], # check if the opcode is legal before running it
                 exec.eq(1),
                 NextState("WAIT_DONE"),
             ).Else(
@@ -463,15 +571,60 @@ Offset:
             NextValue(running, 0),
             illegal_opcode.eq(1),
         )
+        seq.act("DO_BRZ",
+            If(ra_dat == 0,
+                If( (rb_dat[:mpc.nbits] < mpc_stop) & (rb_dat[:mpc.nbits] >= self.mpstart.fields.mpstart), # validate new PC is in range
+                   NextValue(mpc, rb_dat[:mpc.nbits]),
+                ).Else(
+                    NextState("IDLE"),
+                    NextValue(running, 0),
+                )
+            ).Else(
+                If(mpc < mpc_stop,
+                   NextValue(mpc, mpc + 1),
+                ).Else(
+                    NextState("IDLE"),
+                    NextValue(running, 0),
+                )
+            ),
+        )
 
-        exec_units = [ExecPassThroughA(width=rf_width_raw), ExecPassThroughB(width=rf_width_raw)]
+        exec_units = [
+            ExecMask(width=rf_width_raw),
+            ExecLogic(width=rf_width_raw),
+            ExecAddSub(width=rf_width_raw),
+            ExecTestReduce(width=rf_width_raw),
+        ]
+        index = 0
         for unit in exec_units:
             self.submodules += unit
-            self.comb += [
+            setattr(self, "done" + str(index), Signal())
+            setattr(self, "unit_q" + str(index), Signal(wd_dat.nbits))
+            setattr(self, "unit_sel" + str(index), Signal())
+            subdecode = Signal()
+            for op in unit.opcode_list:
+                self.sync.eng_clk += [
+                    If(instruction.opcode == opcodes[op][0],
+                        subdecode.eq(1)
+                    )
+                ]
+            self.sync.eng_clk += [
                 unit.a.eq(ra_dat),
                 unit.b.eq(rb_dat),
-                unit.start.eq(exec & instruction.opcode == unit.opcode),
-                done.eq(done | unit.q_valid),
-                wd_dat.eq( (unit.q & (instruction.opcode == unit.opcode)) | wd_dat),
+                unit.start.eq(exec & subdecode),
+                unit.opcode.eq(instruction.opcode),
+                getattr(self, "done" + str(index)).eq(unit.q_valid),
+                getattr(self, "unit_q" + str(index)).eq(unit.q),
+                getattr(self, "unit_sel" + str(index)).eq(subdecode),
             ]
+            index += 1
 
+        for i in range(index):
+            self.comb += [
+                If(getattr(self, "done" + str(i)),
+                   done.eq(1),
+                ),
+                If(getattr(self, "unit_sel" + str(i)),
+                    wd_dat.eq(getattr(self, "unit_q" + str(i))),
+                )
+            ]
