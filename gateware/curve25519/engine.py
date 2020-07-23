@@ -6,26 +6,28 @@ from litex.soc.integration.doc import AutoDoc, ModuleDoc
 from litex.soc.interconnect import wishbone
 from litex.soc.interconnect.csr_eventmanager import *
 
+prime_string = "2\ :sup:`255`-19"
+
 opcode_bits = 6  # number of bits used to encode the opcode field
 opcodes = {  # mnemonic : [bit coding, docstring]
-    "UDF" : [-1, "Undefined opcodes"],
+    "UDF" : [-1, "Placeholder for undefined opcodes"],
     "PSA" : [0, "Wd <- Ra  # pass A"],
     "PSB" : [1, "Wd <- Rb  # pass B"],
     "MSK" : [2, "Replicate(Ra[0], 256) & Rb  # for doing cswap()"],
     "XOR" : [3, "XOR", "Wd <- Ra ^ Rb  # bitwise XOR"],
     "NOT" : [4, "Wd <- ~Ra   # binary invert"],
     "ADD" : [5, "Wd <- Ra + Rb  # 256-bit binary add, must be followed by TRD,SUB"],
-    "SUB" : [6, "Wd <- Ra - Rb  # 256-bit binary subtraction, must be followed by TRD,SUB"],
+    "SUB" : [6, "Wd <- Ra - Rb  # 256-bit binary subtraction, this is not the same as a subtraction in the finite field"],
     "MUL" : [7, "Wd <- Ra * Rb  # multiplication in F(2^255-19) - result is normalized"],
     "TRD" : [8, "If Ra >= 2^255-19 then Wd <- 2^255-19, else Wd <- 0  # Test reduce"],
     "BRZ" : [9, "If Ra == 0 then mpc[9:0] <- mpc[9:0] + Rb[9:0], else mpc <- mpc + 1  # Branch if zero"],
-    "MAX" : [10, "Maximum opcode number"]
+    "MAX" : [10, "Maximum opcode number (for bounds checking)"]
 }
 
 class RegisterFile(Module, AutoDoc):
     def __init__(self, depth=512, width=256):
         reset_cycles = 4
-        self.intro = ModuleDoc("""
+        self.intro = ModuleDoc(title="Register File", body="""
 This implements the register file for the Curve25519 engine. It's implemented using
 7-series specific block RAMs in order to take advantage of architecture-specific features
 to ensure a compact and performant implementation.
@@ -135,44 +137,48 @@ an address width of 9 bits.
         ]
 
 class Curve25519Const(Module, AutoDoc):
-    def __init__(self):
+    def __init__(self, insert_docs=False):
+        global did_const_doc
         constant_defs = {
             0: [0, "zero", "The number zero"],
-            1: [121665, "a24", "The value A-2/4"],
-            2: [0x7FFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFED, "field", "Binary coding of 2^255-19"],
+            1: [121665, "a24", "The value (A-2)/4"],
+            2: [0x7FFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFED, "field", f"Binary coding of {prime_string}"],
             3: [0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF, "neg1", "Binary -1"],
             4: [1, "one", "The number one"],
         }
-        self.intro = ModuleDoc("""
-This module encodes the constants that can be substituted for any register
-value. Up to 32 constants can be encoded in this ROM.
-        """)
         self.adr = Signal(5)
         self.const = Signal(256)
+        constant_str = "This module encodes the constants that can be substituted for any register value. Therefore, up to 32 constants can be encoded.\n\n"
         for code, const in constant_defs.items():
             self.comb += [
                 If(self.adr == code,
                     self.const.eq(const[0]),
                 )
             ]
-            setattr(self, const[1], ModuleDoc(const[2]))
+            constant_str += """
+**{}**
+
+  Substitute register {} with {}: {}\n""".format(const[1], code, const[2], const[0])
+        if insert_docs:
+            self.constants = ModuleDoc(title="Curve25519 Constants", body=constant_str)
 
 # ------------------------------------------------------------------------ EXECUTION UNITS
 class ExecUnit(Module, AutoDoc):
-    def __init__(self, width=256, opcode_list=["UDF"]):
-        self.intro = ModuleDoc("""
-ExecUnit is the superclass template for execution units.
-
-Configuration Arguments:
-  - opcode_list is the list of opcodes that an ExecUnit can process
-  - width is the bit-width of the execution pathway
-
-Signal API for an exec unit:
-  - `a` and `b` are the inputs. `q` is the output.
-  - `start` is a single-clock signal which indicates processing should start
-  - `q_valid` is a single cycle pulse that indicates that the `q` result is valid
-  - `opcode` is the current opcode being executed (for finer-grained decode of multi-functional units)
-        """)
+    def __init__(self, width=256, opcode_list=["UDF"], insert_docs=False):
+        if insert_docs:
+            self.intro = ModuleDoc(title="ExecUnit class", body="""
+    ExecUnit is the superclass template for execution units.
+    
+    Configuration Arguments:
+      - `opcode_list` is the list of opcodes that an ExecUnit can process
+      - `width` is the bit-width of the execution pathway
+    
+    Signal API for an exec unit:
+      - `a` and `b` are the inputs. `q` is the output.
+      - `start` is a single-clock signal which indicates processing should start
+      - `q_valid` is a single cycle pulse that indicates that the `q` result is valid
+      - `opcode` is the current opcode being executed (for finer-grained decode of multi-functional units)
+            """)
         self.a = Signal(width)
         self.b = Signal(width)
         self.q = Signal(width)
@@ -184,8 +190,20 @@ Signal API for an exec unit:
 
 class ExecMask(ExecUnit):
     def __init__(self, width=256):
-        ExecUnit.__init__(self, width, ["MSK"])
+        ExecUnit.__init__(self, width, ["MSK"], insert_docs=True)  # we insert_docs to be true for exactly once module exactly once
+        self.intro = ModuleDoc(title="Masking ExecUnit Subclass", body=f"""
+This execution unit implements the bit-mask and operation. It takes Ra[0] (the
+zeroth bit of Ra) and replicates it to {str(width)} bits wide, and then ANDs it with
+the full contents of Rb. This operation is introduced as one of the elements of
+the `cswap()` routine, which is a constant-time swap of two variables based on a `swap` flag.
 
+Here is an example of how to swap the contents of `ra` and `rb` based on the value of the 0th bit of `swap`::
+
+  XOR  dummy, ra, rb       # dummy <- ra ^ rb
+  MSK  dummy, swap, dummy  # If swap[0] then dummy <- dummy, else dummy <- 0
+  XOR  ra, dummy, ra       # ra <- ra ^ dummy
+  XOR  rb, dummy, rb       # rb <- rb ^ dummy  
+""")
         self.sync.eng_clk += [
             self.q_valid.eq(self.start),
             self.q.eq(self.b & Replicate(self.a[0], width))
@@ -194,6 +212,15 @@ class ExecMask(ExecUnit):
 class ExecLogic(ExecUnit):
     def __init__(self, width=256):
         ExecUnit.__init__(self, width, ["XOR", "NOT", "PSA", "PSB"])
+        self.intro = ModuleDoc(title="Logic ExecUnit Subclass", body=f"""
+This execution unit implements bit-wise logic operations: XOR, NOT, and 
+passthrough. 
+
+* XOR returns the result of A^B
+* NOT returns the result of !A
+* PSA returns the value of A
+* PSB returns the value of B
+""")
 
         self.sync.eng_clk += [
             self.q_valid.eq(self.start),
@@ -208,9 +235,34 @@ class ExecLogic(ExecUnit):
             )
         ]
 
-class ExecAddSub(ExecUnit):
+class ExecAddSub(ExecUnit, AutoDoc):
     def __init__(self, width=256):
         ExecUnit.__init__(self, width, ["ADD", "SUB"])
+        self.notes = ModuleDoc(title="Add/Sub ExecUnit Subclass", body=f"""
+This execution module implements 256-bit binary addition and subtraction.
+
+Note that to implement operations in **F**\ :sub:`p`, this must be compounded
+with other operators as follows:
+
+Addition of Ra + Rb into Rc in the field {prime_string}::
+
+  ADD Rc, Ra, Rb    ; Rc <- Ra + Rb
+  TRD Rc, Rd        ; Rd <- ReductionValue(Rc)
+  SUB Rc, Rc, Rd    ; Rc <- Rc - Rd 
+
+Negation of Ra into Rc in the field {prime_string}::
+
+  SUB Rc, #FIELDPRIME, Ra   ;  Rc <- 2^255-19 - Ra
+
+Subtraction of Ra - Rb into Rc in the field {prime_string}::
+
+  SUB Rb, #FIELDPRIME, Rb   ;  Rb <- 2^255-19 - Rb
+  ADD Rc, Ra, Rb    ; Rc <- Ra + Rb
+  TRD Rc, Rd        ; Rd <- ReductionValue(Rc)
+  SUB Rc, Rc, Rd    ; Rc <- Rc - Rd 
+
+In all the examples above, Ra and Rb must be members of the field {prime_string}. 
+        """)
 
         self.sync.eng_clk += [
             self.q_valid.eq(self.start),
@@ -225,14 +277,14 @@ class ExecTestReduce(ExecUnit, AutoDoc):
     def __init__(self, width=256):
         ExecUnit.__init__(self, width, ["TRD"])
 
-        self.notes = ModuleDoc("""
-First, observe that 2^n-19 is 0xFF....FFED.
-Next, observe that arithmetic in the field 2^255-19 will never
+        self.notes = ModuleDoc(title="Modular Reduction Test ExecUnit Subclass", body=f"""
+First, observe that 2\ :sup:`n`-19 is 0x07FF....FFED.
+Next, observe that arithmetic in the field of {prime_string} will never
 the 256th bit. 
 
 Modular reduction must happen when an arithmetic operation
 overflows the bounds of the modulus. When this happens, one must
-subtract the modulus (in this case 2^255-19). 
+subtract the modulus (in this case {prime_string}). 
 
 The reduce operation is done in two halves. The first half is
 to check if a reduction must happen. The second is to do the subtraction.
@@ -248,8 +300,8 @@ is never broken up.
 Thus the reduction algorithm is as follows:
 
 1. TestReduce
-  - If the 256th bit is set (e.g, ra[255]), then return 2^255-19
-  - If bits ra[255:5] are all 1, and bits ra[4:0] are greater than or equal to 0x1D, then return 2^255-19
+  - If the 256th bit is set (e.g, ra[255]), then return {prime_string}
+  - If bits ra[255:5] are all 1, and bits ra[4:0] are greater than or equal to 0x1D, then return {prime_string}
   - Otherwise return 0
 2. Subtract
   - Subtract the return value of TestReduce from the tested value
@@ -265,7 +317,11 @@ Thus the reduction algorithm is as follows:
 
 class Engine(Module, AutoCSR, AutoDoc):
     def __init__(self, platform, prefix):
-        self.intro = ModuleDoc("""
+        opdoc = "\n"
+        for mnemonic, description in opcodes.items():
+            opdoc += f" * **{mnemonic}** ({str(description[0])}) -- {description[1]} \n"
+
+        self.intro = ModuleDoc(title="Curve25519 Engine", body="""
 The Curve25519 engine is a microcoded hardware accelerator for Curve25519 operations.
 The Engine loosely resembles a Harvard architecture microcoded CPU, with a single 
 512-entry, 256-bit wide 2R1W windowed-register file, a handful of execution units, and a "mailbox"
@@ -285,25 +341,28 @@ registers a and b respectively. When either of these bits are asserted, the resp
 register address is fed into a constant table, and the result of that table lookup is
 replaced for the constant value. This means up to 32 commonly used constants may be stored.
 
-The Engine address space is divided up as follows:
+The Engine address space is divided up as follows::
 
-Offset:
-   0x0_0000 - 0x0_0fff: microcode (one 4k byte page)
-   0x1_0000 - 0x1_3fff: memory-mapped register file (4 x 4k pages = 16kbytes) 
-        """)
+ 0x0_0000 - 0x0_0fff: microcode (one 4k byte page)
+ 0x1_0000 - 0x1_3fff: memory-mapped register file (4 x 4k pages = 16kbytes)
+ 
+Here are the currently implemented opcodes for The Engine:
+{}  
+        """.format(opdoc))
+
         microcode_width = 32
         microcode_depth = 1024
         running = Signal() # asserted when microcode is running
         num_registers = 32
 
         instruction_layout = [
-            ("opcode", opcode_bits), # opcode to be executed
-            ("ra", log2_int(num_registers)),  # operand A read register
-            ("ca", 1), # substitute constant table value for A
-            ("rb", log2_int(num_registers)), # operand B read register
-            ("cb", 1), # substitute constant table value for B
-            ("wd", log2_int(num_registers)), # write register
-            ("reserved", 9) # reserved for future use. Must be set to 0.
+            ("opcode", opcode_bits, "opcode to be executed"),
+            ("ra", log2_int(num_registers), "operand A read register"),
+            ("ca", 1, "set to substitute constant table value for A"),
+            ("rb", log2_int(num_registers), "operand B read register"),
+            ("cb", 1, "set to substitute constant table value for B"),
+            ("wd", log2_int(num_registers), "write register"),
+            ("reserved", 9, "reserved for future use. Must be set to 0.")
         ]
         instruction = Record(instruction_layout) # current instruction to execute
         illegal_opcode = Signal()
@@ -360,15 +419,15 @@ Offset:
         mpc = Signal(log2_int(microcode_depth))  # the microcode program counter
         self.comb += [
             micro_runport.adr.eq(mpc),
-            # map instruction bits to function
-            instruction.opcode.eq(micro_runport.dat_r[:6]),
-            instruction.wd.eq(micro_runport.dat_r[6:11]),
-            instruction.rb.eq(micro_runport.dat_r[11:16]),
-            instruction.cb.eq(micro_runport.dat_r[16:17]),
-            instruction.ra.eq(micro_runport.dat_r[17:22]),
-            instruction.ca.eq(micro_runport.dat_r[22:23]),
-            instruction.reserved.eq(micro_runport.dat_r[23:32]),
+            instruction.raw_bits().eq(micro_runport.dat_r),  # mapping should follow the record definition *exactly*
             instruction.eq(micro_runport.dat_r),
+        ]
+        instruction_fields = []
+        for opcode, bits, description in instruction_layout:
+            instruction_fields.append(CSRField(opcode, size=bits, description=description))
+        self.instruction = CSRStatus(description="Current instruction being executed by the engine. The format of this register exactly reflects the binary layout of an Engine instruction.", fields=instruction_fields)
+        self.comb += [
+            self.instruction.status.eq(micro_runport.dat_r)
         ]
 
         ### wishbone bus interface: decode the two address spaces and dispatch accordingly
@@ -468,7 +527,7 @@ Offset:
         wd_adr = Signal(log2_int(num_registers))
         rf_write = Signal()
 
-        self.submodules.ra_const_rom = Curve25519Const()
+        self.submodules.ra_const_rom = Curve25519Const(insert_docs=True)
         self.submodules.rb_const_rom = Curve25519Const()
 
         ### merge execution path signals with host access paths
@@ -589,15 +648,15 @@ Offset:
             ),
         )
 
-        exec_units = [
-            ExecMask(width=rf_width_raw),
-            ExecLogic(width=rf_width_raw),
-            ExecAddSub(width=rf_width_raw),
-            ExecTestReduce(width=rf_width_raw),
-        ]
+        exec_units = {
+            "exec_mask"      : ExecMask(width=rf_width_raw),
+            "exec_logic"     : ExecLogic(width=rf_width_raw),
+            "exec_addsub"    : ExecAddSub(width=rf_width_raw),
+            "exec_testreduce": ExecTestReduce(width=rf_width_raw),
+        }
         index = 0
-        for unit in exec_units:
-            self.submodules += unit
+        for name, unit in exec_units.items():
+            setattr(self.submodules, name, unit);
             setattr(self, "done" + str(index), Signal())
             setattr(self, "unit_q" + str(index), Signal(wd_dat.nbits))
             setattr(self, "unit_sel" + str(index), Signal())
