@@ -6,21 +6,22 @@ from litex.soc.integration.doc import AutoDoc, ModuleDoc
 from litex.soc.interconnect import wishbone
 from litex.soc.interconnect.csr_eventmanager import *
 
-prime_string = "2\ :sup:`255`-19"
+prime_string = "$2^{{255}}-19$"  # 2\ :sup:`255`-19
+field_latex = "$\mathbf{{F}}_{{{{2^{{255}}}}-19}}$"
 
 opcode_bits = 6  # number of bits used to encode the opcode field
 opcodes = {  # mnemonic : [bit coding, docstring]
     "UDF" : [-1, "Placeholder for undefined opcodes"],
-    "PSA" : [0, "Wd <- Ra  # pass A"],
-    "PSB" : [1, "Wd <- Rb  # pass B"],
-    "MSK" : [2, "Replicate(Ra[0], 256) & Rb  # for doing cswap()"],
-    "XOR" : [3, "XOR", "Wd <- Ra ^ Rb  # bitwise XOR"],
-    "NOT" : [4, "Wd <- ~Ra   # binary invert"],
-    "ADD" : [5, "Wd <- Ra + Rb  # 256-bit binary add, must be followed by TRD,SUB"],
-    "SUB" : [6, "Wd <- Ra - Rb  # 256-bit binary subtraction, this is not the same as a subtraction in the finite field"],
-    "MUL" : [7, "Wd <- Ra * Rb  # multiplication in F(2^255-19) - result is normalized"],
-    "TRD" : [8, "If Ra >= 2^255-19 then Wd <- 2^255-19, else Wd <- 0  # Test reduce"],
-    "BRZ" : [9, "If Ra == 0 then mpc[9:0] <- mpc[9:0] + Rb[9:0], else mpc <- mpc + 1  # Branch if zero"],
+    "PSA" : [0, "Wd $\gets$ Ra  // pass A"],
+    "PSB" : [1, "Wd $\gets$ Rb  // pass B"],
+    "MSK" : [2, "Replicate(Ra[0], 256) & Rb  // for doing cswap()"],
+    "XOR" : [3, "XOR", "Wd $\gets$ Ra ^ Rb  // bitwise XOR"],
+    "NOT" : [4, "Wd $\gets$ ~Ra   // binary invert"],
+    "ADD" : [5, "Wd $\gets$ Ra + Rb  // 256-bit binary add, must be followed by TRD,SUB"],
+    "SUB" : [6, "Wd $\gets$ Ra - Rb  // 256-bit binary subtraction, this is not the same as a subtraction in the finite field"],
+    "MUL" : [7, f"Wd $\gets$ Ra * Rb  // multiplication in {field_latex} - result is normalized"],
+    "TRD" : [8, "If Ra $\geqq 2^{{255}}-19$ then Wd $\gets$ $2^{{255}}-19$, else Wd $\gets$ 0  // Test reduce"],
+    "BRZ" : [9, "If Ra == 0 then mpc[9:0] $\gets$ mpc[9:0] + Rb[9:0], else mpc $\gets$ mpc + 1  // Branch if zero"],
     "MAX" : [10, "Maximum opcode number (for bounds checking)"]
 }
 
@@ -141,7 +142,7 @@ class Curve25519Const(Module, AutoDoc):
         global did_const_doc
         constant_defs = {
             0: [0, "zero", "The number zero"],
-            1: [121665, "a24", "The value (A-2)/4"],
+            1: [121665, "a24", "The value $\\frac{{A-2}}{{4}}$"],
             2: [0x7FFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFED, "field", f"Binary coding of {prime_string}"],
             3: [0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF, "neg1", "Binary -1"],
             4: [1, "one", "The number one"],
@@ -199,10 +200,10 @@ the `cswap()` routine, which is a constant-time swap of two variables based on a
 
 Here is an example of how to swap the contents of `ra` and `rb` based on the value of the 0th bit of `swap`::
 
-  XOR  dummy, ra, rb       # dummy <- ra ^ rb
-  MSK  dummy, swap, dummy  # If swap[0] then dummy <- dummy, else dummy <- 0
-  XOR  ra, dummy, ra       # ra <- ra ^ dummy
-  XOR  rb, dummy, rb       # rb <- rb ^ dummy  
+  XOR  dummy, ra, rb       // dummy $\gets$ ra ^ rb
+  MSK  dummy, swap, dummy  // If swap[0] then dummy $\gets$ dummy, else dummy $\gets$ 0
+  XOR  ra, dummy, ra       // ra $\gets$ ra ^ dummy
+  XOR  rb, dummy, rb       // rb $\gets$ rb ^ dummy  
 """)
         self.sync.eng_clk += [
             self.q_valid.eq(self.start),
@@ -241,27 +242,37 @@ class ExecAddSub(ExecUnit, AutoDoc):
         self.notes = ModuleDoc(title="Add/Sub ExecUnit Subclass", body=f"""
 This execution module implements 256-bit binary addition and subtraction.
 
-Note that to implement operations in **F**\ :sub:`p`, this must be compounded
+Note that to implement operations in $\mathbf{{F}}_p$, where *p* is $2^{{255}}-19$, this must be compounded
 with other operators as follows:
 
-Addition of Ra + Rb into Rc in the field {prime_string}::
+Addition of Ra + Rb into Rc in {field_latex}:
 
-  ADD Rc, Ra, Rb    ; Rc <- Ra + Rb
-  TRD Rc, Rd        ; Rd <- ReductionValue(Rc)
-  SUB Rc, Rc, Rd    ; Rc <- Rc - Rd 
+.. code-block:: c
 
-Negation of Ra into Rc in the field {prime_string}::
+  ADD Rc, Ra, Rb    // Rc <- Ra + Rb
+  TRD Rc, Rd        // Rd <- ReductionValue(Rc)
+  SUB Rc, Rc, Rd    // Rc <- Rc - Rd 
 
-  SUB Rc, #FIELDPRIME, Ra   ;  Rc <- 2^255-19 - Ra
+Negation of Ra into Rc in {field_latex}:
 
-Subtraction of Ra - Rb into Rc in the field {prime_string}::
+.. code-block:: c
 
-  SUB Rb, #FIELDPRIME, Rb   ;  Rb <- 2^255-19 - Rb
-  ADD Rc, Ra, Rb    ; Rc <- Ra + Rb
-  TRD Rc, Rd        ; Rd <- ReductionValue(Rc)
-  SUB Rc, Rc, Rd    ; Rc <- Rc - Rd 
+  SUB Rc, #FIELDPRIME, Ra   //  Rc <- 2^255-19 - Ra
 
-In all the examples above, Ra and Rb must be members of the field {prime_string}. 
+Note that **#FIELDPRIME** is one of the 32 available hard-coded constants
+that can be substituted for any register in any arithmetic operation, please
+see the section on "Constants" for more details.
+
+Subtraction of Ra - Rb into Rc in {field_latex}:
+
+.. code-block:: c
+
+  SUB Rb, #FIELDPRIME, Rb   //  Rb <- 2^255-19 - Rb
+  ADD Rc, Ra, Rb    // Rc <- Ra + Rb
+  TRD Rc, Rd        // Rd <- ReductionValue(Rc)
+  SUB Rc, Rc, Rd    // Rc <- Rc - Rd 
+
+In all the examples above, Ra and Rb must be members of {field_latex}. 
         """)
 
         self.sync.eng_clk += [
@@ -278,9 +289,9 @@ class ExecTestReduce(ExecUnit, AutoDoc):
         ExecUnit.__init__(self, width, ["TRD"])
 
         self.notes = ModuleDoc(title="Modular Reduction Test ExecUnit Subclass", body=f"""
-First, observe that 2\ :sup:`n`-19 is 0x07FF....FFED.
+First, observe that $2^n-19$ is 0x07FF....FFED.
 Next, observe that arithmetic in the field of {prime_string} will never
-the 256th bit. 
+the 256th bit.
 
 Modular reduction must happen when an arithmetic operation
 overflows the bounds of the modulus. When this happens, one must
@@ -313,6 +324,17 @@ Thus the reduction algorithm is as follows:
                 self.q.eq(0x0)
             )
         ]
+
+class ExecMul(ExecUnit, AutoDoc):
+    def __init__(self, width=256):
+        ExecUnit.__init__(self, width, ["MUL"])
+
+        self.notes = ModuleDoc(title=f"Multiplication in {field_latex} ExecUnit Subclass", body=f"""
+""")
+        self.sync.eng_clk += [
+            self.q.eq(0x0),
+        ]
+
 
 
 class Engine(Module, AutoCSR, AutoDoc):
