@@ -695,22 +695,22 @@ by the implementation of this code.
             self.specials += [
                 Instance("DSP48E1", name="DSP_ENG25519_" + str(i),
                     # configure number of input registers
-                    p_ACASCREG="2",
-                    p_AREG="2",
-                    p_ADREG="0",
-                    p_ALUMODEREG="0",
-                    p_BCASCREG="2",
-                    p_BREG="2",
+                    p_ACASCREG=2,
+                    p_AREG=2,
+                    p_ADREG=0,
+                    p_ALUMODEREG=0,
+                    p_BCASCREG=2,
+                    p_BREG=2,
 
                     # only pipeline at the output
-                    p_CARRYINREG="0",
-                    p_CARRYINSELREG="0",
-                    p_CREG="0",
-                    p_DREG="1", # i think we can use this to save some fabric registers
-                    p_INMODEREG="0",
-                    p_MREG="0",
-                    p_OPMODEREG="0",
-                    p_PREG="1",
+                    p_CARRYINREG=0,
+                    p_CARRYINSELREG=0,
+                    p_CREG=0,
+                    p_DREG=1, # i think we can use this to save some fabric registers
+                    p_INMODEREG=0,
+                    p_MREG=0,
+                    p_OPMODEREG=0,
+                    p_PREG=1,
 
                     p_A_INPUT="DIRECT",
                     p_B_INPUT="DIRECT",
