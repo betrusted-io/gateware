@@ -19,11 +19,22 @@ opcodes = {  # mnemonic : [bit coding, docstring]
     "NOT" : [4, "Wd $\gets$ ~Ra   // binary invert"],
     "ADD" : [5, "Wd $\gets$ Ra + Rb  // 256-bit binary add, must be followed by TRD,SUB"],
     "SUB" : [6, "Wd $\gets$ Ra - Rb  // 256-bit binary subtraction, this is not the same as a subtraction in the finite field"],
-    "MUL" : [7, f"Wd $\gets$ Ra * Rb  // multiplication in {field_latex} - result is normalized"],
+    "MUL" : [7, f"Wd $\gets$ Ra * Rb  // multiplication in {field_latex} - result is reduced"],
     "TRD" : [8, "If Ra $\geqq 2^{{255}}-19$ then Wd $\gets$ $2^{{255}}-19$, else Wd $\gets$ 0  // Test reduce"],
     "BRZ" : [9, "If Ra == 0 then mpc[9:0] $\gets$ mpc[9:0] + Rb[9:0], else mpc $\gets$ mpc + 1  // Branch if zero"],
     "MAX" : [10, "Maximum opcode number (for bounds checking)"]
 }
+
+num_registers = 32
+instruction_layout = [
+    ("opcode", opcode_bits, "opcode to be executed"),
+    ("ra", log2_int(num_registers), "operand A read register"),
+    ("ca", 1, "set to substitute constant table value for A"),
+    ("rb", log2_int(num_registers), "operand B read register"),
+    ("cb", 1, "set to substitute constant table value for B"),
+    ("wd", log2_int(num_registers), "write register"),
+    ("reserved", 9, "reserved for future use. Must be set to 0.")
+]
 
 class RegisterFile(Module, AutoDoc):
     def __init__(self, depth=512, width=256):
@@ -58,13 +69,22 @@ When configured as a 64 bit memory, the depth of the block is 512 bits, correspo
 an address width of 9 bits.
         """.format(reset_cycles))
 
+        instruction = Record(instruction_layout)
         self.phase = phase = Signal()
 
         # these are the signals in and out of the register file
-        self.ra_dat = Signal(width)
+        self.ra_dat = Signal(width) # this is passed in from outside the module because we want to mux with e.g. memory bus
         self.ra_adr = Signal(log2_int(depth))
         self.rb_dat = Signal(width)
         self.rb_adr = Signal(log2_int(depth))
+
+        # register file pipelines the write target address, going to the exec units; also needs the window to be complete
+        # window is assumed to be static and does not change throughout a give program run, so it's not pipelined
+        self.instruction_pipe_in = Signal(len(instruction))
+        self.instruction_pipe_out = Signal(len(instruction))
+        self.window = Signal(log2_int(depth) - log2_int(num_registers))
+
+        # this is the immediate data to write in, coming from the exec units
         self.wd_dat = Signal(width)
         self.wd_adr = Signal(log2_int(depth))
         self.wd_bwe = Signal(width//8)  # byte masks for writing
@@ -83,6 +103,7 @@ an address width of 9 bits.
         ]
         rf_dat = Signal(width)
         self.sync.rf_clk += [
+            self.instruction_pipe_out.eq(self.instruction_pipe_in),  # TODO: check that this is in sync with expected values
             If(phase,
                 self.ra_dat.eq(rf_dat),
                 self.rb_dat.eq(self.rb_dat),
@@ -175,19 +196,28 @@ class ExecUnit(Module, AutoDoc):
       - `width` is the bit-width of the execution pathway
     
     Signal API for an exec unit:
-      - `a` and `b` are the inputs. `q` is the output.
+      - `a` and `b` are the inputs. 
+      - `instruction_in` is the instruction corresponding to the currently present `a` and `b` inputs
       - `start` is a single-clock signal which indicates processing should start
-      - `q_valid` is a single cycle pulse that indicates that the `q` result is valid
-      - `opcode` is the current opcode being executed (for finer-grained decode of multi-functional units)
+      - `q` is the output
+      - `instruction_out` is the instruction for the result present at the `q` output 
+      - `q_valid` is a single cycle pulse that indicates that the `q` result and `wa_out` value is valid
             """)
+        self.instruction = Record(instruction_layout)
+
         self.a = Signal(width)
         self.b = Signal(width)
         self.q = Signal(width)
         self.start = Signal()
         self.q_valid = Signal()
+        # pipeline the instruction
+        self.instruction_in = Signal(len(self.instruction))
+        self.instruction_out = Signal(len(self.instruction))
 
         self.opcode_list = opcode_list
-        self.opcode = Signal(opcode_bits)
+        self.comb += [
+            self.instruction.raw_bits().eq(self.instruction_in)
+        ]
 
 class ExecMask(ExecUnit):
     def __init__(self, width=256):
@@ -207,7 +237,8 @@ Here is an example of how to swap the contents of `ra` and `rb` based on the val
 """)
         self.sync.eng_clk += [
             self.q_valid.eq(self.start),
-            self.q.eq(self.b & Replicate(self.a[0], width))
+            self.q.eq(self.b & Replicate(self.a[0], width)),
+            self.instruction_out.eq(self.instruction_in),
         ]
 
 class ExecLogic(ExecUnit):
@@ -225,15 +256,16 @@ passthrough.
 
         self.sync.eng_clk += [
             self.q_valid.eq(self.start),
-            If(self.opcode == opcodes["XOR"][0],
+            If(self.instruction.opcode == opcodes["XOR"][0],
                self.q.eq(self.a ^ self.b)
-            ).Elif(self.opcode == opcodes["NOT"][0],
+            ).Elif(self.instruction.opcode == opcodes["NOT"][0],
                self.q.eq(~self.a)
-            ).Elif(self.opcode == opcodes["PSA"][0],
+            ).Elif(self.instruction.opcode == opcodes["PSA"][0],
                 self.q.eq(self.a),
-            ).Elif(self.opcode == opcodes["PSB"][0],
+            ).Elif(self.instruction.opcode == opcodes["PSB"][0],
                 self.q.eq(self.b),
-            )
+            ),
+            self.instruction_out.eq(self.instruction_in),
         ]
 
 class ExecAddSub(ExecUnit, AutoDoc):
@@ -277,11 +309,13 @@ In all the examples above, Ra and Rb must be members of {field_latex}.
 
         self.sync.eng_clk += [
             self.q_valid.eq(self.start),
-            If(self.opcode == opcodes["ADD"][0],
+            If(self.instruction.opcode == opcodes["ADD"][0],
                self.q.eq(self.a + self.b),
-            ).Elif(self.opcode == opcodes["SUB"][0],
+            ).Elif(self.instruction.opcode == opcodes["SUB"][0],
                self.q.eq(self.a - self.b),
-            )
+            ),
+
+            self.instruction_out.eq(self.instruction_in),
         ]
 
 class ExecTestReduce(ExecUnit, AutoDoc):
@@ -322,7 +356,9 @@ Thus the reduction algorithm is as follows:
                 self.q.eq(0x7FFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFED)
             ).Else(
                 self.q.eq(0x0)
-            )
+            ),
+            self.q_valid.eq(self.start),
+            self.instruction_out.eq(self.instruction_in),
         ]
 
 class ExecMul(ExecUnit, AutoDoc):
@@ -330,7 +366,405 @@ class ExecMul(ExecUnit, AutoDoc):
         ExecUnit.__init__(self, width, ["MUL"])
 
         self.notes = ModuleDoc(title=f"Multiplication in {field_latex} ExecUnit Subclass", body=f"""
+Unlike the ADD/SUB module, this operator explicitly works in {field_latex}. It takes in two inputs,
+Ra and Rb, and both must be members of {field_latex}. The result is also reduced to a member of {field_latex}.
+
+The base algorithm for this implementation is lifted from the paper "Compact and Flexible FPGA Implementation
+of Ed25519 and X25519" by Furkan Turan and Ingrid Verbauwhede (https://doi.org/10.1145/3312742).  The algorithm
+specified in this paper is optimized for the DSP48E blocks found inside a 7-Series Xilinx FPGA. In particular,
+we can compute 17-bit multiplies using this hardware block, and 255 divides evenly into 17 to produce
+a requirement of 15x DSP48E blocks. 
+
+At a high level, the steps to compute the multiplication are:
+
+1. Schoolbook multiplication 
+2. Collapse partial sums
+3. Propagate carries
+4. In case the carries generated carries, collapse partial sums again
+5. Propagate carries from (4)
+6. Catching the special case of results $\geq$ $2^{{255}}-19$
+7. Add 13 or 0 depending on the outcome of (6)
+8. Collapse partial sums from (7)
+9. Propagate carries from (8)
+
+Because constant-time math is important, even though steps 6-9 are a minor edge
+case, we always spend the cycles, even if we're mostly just adding 0 to the result;
+however, even with these few extra cycles the multiplier is significantly faster than
+anything implemented in software on the CPU, and thus we prefer safety over speed
+in this case.
+
+The above steps are coordinated by the `mseq` state machine. Control lines for 
+the DSP48E blocks are grouped into two sets, one controls the global state of
+things such as the operation mode and input modes, and the other controls the
+routing of individual 17-bit limbs (e.g. "digits" of our 17-bit representation of
+numbers) to various sources and destinations.
+
+The following sections walk through the algorithm in detail.
+
+Schoolbook Multiplication
+-------------------------
+
+The first step in the algorithm is called "schoolbook multiplication". It's
+almost that, but with a twist. Below is what actual schoolbook multiplication
+would be like, if you had a pair of numbers that were broken into three "limbs" (digits)
+A[2:0] and B[2:0]. 
+
+::
+
+                   |    A2        A1       A0
+    x              |    B2        B1       B0 
+   ------------------------------------------
+                   | A2*B0     A1*B0    A0*B0
+            A2*B1  | A1*B1     A0*B1
+   A2*B2    A1*B2  | A0*B2
+     (overflow)         (not overflowing)
+
+The result of schoolbook multiplication is a result that potentially has
+2x the number of bits than the either multiplicand. Since we're doing modular
+multiplication in a finite field, the overflow "wraps around", so that the
+result is always a number within the finite field. 
+
+Mapping the overflow around is a process called reduction. There's a magical
+trick that happens which I don't understand the math behind that makes this
+operation really easy with the parameters chosen for Curve25519, but it 
+looks like this:
+
+::
+
+                   |    A2        A1       A0
+    x              |    B2        B1       B0 
+   ------------------------------------------
+                   | A2*B0     A1*B0    A0*B0
+                   | A1*B1     A0*B1 19*A2*B1
+                 + | A0*B2  19*A2*B2 19*A1*B2
+                 ----------------------------
+                        P2        P1       P0
+
+Basically, by taking each overflowed limb and multiplying it by 19, you can
+"wrap the result" around, creating a number of partial sums P[2:0] that are
+equal to your limbs, but each partial sum potentially overflowing the limb.
+
+In C, the code basically looks like this:
+
+.. code-block:: c
+
+   // initialize the a_bar set of data                                                                                                                                                                                                        
+   for( int i = 0; i < DSP17_ARRAY_LEN; i++ ) {{
+      a_bar_dsp[i] = a_dsp[i] * 19;
+   }}
+   operand p;
+   for( int i = 0; i < DSP17_ARRAY_LEN; i++ ) {{ 
+      p[i] = 0; 
+   }}
+
+   // core multiply
+   for( int col = 0; col < 15; col++ ) {{
+     for( int row = 0; row < 15; row++ ) {{
+       if( row >= col ) {{
+         p[row] += a_dsp[row-col] * b_dsp[col];
+       }} else {{
+         p[row] += a_bar_dsp[15+row-col] * b_dsp[col];
+       }}
+     }}
+   }}
+
+Collapse Partial Sums
+---------------------
+
+The potential width of the partial sum is up to 43 bits wide. This step
+divides the partial sums up into 17-bit words, and then shifts the higher
+to the next limbs over, allowing them to collapse into a smaller sum that 
+overflows less.
+
+   ... P2[16:0]   P1[16:0]      P0[16:0]
+   ... P1[33:17]  P0[33:17]     P14[33:17]*19
+   ... P0[50:34]  P14[50:34]*19 P13[50:34]*19
+
+Again, the magic number 19 shows up to allow sums which "wrapped around"
+to add back in. This is what the C code looks like for this operation.
+
+.. code-block:: c
+
+     prop[0] = (p[0] & 0x1ffff) +
+       (((p[14] * 1) >> 17) & 0x1ffff) * 19 +
+       (((p[13] * 1) >> 34) & 0x1ffff) * 19;
+     prop[1] = (p[1] & 0x1ffff) +
+       ((p[0] >> 17) & 0x1ffff) +
+       (((p[14] * 1) >> 34) & 0x1ffff) * 19;
+     for(int bitslice = 2; bitslice < 15; bitslice += 1) {{
+         prop[bitslice] = (p[bitslice] & 0x1ffff) + ((p[bitslice - 1] >> 17) & 0x1ffff) + ((p[bitslice - 2] >> 34));
+     }}
+
+Propagate Carries
+-----------------
+
+The partial sums will generate carries, which need to be propagated down the
+chain. The C-code equivalent of this looks as follows:
+
+.. code-block:: c
+
+   for(int i = 0; i < 15; i++) {{
+     if ( i+1 < 15 ) {{
+        prop[i+1] = (prop[i] >> 17) + prop[i+1];
+        prop[i] = prop[i] & 0x1ffff;
+     }}
+   }}
+
+Normalize
+---------
+
+Unfortunately, at this point, the carries can generate carries, so a second round
+of this partial sum and carry is required.
+
+The result at this point is basically correct, except there is one case that
+is not handled well: where the result is between $2^{{255}}-19$ and $2^{{255}}-1$.
+In this case, the number will basically be somewhere in between 0x7ff....ffed and
+0x7ff....ffff. In this case, we need to add 13 to the result, so that the result
+is a member of the field $2^{{255}}-19$.
+
+We do a simple pattern detect to detect the "1's" in bit positions 255-5, and a
+LUT to check the final 5 bits. If it falls within this special case, we add the
+number 13, otherwise, we add 0.
+
+After adding the number 13, we have to once again propagate carries. For simplicity,
+in this implementation we repeat the whole sum-and-propagate process once again. For
+constant time, regardless of whether we need to add 0 or 13, we do this process,
+even if we are just adding 0.
+
+Once this is finished, we have the final result.
+
 """)
+        # array of 15, 17-bit wide signals = 255 bits
+        a_17 = [Signal(17),Signal(17),Signal(17),Signal(17),Signal(17),
+                Signal(17),Signal(17),Signal(17),Signal(17),Signal(17),
+                Signal(17),Signal(17),Signal(17),Signal(17),Signal(17),]
+        b_17 = [Signal(17),Signal(17),Signal(17),Signal(17),Signal(17),
+                Signal(17),Signal(17),Signal(17),Signal(17),Signal(17),
+                Signal(17),Signal(17),Signal(17),Signal(17),Signal(17),]
+        # split incoming data into 17-bit wide chunks
+        for i in range(15):
+            self.comb += [
+                a_17[i].eq(self.a[i*17:i*17+17]),
+                b_17[i].eq(self.b[i*17:i*17+17]),
+            ]
+
+        # signals common to all DSP blocks
+        dsp_alumode = Signal(4)
+        dsp_inmode = Signal(5)
+        dsp_opmode = Signal(7)
+        dsp_reset = Signal()
+        dsp_a1_ce = Signal()
+        dsp_a2_ce = Signal()
+        dsp_b1_ce = Signal()
+        dsp_b2_ce = Signal()
+        dsp_d_ce = Signal()
+        dsp_p_ce = Signal()
+
+        step = Signal(max=15+1)  # controls the multiplication step
+        carry_mode = Signal()
+
+        self.timing = ModuleDoc(title="Detailed timing operation", body="""
+
+Below is a detailed timing diagram that illustrates the expected sequence of events
+by the implementation of this code.
+
+.. wavedrom::
+  :caption: Detailed timing of the multiply operation
+  
+  { "config": {skin : "default"},
+  "signal" : [
+  { "name": "clk",         "wave": "p........................." },
+  { "name": "go",          "wave": "010.....................10" },
+  { "name": "self.a",      "wave": "x2......................2.", "data": ["A0[255:0]","A1[255:0]"] },
+  { "name": "self.b",      "wave": "x2......................2.", "data": ["B0[255:0]","B2[255:0]"] },
+  { "name": "state",       "wave": "2.34......5555666687777923", "data":["IDLE","SETA","MPY","DLY","PLSB","PMSB","PROP","DLY","PLSB","PMSB","PROP","NORM","DLY","PLSB","PMSB","PROP","DONE","IDLE","SETA"]},
+  { "name": "step",        "wave": "x..2===|==5...6....7...xxx", "data":["0","1", "2", "3","13","14","0","1","2"]},
+  { "name": "dsp.a",       "wave": "x2x.....................2x", "data": ["A0xx","A1xx","0","13"] },
+  { "name": "dsp.b",       "wave": "x2====|==855xx66x.....xx2=", "data": ["19","B00","B01","B02","B03","B13","B14","13","1or19","1or19","1or19","1or19","19","B2_00"] },
+  { "name": "dsp.c",        "wave": "x.........5xxx6x.xx7x.....", "data":["P14,0","PS0","PS1"]},
+  { "name": "dsp.d",        "wave": "x.........55x.66x..77x....", "data":["Q14,1","R14,2","QS14,1","RS14,2","QS14,1","RS14,2"]},
+  {},
+  { "name": "A1_CE",       "wave": "1.0......................." },
+  { "name": "A1",          "wave": "x.2....................x..", "data": ["Axx"] },
+  { "name": "A2_CE",       "wave": "0..10....................." },
+  { "name": "A2",          "wave": "x...2..................x..", "data":["Axx*19"] },
+  { "name": "B1_CE",       "wave": "0.1.......0..............." },
+  { "name": "B1",          "wave": "x..2===|===............x..", "data": ["B00","B01","B02","B03","B13","B14","13"] },
+  { "name": "B2_CE",       "wave": "1.0.......1.0.1.0..1.0...." },
+  { "name": "B2",          "wave": "x.2........55xx66xx77x....", "data": ["19","1or19","1or19","1or19","1or19","1or19","1or19"] },
+  { "name": "D_CE",        "wave": "0.........1.0.1.0..1.0...." },
+  { "name": "C",           "wave": "x..........555x6668777x...", "data": ["P14,0","*P","*P","PS0,0","*P","*P","*P","PS1,0","*P","*P"] },
+  { "name": "D",           "wave": "x..........55xx66x.77xx...", "data": ["Q14,1","R14,2","QS14,1","RS14,2","QS14,1","RS14,2"] },
+  { "name": "inmode",      "wave": "x.22......x5.x.6.x87.x....", "data":["A1B2","AnB1","DB2","DB2","0B1","DB2"]},
+  { "name": "opmode",      "wave": "x.2.=.....x555x6668777x...", "data":["M","PC+M","M","P+M","PC>+P","M","P+M","PC>+P","AB/0+P","M","P+M","PC>+P"]},
+  {},
+  { "name": "P",           "wave": "x..2====|==x555x6666777x..", "data": ["A19","P0","P1","P2","P3","P13","P14","PS0a","PS0b","PS0","PS1a","PS1b","PS1c","PS1","PS2a","PS2b","final"] },
+  { "name": "overflow",    "wave": "x.................2x......", "data":[""]},
+  { "name": "done",        "wave": "0......................10." },
+  ]}
+        """)
+        self.submodules.mseq = mseq = ClockDomainsRenamer("rf_clk")(FSM(reset_state="IDLE"))
+        mseq.act("IDLE",
+            NextValue(carry_mode, 0),
+            NextValue(step, 0),
+            If(self.start,
+                NextState("SETUP_A")
+            )
+        )
+        mseq.act("SETUP_A", # SETA, load the a, a19 values values
+            NextState("MULTIPLY"),
+        )
+        mseq.act("MULTIPLY", # MPY
+            If(step < 15,
+                NextValue(step, step + 1)
+            ).Else(
+                NextState("PSUM_LSB"),
+                NextValue(carry_mode, 1),
+                NextValue(step, 0),
+            )
+        )
+        mseq.act("PSUM_LSB", # PLSB
+            NextState("PSUM_MSB")
+        )
+        mseq.act("PSUM_MSB", # PMSB
+            NextState("CARRYPROP")
+        )
+        mseq.act("CARRYPROP", # PROP
+            If(step == 1,
+                NextState("NORMALIZE")
+            ).Elif(step == 2,
+                NextState("DONE"),
+            ).Else(
+                NextState("PSUM_LSB")
+            ),
+            NextValue(step, step + 1),
+        )
+        mseq.act("NORMALIZE", # NORM
+            NextState("PSUM_LSB")
+        )
+        mseq.act("DONE", # DONE
+            NextState("IDLE")
+        )
+
+        # DSP48E opcode encodings
+        OP_PASS_M = 0b000_01_01  # X:Y <- M; Z <-0; P <- 0 + X:Y + 0
+        INMODE_A1 = 0b0001
+        INMODE_A2 = 0b0000
+        INMODE_D  = 0b0110
+        INMODE_0  = 0b0010
+        INMODE_B2 = 0b0
+        INMODE_B1 = 0b1
+
+        self.comb += [
+            dsp_alumode.eq(0),  # always in P = Z + X + Y + CIN
+            If(mseq.before_entering("SETUP_A"),
+                dsp_inmode.eq(Cat(INMODE_A1, INMODE_B2)),
+                dsp_opmode.eq(OP_PASS_M),
+                dsp_b2_ce.eq(1),
+                dsp_a1_ce.eq(1),
+            ).Elif(mseq.ongoing("SETUP_A"),
+                # at this point, these are already loaded: A1 <- Axx, B2 <- 19
+                # P <- A1 * B2
+                dsp_inmode.eq(Cat(INMODE_A1, INMODE_B2)),
+                dsp_opmode.eq(OP_PASS_M),
+                # pipeline in the b1 value for the first round of the multiply
+                dsp_b1_ce.eq(1),
+            ).Elif(mseq.ongoing("MULTIPLY"),
+                If(step == 0,
+                   dsp_a2_ce.eq(1),  # latch the pipelined Axx * 19 signal on the first round of multiply
+                )
+            )
+        ]
+        for i in range(15):
+            # per-block DSP signals
+            setattr(self, "dsp_a" + str(i), Signal(17))
+            setattr(self, "dsp_b" + str(i), Signal(17))
+            setattr(self, "dsp_c" + str(i), Signal(48))
+            setattr(self, "dsp_d" + str(i), Signal(17))
+            setattr(self, "dsp_match" + str(i), Signal())
+            setattr(self, "dsp_p" + str(i), Signal(48))
+
+            self.comb += [
+                If(mseq.before_entering("SETUP_A"),
+                    getattr( self, "dsp_a" + str(i) ).eq(a_17[i]),
+                    getattr( self, "dsp_b" + str(i) ).eq(19),
+                ).Elif(mseq.ongoing("SETUP_A"),
+                    getattr( self, "dsp_a" + str(i) ).eq( getattr(self, "dsp_p" + str(i)) ),
+                )
+            ]
+            self.specials += [
+                Instance("DSP48E1", name="DSP_ENG25519_" + str(i),
+                    # configure number of input registers
+                    p_ACASCREG="2",
+                    p_AREG="2",
+                    p_ADREG="0",
+                    p_ALUMODEREG="0",
+                    p_BCASCREG="2",
+                    p_BREG="2",
+
+                    # only pipeline at the output
+                    p_CARRYINREG="0",
+                    p_CARRYINSELREG="0",
+                    p_CREG="0",
+                    p_DREG="1", # i think we can use this to save some fabric registers
+                    p_INMODEREG="0",
+                    p_MREG="0",
+                    p_OPMODEREG="0",
+                    p_PREG="1",
+
+                    p_A_INPUT="DIRECT",
+                    p_B_INPUT="DIRECT",
+                    p_USE_DPORT="TRUE",
+                    p_USE_MULT="MULTIPLY",
+                    p_USE_SIMD="ONE48",
+
+                    # setup pattern detector to catch the case of mostly 1's
+                    p_AUTORESET_PATDET="NO_RESET",
+                    p_MASK   ='1'*(48-17)+'0'*17,  # 1 bits are ignored, 0 compared
+                    p_PATTERN='0'*(48-17)+'1'*17,  # compare against 0x1_FFFF
+                    p_SEL_MASK="MASK",
+                    p_SEL_PATTERN="PATTERN",
+                    p_USE_PATTERN_DETECT="PATDET",
+
+                    # signals
+                    i_A=getattr(self, "dsp_a" + str(i)),
+                    i_ALUMODE=dsp_alumode,
+                    i_B=getattr(self, "dsp_b" + str(i)),
+                    i_C=getattr(self, "dsp_c" + str(i)),
+                    i_CARRYIN=0,
+                    i_CARRYINSEL=0,
+                    i_CEA1=dsp_a1_ce,
+                    i_CEA2=dsp_a2_ce,
+                    i_CEAD=0, # no pipe
+                    i_CEALUMODE=0, # no pipe
+                    i_CEB1=dsp_b1_ce,
+                    i_CEB2=dsp_b2_ce,
+                    i_CEC=0, # no pipe
+                    i_CECARRYIN=0,
+                    i_CECTRL=0, # no pipe on opmode
+                    i_CED=dsp_d_ce,
+                    i_CEP=dsp_p_ce,
+                    i_CLK=ClockSignal("rf_clk"),  # run at 2x speed of engine clock
+                    i_D=getattr(self, "dsp_d" + str(i)),
+                    i_INMODE=dsp_inmode,
+                    i_OPMODE=dsp_opmode,
+                    o_P=getattr(self, "dsp_p" + str(i)),
+                    o_PATTERNDETECT=getattr(self, "dsp_match" + str(i)),
+
+                    # resets
+                    i_RSTA=dsp_reset,
+                    i_RSTALLCARRYIN=dsp_reset,
+                    i_RSTALUMODE=dsp_reset,
+                    i_RSTB=dsp_reset,
+                    i_RSTC=dsp_reset,
+                    i_RSTCTRL=dsp_reset,
+                    i_RSTD=dsp_reset,
+                    i_RSTINMODE=dsp_reset,
+                    i_RSTM=dsp_reset,
+                    i_RSTP=dsp_reset,
+                )
+            ]
+
         self.sync.eng_clk += [
             self.q.eq(0x0),
         ]
@@ -375,17 +809,7 @@ Here are the currently implemented opcodes for The Engine:
         microcode_width = 32
         microcode_depth = 1024
         running = Signal() # asserted when microcode is running
-        num_registers = 32
 
-        instruction_layout = [
-            ("opcode", opcode_bits, "opcode to be executed"),
-            ("ra", log2_int(num_registers), "operand A read register"),
-            ("ca", 1, "set to substitute constant table value for A"),
-            ("rb", log2_int(num_registers), "operand B read register"),
-            ("cb", 1, "set to substitute constant table value for B"),
-            ("wd", log2_int(num_registers), "write register"),
-            ("reserved", 9, "reserved for future use. Must be set to 0.")
-        ]
         instruction = Record(instruction_layout) # current instruction to execute
         illegal_opcode = Signal()
 
@@ -554,12 +978,16 @@ Here are the currently implemented opcodes for The Engine:
 
         ### merge execution path signals with host access paths
         self.comb += [
+            ra_adr.eq(instruction.ra),
+            rb_adr.eq(instruction.rb),
             self.ra_const_rom.adr.eq(ra_adr),
             self.rb_const_rom.adr.eq(rb_adr),
+            rf.window.eq(self.window.fields.window),
 
             If(running,
                 rf.ra_adr.eq(Cat(ra_adr, self.window.fields.window)),
                 rf.rb_adr.eq(Cat(rb_adr, self.window.fields.window)),
+                rf.instruction_pipe_in.eq(instruction.raw_bits()),
                 rf.wd_adr.eq(Cat(wd_adr, self.window.fields.window)),
                 rf.wd_dat.eq(wd_dat),
                 rf.wd_bwe.eq(0xFFFF_FFFF), # enable all bytes
@@ -637,7 +1065,7 @@ Here are the currently implemented opcodes for The Engine:
             )
         )
         seq.act("WAIT_DONE",
-            If(done,
+            If(done, # TODO: for now, we just wait for each instruction to finish; but the foundations are around for pipelining...
                 If(mpc < mpc_stop,
                    NextState("FETCH"),
                    NextValue(mpc, mpc + 1),
@@ -675,6 +1103,7 @@ Here are the currently implemented opcodes for The Engine:
             "exec_logic"     : ExecLogic(width=rf_width_raw),
             "exec_addsub"    : ExecAddSub(width=rf_width_raw),
             "exec_testreduce": ExecTestReduce(width=rf_width_raw),
+            "exec_mul"       : ExecMul(width=rf_width_raw),
         }
         index = 0
         for name, unit in exec_units.items():
@@ -682,6 +1111,7 @@ Here are the currently implemented opcodes for The Engine:
             setattr(self, "done" + str(index), Signal())
             setattr(self, "unit_q" + str(index), Signal(wd_dat.nbits))
             setattr(self, "unit_sel" + str(index), Signal())
+            setattr(self, "unit_wd" + str(index), Signal(log2_int(num_registers)))
             subdecode = Signal()
             for op in unit.opcode_list:
                 self.sync.eng_clk += [
@@ -689,23 +1119,31 @@ Here are the currently implemented opcodes for The Engine:
                         subdecode.eq(1)
                     )
                 ]
+            instruction_out = Record(instruction_layout)
+            self.comb += [
+                instruction_out.raw_bits().eq(unit.instruction_out)
+            ]
             self.sync.eng_clk += [
                 unit.a.eq(ra_dat),
                 unit.b.eq(rb_dat),
+                unit.instruction_in.eq(instruction.raw_bits()),
                 unit.start.eq(exec & subdecode),
-                unit.opcode.eq(instruction.opcode),
                 getattr(self, "done" + str(index)).eq(unit.q_valid),
                 getattr(self, "unit_q" + str(index)).eq(unit.q),
                 getattr(self, "unit_sel" + str(index)).eq(subdecode),
+                getattr(self, "unit_wd" + str(index)).eq(instruction_out.wd),
             ]
             index += 1
 
         for i in range(index):
             self.comb += [
                 If(getattr(self, "done" + str(i)),
-                   done.eq(1),
-                ),
-                If(getattr(self, "unit_sel" + str(i)),
-                    wd_dat.eq(getattr(self, "unit_q" + str(i))),
+                   done.eq(1),  # TODO: for proper pipelining, handle case of two units done simultaneously!
+                   wd_dat.eq(getattr(self, "unit_q" + str(i))),
+                   wd_adr.eq(getattr(self, "unit_wd" + str(i))),
                 )
             ]
+
+        self.comb += [
+            rf_write.eq(done),
+        ]
