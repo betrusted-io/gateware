@@ -550,7 +550,6 @@ Once this is finished, we have the final result.
 
         # signals common to all DSP blocks
         dsp_alumode = Signal(4)
-        dsp_inmode = Signal(5)
         dsp_opmode = Signal(7)
         dsp_reset = Signal()
         dsp_a1_ce = Signal()
@@ -561,7 +560,6 @@ Once this is finished, we have the final result.
         dsp_p_ce = Signal()
 
         step = Signal(max=15+1)  # controls the multiplication step
-        carry_mode = Signal()
 
         self.timing = ModuleDoc(title="Detailed timing operation", body="""
 
@@ -579,7 +577,7 @@ by the implementation of this code.
   { "name": "self.b",      "wave": "x2......................2.", "data": ["B0[255:0]","B2[255:0]"] },
   { "name": "state",       "wave": "2.34......5555666687777923", "data":["IDLE","SETA","MPY","DLY","PLSB","PMSB","PROP","DLY","PLSB","PMSB","PROP","NORM","DLY","PLSB","PMSB","PROP","DONE","IDLE","SETA"]},
   { "name": "step",        "wave": "x..2===|==5...6....7...xxx", "data":["0","1", "2", "3","13","14","0","1","2"]},
-  { "name": "dsp.a",       "wave": "x2x.....................2x", "data": ["A0xx","A1xx","0","13"] },
+  { "name": "dsp.a",       "wave": "x2x2x...................2x", "data": ["A0xx","A19","A1xx","0","13"] },
   { "name": "dsp.b",       "wave": "x2====|==855xx66x.....xx2=", "data": ["19","B00","B01","B02","B03","B13","B14","13","1or19","1or19","1or19","1or19","19","B2_00"] },
   { "name": "dsp.c",        "wave": "x.........5xxx6x.xx7x.....", "data":["P14,0","PS0","PS1"]},
   { "name": "dsp.d",        "wave": "x.........55x.66x..77x....", "data":["Q14,1","R14,2","QS14,1","RS14,2","QS14,1","RS14,2"]},
@@ -605,7 +603,6 @@ by the implementation of this code.
         """)
         self.submodules.mseq = mseq = ClockDomainsRenamer("rf_clk")(FSM(reset_state="IDLE"))
         mseq.act("IDLE",
-            NextValue(carry_mode, 0),
             NextValue(step, 0),
             If(self.start,
                 NextState("SETUP_A")
@@ -618,10 +615,12 @@ by the implementation of this code.
             If(step < 15,
                 NextValue(step, step + 1)
             ).Else(
-                NextState("PSUM_LSB"),
-                NextValue(carry_mode, 1),
+                NextState("P_DELAY"),
                 NextValue(step, 0),
             )
+        )
+        mseq.act("P_DELAY", # DLY - due to pipelining of P register delaying feedback by one cycle
+            NextState("PSUM_LSB")
         )
         mseq.act("PSUM_LSB", # PLSB
             NextState("PSUM_MSB")
@@ -643,11 +642,21 @@ by the implementation of this code.
             NextState("PSUM_LSB")
         )
         mseq.act("DONE", # DONE
-            NextState("IDLE")
+            NextState("DONE2"),
+        )
+        mseq.act("DONE2", # second done state, because we are latching into a half-rate clock domain
+            NextState("IDLE"),
+            # Note: we could, in theory, pipeline the next multiply by detecting if go goes high here,
+            # and bypassing IDLE and going straight to SETA, but...
         )
 
         # DSP48E opcode encodings
-        OP_PASS_M = 0b000_01_01  # X:Y <- M; Z <-0; P <- 0 + X:Y + 0
+        OP_PASS_M        = 0b000_01_01  # X:Y <- M; Z <-0;    P <- 0 + M + 0
+        OP_M_PLUS_PCIN   = 0b001_01_01  # X:Y <- M; Z <-PCIN; P <- PCIN + M + 0
+        OP_M_PLUS_P      = 0b010_01_01  # X:Y <- M; Z <-P   ; P <- P + M + 0
+        OP_P_PLUS_PCIN17 = 0b101_10_00  # X <- P; Y <- 0; Z <- PCIN >> 17; P <- PCIN>>17 + P + 0
+        OP_AB_PLUS_P     = 0b010_00_11  # X <- A:B; Y <- 0; Z <- P; P <- A:B + 0 + P + 0
+        OP_0_PLUS_P      = 0b010_00_00  # X <- 0; Y <- 0; Z <- P; P <- 0 + 0 + P + 0
         INMODE_A1 = 0b0001
         INMODE_A2 = 0b0000
         INMODE_D  = 0b0110
@@ -655,41 +664,131 @@ by the implementation of this code.
         INMODE_B2 = 0b0
         INMODE_B1 = 0b1
 
+        overflow_25519 = Signal() # set during normalize if we're overflowing 2^255-19
+
+        # see the self.timing documentation (above, best viewed after post-processing with sphinx) for how this all works.
         self.comb += [
-            dsp_alumode.eq(0),  # always in P = Z + X + Y + CIN
+            dsp_alumode.eq(0),
             If(mseq.before_entering("SETUP_A"),
-                dsp_inmode.eq(Cat(INMODE_A1, INMODE_B2)),
                 dsp_opmode.eq(OP_PASS_M),
                 dsp_b2_ce.eq(1),
                 dsp_a1_ce.eq(1),
             ).Elif(mseq.ongoing("SETUP_A"),
                 # at this point, these are already loaded: A1 <- Axx, B2 <- 19
                 # P <- A1 * B2
-                dsp_inmode.eq(Cat(INMODE_A1, INMODE_B2)),
                 dsp_opmode.eq(OP_PASS_M),
                 # pipeline in the b1 value for the first round of the multiply
                 dsp_b1_ce.eq(1),
             ).Elif(mseq.ongoing("MULTIPLY"),
                 If(step == 0,
-                   dsp_a2_ce.eq(1),  # latch the pipelined Axx * 19 signal on the first round of multiply
+                    dsp_a2_ce.eq(1),  # latch the pipelined Axx * 19 signal on the first round of multiply
+                    dsp_opmode.eq(OP_PASS_M), # don't add PCIN on the first partial product, as it's bogus on step 0
+                ).Else(
+                    dsp_a2_ce.eq(0),
+                    dsp_opmode.eq(OP_M_PLUS_PCIN),
+                ),
+                dsp_b1_ce.eq(1),
+            ).Elif(mseq.ongoing("P_DELAY"),
+                dsp_b2_ce.eq(1),
+                dsp_d_ce.eq(1),
+            ).Elif(mseq.ongoing("PSUM_LSB"),
+                dsp_b2_ce.eq(1),
+                dsp_d_ce.eq(1),
+                dsp_opmode.eq(OP_PASS_M),
+            ).Elif(mseq.ongoing("PSUM_MSB"),
+                dsp_opmode.eq(OP_M_PLUS_P),
+            ).Elif(mseq.ongoing("CARRYPROP"),
+                dsp_opmode.eq(OP_P_PLUS_PCIN17),
+            ).Elif(mseq.ongoing("NORMALIZE"),
+                If(overflow_25519,
+                    dsp_opmode.eq(OP_AB_PLUS_P),
+                ).Else(
+                    dsp_opmode.eq(OP_0_PLUS_P),
                 )
             )
         ]
         for i in range(15):
-            # per-block DSP signals
+            # create all the per-block DSP signals before we loop through and connect them
             setattr(self, "dsp_a" + str(i), Signal(17))
             setattr(self, "dsp_b" + str(i), Signal(17))
             setattr(self, "dsp_c" + str(i), Signal(48))
             setattr(self, "dsp_d" + str(i), Signal(17))
             setattr(self, "dsp_match" + str(i), Signal())
             setattr(self, "dsp_p" + str(i), Signal(48))
+            setattr(self, "dsp_inmode" + str(i), Signal(5))
 
+        for i in range(15):
             self.comb += [
                 If(mseq.before_entering("SETUP_A"),
                     getattr( self, "dsp_a" + str(i) ).eq(a_17[i]),
                     getattr( self, "dsp_b" + str(i) ).eq(19),
                 ).Elif(mseq.ongoing("SETUP_A"),
-                    getattr( self, "dsp_a" + str(i) ).eq( getattr(self, "dsp_p" + str(i)) ),
+                    getattr( self, "dsp_inmode" + str(i) ).eq(Cat(INMODE_A1, INMODE_B2)),
+                    getattr(self, "dsp_b" + str(i)).eq(b_17[0]), # preload B00
+                ).Elif(mseq.ongoing("MULTIPLY"),
+                    If(step == 0,
+                       getattr(self, "dsp_a" + str(i)).eq(getattr(self, "dsp_p" + str(i))),
+                    ),
+                    If(step < 14,
+                        getattr(self, "dsp_b" + str(i)).eq( (self.b >> (17*step)) & 0x1_ffff ), # b_17[step+1]
+                    ).Else(
+                        # set the number "13" to add for the normalization step later on
+                        If(i == 0,
+                           getattr(self, "dsp_b" + str(i)).eq(13),
+                        ).Else(
+                           getattr(self, "dsp_b" + str(i)).eq(0),
+                        )
+                    ),
+                    If(i >= step,
+                        getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_A1, INMODE_B2)),
+                    ).Else(
+                        getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_A2, INMODE_B2)),
+                    )
+                ).Elif(mseq.ongoing("P_DELAY"),
+                    getattr( self, "dsp_c" + str(i)).eq(getattr(self, "dsp_p" + str(i)) & 0x1_ffff),
+                )
+            ]
+            if i > 0:
+                self.comb += [
+                    If(mseq.ongoing("P_DELAY"),
+                        getattr(self, "dsp_d" + str(i)).eq((getattr(self, "dsp_p" + str(i - 1)) >> 17) & 0x1_ffff),
+                        getattr(self, "dsp_b" + str(i)).eq(1),
+                    )]
+            else:
+                self.comb += [
+                    If(mseq.ongoing("P_DELAY"),
+                        getattr(self, "dsp_d" + str(i)).eq((getattr(self, "dsp_p" + str(14)) >> 17) & 0x1_ffff),
+                        getattr(self, "dsp_b" + str(i)).eq(19),
+                    )]
+            self.comb += [
+                    If(mseq.ongoing("PSUM_LSB"),
+                    getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_D, INMODE_B2)),
+                    )]
+            if i > 1:
+                self.comb += [
+                    If(mseq.ongoing("PSUM_LSB"),
+                        getattr(self, "dsp_d" + str(i)).eq((getattr(self, "dsp_p" + str(i - 2)) >> 34) & 0x1_ffff),
+                        getattr(self, "dsp_b" + str(i)).eq(1),
+                    )]
+            elif i == 1:
+                self.comb += [
+                    If(mseq.ongoing("PSUM_LSB"),
+                        getattr(self, "dsp_d" + str(i)).eq((getattr(self, "dsp_p" + str(14)) >> 34) & 0x1_ffff),
+                        getattr(self, "dsp_b" + str(i)).eq(19),
+                    )]
+            else:
+                self.comb += [
+                    If(mseq.ongoing("PSUM_LSB"),
+                        getattr(self, "dsp_d" + str(i)).eq((getattr(self, "dsp_p" + str(13)) >> 34) & 0x1_ffff),
+                        getattr(self, "dsp_b" + str(i)).eq(19),
+                    )]
+            self.comb += [
+                If(mseq.ongoing("PSUM_MSB"),
+                    getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_D, INMODE_B2)),
+                ).Elif(mseq.ongoing("CARRYPROP"),
+                    # nothing, actually. it's all internal.
+                ).Elif(mseq.ongoing("NORMALIZE"),
+                    getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_0, INMODE_B1)),
                 )
             ]
             self.specials += [
@@ -746,7 +845,7 @@ by the implementation of this code.
                     i_CEP=dsp_p_ce,
                     i_CLK=ClockSignal("rf_clk"),  # run at 2x speed of engine clock
                     i_D=getattr(self, "dsp_d" + str(i)),
-                    i_INMODE=dsp_inmode,
+                    i_INMODE=getattr(self, "dsp_inmode" + str(i)),
                     i_OPMODE=dsp_opmode,
                     o_P=getattr(self, "dsp_p" + str(i)),
                     o_PATTERNDETECT=getattr(self, "dsp_match" + str(i)),
@@ -764,11 +863,35 @@ by the implementation of this code.
                     i_RSTP=dsp_reset,
                 )
             ]
-
-        self.sync.eng_clk += [
-            self.q.eq(0x0),
+            self.sync.rf_clk += [ # this syncs into the eng_clk domain
+                If(mseq.ongoing("DONE") | mseq.ongoing("DONE2"),
+                   self.q[i * 17:i * 17 + 17].eq(getattr(self, "dsp_p" + str(i))[:17]),
+                    self.q_valid.eq(1),
+                ).Else(
+                    self.q.eq(self.q),
+                    self.q_valid.eq(0),
+                )
+            ]
+        # compute special-case detection if the partial sum output is >= 2^255-19
+        self.comb += [
+            overflow_25519.eq(
+                self.dsp_match14 &
+                self.dsp_match13 &
+                self.dsp_match12 &
+                self.dsp_match11 &
+                self.dsp_match10 &
+                self.dsp_match9 &
+                self.dsp_match8 &
+                self.dsp_match7 &
+                self.dsp_match6 &
+                self.dsp_match5 &
+                self.dsp_match4 &
+                self.dsp_match3 &
+                self.dsp_match2 &
+                self.dsp_match1 &
+                (self.dsp_p0 >= 0x1_ffed)
+            )
         ]
-
 
 
 class Engine(Module, AutoCSR, AutoDoc):
