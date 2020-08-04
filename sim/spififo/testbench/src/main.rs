@@ -113,5 +113,8 @@ fn run(p: &pac::Peripherals) {
     report(&p, 0x8000_0005);
 
     // set success to indicate to the CI framework that the test has passed
+    p.SIMSTATUS.simstatus.modify(|_r, w| w.success().bit(true));
+
+    p.SIMSTATUS.simstatus.modify(|_r, w| w.success().bit(true).done().bit(true)); // work around a VexMinDebug issue by setting the done bit here
     p.SIMSTATUS.simstatus.modify(|_r, w| w.success().bit(true).done().bit(true)); // work around a VexMinDebug issue by setting the done bit here
 }
