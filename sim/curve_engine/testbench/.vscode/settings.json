@@ -1,0 +1,4 @@
+{
+    "rust-analyzer.cargo.features": ["u32_backend"],
+    "rust-analyzer.cargo.allFeatures": false
+}
