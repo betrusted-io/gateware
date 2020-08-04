@@ -1,0 +1,3 @@
+[submodule "sim/curve_engine/testbench/curve25519-dalek"]
+	path = sim/curve_engine/testbench/curve25519-dalek
+	url = git@github.com:betrusted-io/curve25519-dalek.git

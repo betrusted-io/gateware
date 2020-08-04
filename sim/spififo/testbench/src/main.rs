@@ -60,6 +60,7 @@ fn run(p: &pac::Peripherals) {
             report(&p, (*(ram.add(i+10))).read());
         }
 
+        report(&p, 0x8000_0003);
         // establish an out-of-phase condition: put 8 elements into the queue for Tx, but only take 4 out
         for i in 0..8 {
             (*com).write( i + 0xFAF0 );
@@ -71,6 +72,7 @@ fn run(p: &pac::Peripherals) {
             while p.SPICONTROLLER.status.read().tip().bit() { }
         }
 
+        report(&p, 0x8000_0004);
         if true {
             // latest version just resets the pointers
             p.COM.control.write( |w| w.reset().bit(true) ); // reset fifos
@@ -108,11 +110,8 @@ fn run(p: &pac::Peripherals) {
     }
 
     // example of updating the "report" bits monitored by the CI framework
-    unsafe {
-        // recall one of the locations we stashed as a report code
-        p.SIMSTATUS.report.write(|w| w.bits( (*ram.add(50)).read() ));
-    }
+    report(&p, 0x8000_0005);
 
     // set success to indicate to the CI framework that the test has passed
-    p.SIMSTATUS.simstatus.modify(|_r, w| w.success().bit(true));
+    p.SIMSTATUS.simstatus.modify(|_r, w| w.success().bit(true).done().bit(true)); // work around a VexMinDebug issue by setting the done bit here
 }
