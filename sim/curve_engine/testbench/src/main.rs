@@ -23,14 +23,88 @@ fn run(p: &pac::Peripherals) {
     let vectors = vectors_ptr as *mut Volatile<u32>;
 
     let mut pass = true;
-    let mut phase: u32 = 0x1;
+    let mut phase: u32 = 0x8000_0000;
 
-    ///////////////  CONFIRM THAT VECTOR ROM IS ACCESSIBLE, AND IN CORRECT BYTE ORDER
+    report(&p, phase);  phase += 1;
+
+    ///////////////  APPLY AND RUN ARITHMETIC TEST VECTORS
+    let mut test_offset: usize = 0x0;
+    let mut magic_number: u32;
+    loop {
+        unsafe{ magic_number = (*(vectors.add(test_offset))).read(); }
+        report(&p, magic_number);
+        if magic_number != 0x5645_4354 {
+            break;
+        }
+        test_offset += 1;
+        unsafe {
+            let load_addr = ((*(vectors.add(test_offset))).read() >> 16) & 0xFFFF;
+            let code_len = (*(vectors.add(test_offset))).read() & 0xFFFF;
+            test_offset += 1;
+            let num_args = ((*(vectors.add(test_offset))).read() >> 27) & 0x1F;
+            let window = ((*(vectors.add(test_offset))).read() >> 23) & 0xF;
+            let num_vectors = ((*(vectors.add(test_offset))).read() >> 0) & 0x3F_FFFF;
+            test_offset += 1;
+            for i in 0..code_len as usize {
+                (*(microcode.add(i))).write( (*(vectors.add(test_offset))).read() );
+                test_offset += 1;
+            }
+
+            test_offset = test_offset + (8 - (test_offset % 8)); // skip over padding
+
+            report(&p, phase);  phase += 1;
+
+            // copy in the arguments
+            for _vector in 0..num_vectors {
+                for argcnt in 0..num_args {
+                    for word in 0..8 {
+                       (*( rf.add( (window * 32 * 8 + argcnt * 8 + word) as usize )) ).write( (*(vectors.add(test_offset))).read() );
+                       test_offset += 1;
+                    }
+                }
+
+                // setup the engine to run
+                p.ENGINE.window.write(|w| w.bits(window));
+                p.ENGINE.mpstart.write(|w| w.bits(load_addr));
+                p.ENGINE.mplen.write(|w| w.bits(code_len));
+                // start the run
+                p.ENGINE.control.write(|w| w.go().set_bit());
+                loop {
+                    let status = p.ENGINE.status.read().bits();
+                    report(&p, status);
+                    if (status & 1) == 0 {
+                        break;
+                    }
+                }
+
+                // check result
+                let mut vect_pass = true;
+                for word in 0..8 {
+                    let expect = (*(vectors.add(test_offset))).read();
+                    test_offset += 1;
+                    let actual = (*( rf.add( (window * 32 * 8 + 31 * 8 + word) as usize ))).read();
+                    if expect != actual {
+                        vect_pass = false;
+                    }
+                }
+                if vect_pass {
+                    report(&p, 0xC0DE_600D);
+                } else {
+                    report(&p, 0xDEAD_2551);
+                    pass = false;
+                }
+                report(&p, phase);  phase += 1;
+            }
+        }
+    }
+    /*  // for historical reference
     for i in 0..96/4 {
         unsafe {
             report(&p, (*(vectors.add(i))).read());
         }
     }
+    */
+    phase += 0x1000_0000;
 
     ///////////////  TEST ACCESS TO REGISTERFILE AND MICROCODE SPACE
 

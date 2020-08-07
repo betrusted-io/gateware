@@ -92,6 +92,9 @@ def generate_top():
     global dutio
     global boot_from_spi
 
+    # build the test vectors for the curve engine
+    os.system("cd testbench/curve25519-dalek && cargo test field::test::make_vectors")
+
     # we have to do two passes: once to make the SVD, without compiling the BIOS
     # second, to compile the BIOS, which is then built into the gateware.
 
