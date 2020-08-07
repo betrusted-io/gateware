@@ -14,15 +14,16 @@ opcodes = {  # mnemonic : [bit coding, docstring]
     "UDF" : [-1, "Placeholder for undefined opcodes"],
     "PSA" : [0, "Wd $\gets$ Ra  // pass A"],
     "PSB" : [1, "Wd $\gets$ Rb  // pass B"],
-    "MSK" : [2, "Replicate(Ra[0], 256) & Rb  // for doing cswap()"],
-    "XOR" : [3, "XOR", "Wd $\gets$ Ra ^ Rb  // bitwise XOR"],
+    "MSK" : [2, "Wd $\gets$ Replicate(Ra[0], 256) & Rb  // for doing cswap()"],
+    "XOR" : [3, "Wd $\gets$ Ra ^ Rb  // bitwise XOR"],
     "NOT" : [4, "Wd $\gets$ ~Ra   // binary invert"],
     "ADD" : [5, "Wd $\gets$ Ra + Rb  // 256-bit binary add, must be followed by TRD,SUB"],
     "SUB" : [6, "Wd $\gets$ Ra - Rb  // 256-bit binary subtraction, this is not the same as a subtraction in the finite field"],
     "MUL" : [7, f"Wd $\gets$ Ra * Rb  // multiplication in {field_latex} - result is reduced"],
     "TRD" : [8, "If Ra $\geqq 2^{{255}}-19$ then Wd $\gets$ $2^{{255}}-19$, else Wd $\gets$ 0  // Test reduce"],
-    "BRZ" : [9, "If Ra == 0 then mpc[9:0] $\gets$ mpc[9:0] + Rb[9:0], else mpc $\gets$ mpc + 1  // Branch if zero"],
-    "MAX" : [10, "Maximum opcode number (for bounds checking)"]
+    "BRZ" : [9, "If Ra == 0 then mpc[9:0] $\gets$ mpc[9:0] + immediate[9:0], else mpc $\gets$ mpc + 1  // Branch if zero"],
+    "FIN" : [10, "hast execution and assert interrupt to host CPU that microcode execution is done"],
+    "MAX" : [11, "Maximum opcode number (for bounds checking)"]
 }
 
 num_registers = 32
@@ -33,7 +34,7 @@ instruction_layout = [
     ("rb", log2_int(num_registers), "operand B read register"),
     ("cb", 1, "set to substitute constant table value for B"),
     ("wd", log2_int(num_registers), "write register"),
-    ("reserved", 9, "reserved for future use. Must be set to 0.")
+    ("immediate", 9, "Used by jumps to load the next PC value")
 ]
 
 class RegisterFile(Module, AutoDoc):
@@ -282,7 +283,7 @@ Addition of Ra + Rb into Rc in {field_latex}:
 .. code-block:: c
 
   ADD Rc, Ra, Rb    // Rc <- Ra + Rb
-  TRD Rc, Rd        // Rd <- ReductionValue(Rc)
+  TRD Rd, Rc        // Rd <- ReductionValue(Rc)
   SUB Rc, Rc, Rd    // Rc <- Rc - Rd 
 
 Negation of Ra into Rc in {field_latex}:
@@ -301,7 +302,7 @@ Subtraction of Ra - Rb into Rc in {field_latex}:
 
   SUB Rb, #FIELDPRIME, Rb   //  Rb <- 2^255-19 - Rb
   ADD Rc, Ra, Rb    // Rc <- Ra + Rb
-  TRD Rc, Rd        // Rd <- ReductionValue(Rc)
+  TRD Rd, Rc        // Rd <- ReductionValue(Rc)
   SUB Rc, Rc, Rd    // Rc <- Rc - Rd 
 
 In all the examples above, Ra and Rb must be members of {field_latex}. 
@@ -1151,6 +1152,9 @@ Here are the currently implemented opcodes for The Engine:
             )
         ]
 
+        sext_immediate = Signal((log2_int(microcode_depth), True)) # make this signal signed
+        self.comb += sext_immediate.eq(instruction.immediate) # does this automatically do sign extension? who knows. migen claims "user-friendly sign extension rules, (a la MyHDL)", with no further explanation. :-P
+
         ### Microcode sequencer. Very simple: it can only run linear sections of microcode. Feature not bug;
         ### constant time operation is a defense against timing attacks.
         engine_go = Signal()
@@ -1183,6 +1187,9 @@ Here are the currently implemented opcodes for The Engine:
             ).Elif(instruction.opcode < opcodes["MAX"][0], # check if the opcode is legal before running it
                 exec.eq(1),
                 NextState("WAIT_DONE"),
+            ).Elif(instruction.opcode == opcodes["FIN"][0],
+                NextState("IDLE"),
+                NextValue(running, 0),
             ).Else(
                 NextState("ILLEGAL_OPCODE"),
             )
@@ -1206,7 +1213,7 @@ Here are the currently implemented opcodes for The Engine:
         seq.act("DO_BRZ",
             If(ra_dat == 0,
                 If( (rb_dat[:mpc.nbits] < mpc_stop) & (rb_dat[:mpc.nbits] >= self.mpstart.fields.mpstart), # validate new PC is in range
-                   NextValue(mpc, rb_dat[:mpc.nbits]),
+                   NextValue(mpc, sext_immediate + mpc + 1),
                 ).Else(
                     NextState("IDLE"),
                     NextValue(running, 0),

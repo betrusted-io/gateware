@@ -74,11 +74,16 @@ add the submodules we're testing to the SoC, which is encapsulated in the Sim cl
 class Dut(Sim):
     def __init__(self, platform, spiboot=False, **kwargs):
         Sim.__init__(self, platform, custom_clocks=local_clocks, spiboot=spiboot, **kwargs) # SoC magic is in here
+        SoCCore.mem_map["vectors"] = 0x30000000 # add test vector ROM area, cached OK
 
         self.submodules.engine = ClockDomainsRenamer({"eng_clk":"clk50", "rf_clk":"sys"})(Engine(platform, self.mem_map["engine"]))
         self.add_csr("engine")
         self.add_interrupt("engine")
         self.bus.add_slave("engine", self.engine.bus, SoCRegion(origin=self.mem_map["engine"], size=0x2_0000, cached=False))
+
+        vector_data = get_mem_data("testbench/curve25519-dalek/test_vectors.bin", "little")
+        self.add_rom("vectors", self.mem_map["vectors"], len(vector_data)*4, vector_data)
+
 
 """
 generate all the files necessary to run xsim

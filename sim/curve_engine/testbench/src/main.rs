@@ -19,8 +19,18 @@ fn run(p: &pac::Peripherals) {
     let rf_ptr: *mut u32 = 0xe003_0000 as *mut u32;
     let rf = rf_ptr as *mut Volatile<u32>;
 
+    let vectors_ptr: *mut u32 = 0x3000_0000 as *mut u32;
+    let vectors = vectors_ptr as *mut Volatile<u32>;
+
     let mut pass = true;
     let mut phase: u32 = 0x1;
+
+    ///////////////  CONFIRM THAT VECTOR ROM IS ACCESSIBLE, AND IN CORRECT BYTE ORDER
+    for i in 0..96/4 {
+        unsafe {
+            report(&p, (*(vectors.add(i))).read());
+        }
+    }
 
     ///////////////  TEST ACCESS TO REGISTERFILE AND MICROCODE SPACE
 
