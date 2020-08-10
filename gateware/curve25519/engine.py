@@ -38,7 +38,7 @@ instruction_layout = [
 ]
 
 class RegisterFile(Module, AutoDoc):
-    def __init__(self, depth=512, width=256):
+    def __init__(self, depth=512, width=256, bypass=False):
         reset_cycles = 4
         self.intro = ModuleDoc(title="Register File", body="""
 This implements the register file for the Curve25519 engine. It's implemented using
@@ -50,8 +50,9 @@ but only if used in "SDP" (simple dual port) mode. In SDP, you have one read, on
 However, the register file needs to produce two operands per cycle, while accepting up to
 one operand per cycle. 
 
-In order to do this, we stipulate that the RF runs at `rf_clk` (100MHz), but uses two phases 
-to produce/consume data according to a half-rate "Engine clock" `eng_clk` (50MHz).
+In order to do this, we stipulate that the RF runs at `rf_clk` (200MHz), but uses two phases 
+to produce/consume data. "Engine clock" `eng_clk` (50MHz) runs at a lower rate to accommodate
+large-width arithmetic in a single cycle.
 
 The phasing is defined as follows:
 
@@ -71,7 +72,9 @@ an address width of 9 bits.
         """.format(reset_cycles))
 
         instruction = Record(instruction_layout)
-        self.phase = phase = Signal()
+        phase = Signal(2)  # internal phase
+        self.phase = Signal()  # external phase
+        self.comb += self.phase.eq(phase[1]) # divide down internal phase so slower modules can capture it
 
         # these are the signals in and out of the register file
         self.ra_dat = Signal(width) # this is passed in from outside the module because we want to mux with e.g. memory bus
@@ -92,30 +95,64 @@ an address width of 9 bits.
         self.we = Signal()
         self.clear = Signal()
 
+        self.running = Signal() # used for activity gating to RAM
+
         eng_sync = Signal(reset=1)
 
         rf_adr = Signal(log2_int(depth))
         self.comb += [
-            If(~phase,
+            If(phase == 0,
                 rf_adr.eq(self.ra_adr),
-            ).Else(
+            ).Elif(phase == 1,
                 rf_adr.eq(self.rb_adr),
             )
         ]
         rf_dat = Signal(width)
+        self.sync.eng_clk += [
+            # TODO: check that this is in sync with expected values
+            self.instruction_pipe_out.eq(self.instruction_pipe_in),
+        ]
+        # unfortunately, -1L speed grade is too slow to support pipeline bypassing of the register file:
+        # bypass path closes at about 5.4ns, which fails to meet the 5ns cycle time target for the four-phase RF
+        if bypass:
+            self.sync.rf_clk += [
+                If(phase == 1,
+                    If((self.wd_adr != self.ra_adr) | ~self.we,
+                        self.ra_dat.eq(rf_dat),
+                       ).Else(
+                        self.ra_dat.eq(self.wd_dat),
+                    ),
+                    self.rb_dat.eq(self.rb_dat),
+                   ).Elif(phase == 2,
+                    self.ra_dat.eq(self.ra_dat),
+                    If((self.wd_adr != self.rb_adr) | ~self.we,
+                        self.rb_dat.eq(rf_dat),
+                       ).Else(
+                        self.rb_dat.eq(self.wd_dat),
+                    )
+                          ).Else(
+                    self.ra_dat.eq(self.ra_dat),
+                    self.rb_dat.eq(self.rb_dat),
+                ),
+            ]
+        else:
+            self.sync.rf_clk += [
+                If(phase == 1,
+                    self.ra_dat.eq(rf_dat),
+                    self.rb_dat.eq(self.rb_dat),
+                ).Elif(phase == 2,
+                    self.ra_dat.eq(self.ra_dat),
+                    self.rb_dat.eq(rf_dat),
+                ).Else(
+                    self.ra_dat.eq(self.ra_dat),
+                    self.rb_dat.eq(self.rb_dat),
+                ),
+            ]
         self.sync.rf_clk += [
-            self.instruction_pipe_out.eq(self.instruction_pipe_in),  # TODO: check that this is in sync with expected values
-            If(phase,
-                self.ra_dat.eq(rf_dat),
-                self.rb_dat.eq(self.rb_dat),
-            ).Else(
-                self.ra_dat.eq(self.ra_dat),
-                self.rb_dat.eq(rf_dat),
-            ),
             If(eng_sync,
                 phase.eq(0),
             ).Else(
-                phase.eq(~phase),
+                phase.eq(phase + 1),
             )
         ]
 
@@ -136,8 +173,8 @@ an address width of 9 bits.
                 i_WRADDR = self.wd_adr,
                 i_DI = self.wd_dat[word*64 : word*64 + 64],
                 o_DO = rf_dat[word*64 : word*64 + 64],
-                i_RDEN = 1,
-                i_WREN = phase & self.we,
+                i_RDEN = self.running, # reduce power when not running
+                i_WREN = (phase == 2) & self.we,
                 i_RST = eng_sync,
                 i_WE = self.wd_bwe[word*8 : word*8 + 8],
             )
@@ -353,7 +390,7 @@ Thus the reduction algorithm is as follows:
   - Subtract the return value of TestReduce from the tested value
         """)
         self.sync.eng_clk += [
-            If( (self.a[255] == 1) | ((self.a[5:256] == Replicate(1, 251) & (self.a[:5] >= 0x1D))),
+            If( (self.a >= 0x7FFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFED),
                 self.q.eq(0x7FFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFED)
             ).Else(
                 self.q.eq(0x0)
@@ -369,6 +406,9 @@ class ExecMul(ExecUnit, AutoDoc):
         self.notes = ModuleDoc(title=f"Multiplication in {field_latex} ExecUnit Subclass", body=f"""
 Unlike the ADD/SUB module, this operator explicitly works in {field_latex}. It takes in two inputs,
 Ra and Rb, and both must be members of {field_latex}. The result is also reduced to a member of {field_latex}.
+
+The multiplier is designed with a separate clock, `mul_clk` so that it can be remapped to a faster
+domain than `engine_clk` for better performance. The nominal target for `mul_clk` is 100MHz.
 
 The base algorithm for this implementation is lifted from the paper "Compact and Flexible FPGA Implementation
 of Ed25519 and X25519" by Furkan Turan and Ingrid Verbauwhede (https://doi.org/10.1145/3312742).  The algorithm
@@ -602,7 +642,7 @@ by the implementation of this code.
   { "name": "done",        "wave": "0......................10." },
   ]}
         """)
-        self.submodules.mseq = mseq = ClockDomainsRenamer("rf_clk")(FSM(reset_state="IDLE"))
+        self.submodules.mseq = mseq = ClockDomainsRenamer("mul_clk")(FSM(reset_state="IDLE"))
         mseq.act("IDLE",
             NextValue(step, 0),
             If(self.start,
@@ -671,7 +711,6 @@ by the implementation of this code.
         self.comb += [
             dsp_alumode.eq(0),
             If(mseq.before_entering("SETUP_A"),
-                dsp_opmode.eq(OP_PASS_M),
                 dsp_b2_ce.eq(1),
                 dsp_a1_ce.eq(1),
             ).Elif(mseq.ongoing("SETUP_A"),
@@ -844,7 +883,7 @@ by the implementation of this code.
                     i_CECTRL=0, # no pipe on opmode
                     i_CED=dsp_d_ce,
                     i_CEP=dsp_p_ce,
-                    i_CLK=ClockSignal("rf_clk"),  # run at 2x speed of engine clock
+                    i_CLK=ClockSignal("mul_clk"),  # run at 2x speed of engine clock
                     i_D=getattr(self, "dsp_d" + str(i)),
                     i_INMODE=getattr(self, "dsp_inmode" + str(i)),
                     i_OPMODE=dsp_opmode,
@@ -864,7 +903,7 @@ by the implementation of this code.
                     i_RSTP=dsp_reset,
                 )
             ]
-            self.sync.rf_clk += [ # this syncs into the eng_clk domain
+            self.sync.mul_clk += [ # this syncs into the eng_clk domain
                 If(mseq.ongoing("DONE") | mseq.ongoing("DONE2"),
                    self.q[i * 17:i * 17 + 17].eq(getattr(self, "dsp_p" + str(i))[:17]),
                     self.q_valid.eq(1),
@@ -930,6 +969,51 @@ Here are the currently implemented opcodes for The Engine:
 {}  
         """.format(opdoc))
 
+        ##### TIMING CONSTRAINTS -- you want these. Trust me.
+        ### clk200->clk50 multi-cycle paths:
+        # we architecturally guarantee extra setup time from the register file to the point of consumption:
+        # read data is stable by the 3rd phase of the RF fetch cycle, and so it is in fact ready even before
+        # the other signals that trigger the execute mode, hence 4+1 cycles total setup time
+        platform.add_platform_command("set_multicycle_path 5 -setup -start -from [get_clocks clk200] -to [get_clocks clk50] -through [get_nets *rf_rb_dat*]")
+        platform.add_platform_command("set_multicycle_path 4 -hold -from [get_clocks clk200] -to [get_clocks clk50] -through [get_nets *rf_rb_dat*]")
+        platform.add_platform_command("set_multicycle_path 5 -setup -start -from [get_clocks clk200] -to [get_clocks clk50] -through [get_nets *rf_ra_dat*]")
+        platform.add_platform_command("set_multicycle_path 4 -hold -from [get_clocks clk200] -to [get_clocks clk50] -through [get_nets *rf_ra_dat*]")
+        ### clk200->clk100 multi-cycle paths:
+        # same as above, but for the multiplier path.
+        platform.add_platform_command("set_multicycle_path 3 -setup -start -from [get_clocks clk200] -to [get_clocks sys_clk] -through [get_nets *rf_rb_dat*]")
+        platform.add_platform_command("set_multicycle_path 2 -hold -from [get_clocks clk200] -to [get_clocks sys_clk] -through [get_nets *rf_rb_dat*]")
+        platform.add_platform_command("set_multicycle_path 3 -setup -start -from [get_clocks clk200] -to [get_clocks sys_clk] -through [get_nets *rf_ra_dat*]")
+        platform.add_platform_command("set_multicycle_path 2 -hold -from [get_clocks clk200] -to [get_clocks sys_clk] -through [get_nets *rf_ra_dat*]")
+        ### sys->clk200 multi-cycle paths:
+        # microcode fetch is stable 10ns before use by the register file, by design
+        platform.add_platform_command("set_multicycle_path 2 -setup -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_nets engine_ra_adr*]")
+        platform.add_platform_command("set_multicycle_path 1 -hold -end -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_nets engine_ra_adr*]")
+        platform.add_platform_command("set_multicycle_path 2 -setup -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_nets engine_rb_adr*]")
+        platform.add_platform_command("set_multicycle_path 1 -hold -end -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_nets engine_rb_adr*]")
+        # ignore the clk200 reset path for timing purposes -- there is >1 cycle guaranteed after reset for everything to settle before anything moves on these paths
+        platform.add_platform_command("set_false_path -through [get_nets clk200_rst]")
+        # ignore the clk50 reset path for timing purposes -- there is > 1 cycle guaranteed after reset for everything to settle before anything moves on these paths (applies for other crypto engines, (SHA/AES) as well)
+        platform.add_platform_command("set_false_path -through [get_nets clk50_rst]")
+        ### sys->clk50 multi-cycle paths:
+        # microcode fetch is guaranteed not to transition in the middle of an exec computation
+        platform.add_platform_command("set_multicycle_path 2 -setup -start -from [get_clocks sys_clk] -to [get_clocks clk50] -through [get_cells microcode_reg*]")
+        platform.add_platform_command("set_multicycle_path 1 -hold -from [get_clocks sys_clk] -to [get_clocks clk50] -through [get_cells microcode_reg*]")
+        ### clk50->clk200 multi-cycle paths:
+        # engine running will set up a full eng_clk cycle before any RF accesses need to be valid
+        platform.add_platform_command("set_multicycle_path 4 -setup -from [get_clocks clk50] -to [get_clocks clk200] -through [get_nets engine_running*]")
+        platform.add_platform_command("set_multicycle_path 3 -hold -end -from [get_clocks clk50] -to [get_clocks clk200] -through [get_nets engine_running*]")
+        # data writeback happens on phase==2, and thus is stable for at least two clk200 clocks extra
+        platform.add_platform_command("set_multicycle_path 2 -setup -from [get_clocks clk50] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/DI*DI*]")
+        platform.add_platform_command("set_multicycle_path 1 -hold -end -from [get_clocks clk50] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/DI*DI*]")
+        platform.add_platform_command("set_multicycle_path 2 -setup -from [get_clocks clk50] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/ADDR*ADDR*]")
+        platform.add_platform_command("set_multicycle_path 1 -hold -end -from [get_clocks clk50] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/ADDR*ADDR*]")
+        ### sys->clk200 multi-cycle paths:
+        # data writeback happens on phase==2, and thus is stable for at least two clk200 clocks extra
+        platform.add_platform_command("set_multicycle_path 2 -setup -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/DI*DI*]")
+        platform.add_platform_command("set_multicycle_path 1 -hold -end -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/DI*DI*]")
+        platform.add_platform_command("set_multicycle_path 2 -setup -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/ADDR*ADDR*]")
+        platform.add_platform_command("set_multicycle_path 1 -hold -end -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/ADDR*ADDR*]")
+
         microcode_width = 32
         microcode_depth = 1024
         running = Signal() # asserted when microcode is running
@@ -983,7 +1067,7 @@ Here are the currently implemented opcodes for The Engine:
         self.specials += micro_wrport
         micro_rdport = microcode.get_port(mode=READ_FIRST)
         self.specials += micro_rdport
-        micro_runport = microcode.get_port(mode=READ_FIRST)
+        micro_runport = microcode.get_port(mode=READ_FIRST) # , clock_domain="eng_clk"
         self.specials += micro_runport
 
         mpc = Signal(log2_int(microcode_depth))  # the microcode program counter
@@ -1135,7 +1219,7 @@ Here are the currently implemented opcodes for The Engine:
             )
         ]
         # simple machine to wait 2 RF clock cycles for data to propagate out of the register file and back to the host
-        rd_wait_states=2
+        rd_wait_states=4
         bus_rd_wait = Signal(max=(rd_wait_states+1))
         self.sync.rf_clk += [
             If(rdata_req,
@@ -1157,15 +1241,28 @@ Here are the currently implemented opcodes for The Engine:
 
         ### Microcode sequencer. Very simple: it can only run linear sections of microcode. Feature not bug;
         ### constant time operation is a defense against timing attacks.
+
+        # pulse-stretch the go from sys->eng_clk. Don't use Migen CDC primitives, as they add latency; a BlindTransfer
+        # primitive on its own will take about as much time as a couple instructions on The Engine.
         engine_go = Signal()
-        self.submodules.gosync = BlindTransfer("sys", "eng_clk")
-        self.comb += [ self.gosync.i.eq(self.control.fields.go), engine_go.eq(self.gosync.o)]
+        go_stretch = Signal(2)
+        self.sync += [
+            If(self.control.fields.go,
+                go_stretch.eq(2)
+            ).Else(
+                If(go_stretch != 0,
+                   go_stretch.eq(go_stretch - 1),
+                )
+            )
+        ]
+        self.comb += engine_go.eq(self.control.fields.go | (go_stretch != 0))
 
         self.submodules.seq = seq = ClockDomainsRenamer("eng_clk")(FSM(reset_state="IDLE"))
         mpc_stop = Signal(log2_int(microcode_depth))
         window_latch = Signal(self.window.fields.window.size)
         exec = Signal()  # indicates to execution units to start running
         done = Signal()  # indicates when the given execution units are done (as-muxed from subunits)
+        self.comb += rf.running.eq(~seq.ongoing("IDLE") | rdata_re),  # let the RF know when we're not executing, so it can idle to save power
         seq.act("IDLE",
             If(engine_go,
                 NextValue(mpc, self.mpstart.fields.mpstart),
@@ -1184,12 +1281,12 @@ Here are the currently implemented opcodes for The Engine:
         seq.act("EXEC",
             If(instruction.opcode == opcodes["BRZ"][0],
                 NextState("DO_BRZ"),
-            ).Elif(instruction.opcode < opcodes["MAX"][0], # check if the opcode is legal before running it
-                exec.eq(1),
-                NextState("WAIT_DONE"),
             ).Elif(instruction.opcode == opcodes["FIN"][0],
                 NextState("IDLE"),
                 NextValue(running, 0),
+            ).Elif(instruction.opcode < opcodes["MAX"][0], # check if the opcode is legal before running it
+                exec.eq(1),
+                NextState("WAIT_DONE"),
             ).Else(
                 NextState("ILLEGAL_OPCODE"),
             )
@@ -1244,7 +1341,7 @@ Here are the currently implemented opcodes for The Engine:
             setattr(self, "unit_wd" + str(index), Signal(log2_int(num_registers)))
             subdecode = Signal()
             for op in unit.opcode_list:
-                self.sync.eng_clk += [
+                self.comb += [
                     If(instruction.opcode == opcodes[op][0],
                         subdecode.eq(1)
                     )
@@ -1253,12 +1350,12 @@ Here are the currently implemented opcodes for The Engine:
             self.comb += [
                 instruction_out.raw_bits().eq(unit.instruction_out)
             ]
-            self.sync.eng_clk += [
+            self.comb += [
+                unit.start.eq(exec & subdecode),
+                getattr(self, "done" + str(index)).eq(unit.q_valid),
                 unit.a.eq(ra_dat),
                 unit.b.eq(rb_dat),
                 unit.instruction_in.eq(instruction.raw_bits()),
-                unit.start.eq(exec & subdecode),
-                getattr(self, "done" + str(index)).eq(unit.q_valid),
                 getattr(self, "unit_q" + str(index)).eq(unit.q),
                 getattr(self, "unit_sel" + str(index)).eq(subdecode),
                 getattr(self, "unit_wd" + str(index)).eq(instruction_out.wd),
@@ -1271,6 +1368,8 @@ Here are the currently implemented opcodes for The Engine:
                    done.eq(1),  # TODO: for proper pipelining, handle case of two units done simultaneously!
                    wd_dat.eq(getattr(self, "unit_q" + str(i))),
                    wd_adr.eq(getattr(self, "unit_wd" + str(i))),
+                ).Elif(seq.ongoing("IDLE"),
+                    done.eq(0),
                 )
             ]
 

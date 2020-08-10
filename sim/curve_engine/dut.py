@@ -64,7 +64,8 @@ dutio = [
 additional clocks beyond the simulation defaults
 """
 local_clocks = {
-    "clk50": [50e6, 22.5],
+    "clk50": [50e6, 0],
+    "clk200": [200e6, 0],
     # add more clocks here, formatted as {"name" : [freq, phase]}
 }
 
@@ -76,7 +77,7 @@ class Dut(Sim):
         Sim.__init__(self, platform, custom_clocks=local_clocks, spiboot=spiboot, **kwargs) # SoC magic is in here
         SoCCore.mem_map["vectors"] = 0x30000000 # add test vector ROM area, cached OK
 
-        self.submodules.engine = ClockDomainsRenamer({"eng_clk":"clk50", "rf_clk":"sys"})(Engine(platform, self.mem_map["engine"]))
+        self.submodules.engine = ClockDomainsRenamer({"eng_clk":"clk50", "rf_clk":"clk200", "mul_clk":"sys"})(Engine(platform, self.mem_map["engine"]))
         self.add_csr("engine")
         self.add_interrupt("engine")
         self.bus.add_slave("engine", self.engine.bus, SoCRegion(origin=self.mem_map["engine"], size=0x2_0000, cached=False))
@@ -93,7 +94,10 @@ def generate_top():
     global boot_from_spi
 
     # build the test vectors for the curve engine
-    os.system("cd testbench/curve25519-dalek && cargo test field::test::make_vectors")
+    ret = os.system("cd testbench/curve25519-dalek && cargo test field::test::make_vectors")
+    if ret:
+        print("Problem generating test vectors, aborting.")
+        sys.exit(1)
 
     # we have to do two passes: once to make the SVD, without compiling the BIOS
     # second, to compile the BIOS, which is then built into the gateware.
