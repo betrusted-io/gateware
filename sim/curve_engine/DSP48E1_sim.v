@@ -25,7 +25,7 @@
 
 `celldefine
 
-module DSP48E1 #(
+module DSP48E1_sim #(
   `ifdef XIL_TIMING
   parameter LOC = "UNPLACED",  
   `endif
@@ -113,7 +113,7 @@ module DSP48E1 #(
 );
   
 // define constants
-   localparam MODULE_NAME = "DSP48E1";
+   localparam MODULE_NAME = "DSP48E1_sim";
 
    tri0  GSR = glbl.GSR;
 

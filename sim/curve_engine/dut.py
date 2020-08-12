@@ -77,7 +77,8 @@ class Dut(Sim):
         Sim.__init__(self, platform, custom_clocks=local_clocks, spiboot=spiboot, **kwargs) # SoC magic is in here
         SoCCore.mem_map["vectors"] = 0x30000000 # add test vector ROM area, cached OK
 
-        self.submodules.engine = ClockDomainsRenamer({"eng_clk":"clk50", "rf_clk":"clk200", "mul_clk":"sys"})(Engine(platform, self.mem_map["engine"]))
+        # sim=True parameter uses explicit copy of DSP48E1 primitive to aid with internal debug
+        self.submodules.engine = ClockDomainsRenamer({"eng_clk":"clk50", "rf_clk":"clk200", "mul_clk":"sys"})(Engine(platform, self.mem_map["engine"], sim=True))
         self.add_csr("engine")
         self.add_interrupt("engine")
         self.bus.add_slave("engine", self.engine.bus, SoCRegion(origin=self.mem_map["engine"], size=0x2_0000, cached=False))
@@ -133,7 +134,7 @@ before calling SimRunner
 """
 def run_sim(ci=False):
     # add third-party modules via extra_cmds, eg. "cd run && xvlog ../MX66UM1G45G/MX66UM1G45G.v"
-    extra_cmds = ['echo "extra commands!"', 'echo "more extra commands!"']
+    extra_cmds = ['cd run && xvlog ../DSP48E1_sim.v']
     SimRunner(ci, extra_cmds)
 
 
