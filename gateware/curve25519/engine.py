@@ -658,11 +658,33 @@ by the implementation of this code.
 
         self.diagrams = ModuleDoc(title="Dataflow Diagrams", body="""
         
-    .. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/mpy_pipe.png
-      :alt: data flow block diagram of the multiplier core
+.. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/mpy_pipe.png
+   :alt: data flow block diagram of the multiplier core
       
-      Above is the relevant elements of the DSP48E1 block as configured for the systolic dataflow for the "schoolbook"
-      multiply operation. Items shaded in gray are external to the DSP48E1 block.      
+  Above is the relevant elements of the DSP48E1 block as configured for the systolic dataflow for the "schoolbook"
+  multiply operation. Items shaded in gray are external to the DSP48E1 block.
+  
+.. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/psum.png
+   :alt: data flow block diagram of the partial sum step
+      
+  Above is the configuration of the DSP48E1 block for the partial sum steps. Partial sum takes two cycles to
+  sum together the three 17-bit segments of the partial sums.
+  
+.. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/carry_prop.png
+   :alt: data flow block diagram of the carry propagate
+
+  Above is the configuration of the DSP48E1 block for the carry propagate step. This step must be repeated 
+  14 times to handle the worst-case carry propagate path. During the carry propagate step, the pattern
+  detector is active, and on the final step we check it to see if the result overflows $2^{{255}}-19$.
+  
+.. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/normalize.png
+   :alt: data flow block diagram of the normalization step
+  
+  Above is the configuration of the DSP48E1 block for the normalization step. If the result overflows $2^{{255}}-19$,
+  we must add 19 to make it a member of the prime field once again. We can do this in a single cycle by
+  short-circuiting the carry propagate: we already know we will have to propagate a carry to handle the overflow
+  case (there are only 19 possible numbers that will overflow this, and all of them have 1's set up the entire
+  chain), so we pre-add the carry simultaneous with adding the number 19 to the least significant limb.
         """)
 
         start_pipe = Signal()
