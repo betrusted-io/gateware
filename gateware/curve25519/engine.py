@@ -428,14 +428,24 @@ At a high level, the steps to compute the multiplication are:
 1. Schoolbook multiplication 
 2. Collapse partial sums
 3. Propagate carries
-4. Catch the special case of results $\geq$ $2^{{255}}-19$
-5. Add 19 or 0 depending on the outcome of (4) + short-circuit carry propagate
+4. Catch the special case of results $\geq$ $2^{{255}}-19$, or the 256th bit set
+5. Add 19 or 0 depending on the outcome of (4)
+6. Propagate carries again, in case these overflow (rarely, but they do)
 
-In the case that step (5) adds 19, we know that the upper bits will always need
-to carry-propagate. So instead of taking 15 cycles to do a constant-time carry
-propagate through the whole array, we pre-add 1 to every partial sum in the chain
-while adding the 19, thus allowing us to complete the carry propagate in a single
-cycle instead of 15.
+The multiplier would run about 30% faster if step (6) were skipped. This step happens
+in a fairly small minority of cases, maybe a fraction of 1%, and the worst-case
+carry propagate is diminishingly rare. The test for
+whether or not to propagate carries is fairly straightforward. However, this creates
+a timing side-channel, therefore we prefer a slower but safer implementation, even if
+we are spending a bunch of cycles most of the time doing nothing.
+
+A constant-time optimization would be for the multiplier to simply produce a 256-bit
+result, and then use a subsequent TRD/SUB instruction pair. However, the non-pipelined
+version of this core takes 60ns per instrution, or 120ns total to compute this, whereas
+iterating another carry would take 140ns total (as the mul core runs 2x speed of the
+rest of the engine). This is basically a wash. However, if pipelining (and bypassing) 
+were implemented, this might be a viable optimization, but bypassing such a wide core
+would also have resource and speed implications of its own.
 
 The above steps are coordinated by the `mseq` state machine. Control lines for 
 the DSP48E blocks are grouped into two sets, one controls the global state of
@@ -561,14 +571,14 @@ Unfortunately, at this point, the carries can generate carries, so a second roun
 of this partial sum and carry is required.
 
 The result at this point is basically correct, except there is one case that
-is not handled well: where the result is between $2^{{255}}-19$ and $2^{{255}}-1$.
+is not handled well: where the result is between $2^{{255}}-19$ and $2^{{256}}-1$.
 In this case, the number will basically be somewhere in between 0x7ff....ffed and
-0x7ff....ffff. In this case, we need to add 19 to the result, so that the result
-is a member of the field $2^{{255}}-19$.
+0x7ff....ffff, or the 255th bit will be set. In this case, we need to add 19 to 
+the result, so that the result is a member of the field $2^{{255}}-19$.
 
 We do a simple pattern detect to detect the "1's" in bit positions 255-5, and a
-LUT to check the final 5 bits. If it falls within this special case, we add the
-number 19, otherwise, we add 0.
+LUT to check the final 5 bits, OR'd with a check of the 256th bit being 1. 
+If it falls within this special case, we add the number 19, otherwise, we add 0.
 
 After adding the number 19, we have to once again propagate carries. For simplicity,
 in this implementation we repeat the whole sum-and-propagate process once again. For
@@ -610,6 +620,18 @@ Once this is finished, we have the final result.
         self.comb += zeros.eq(0)
 
         step = Signal(max=15+1)  # controls the multiplication step
+        prop = Signal() # count the propagations
+
+        for i in range(15):
+            # create all the per-block DSP signals before we loop through and connect them
+            setattr(self, "dsp_a" + str(i), Signal(48, name="dsp_a" + str(i)))
+            setattr(self, "dsp_b" + str(i), Signal(17, name="dsp_b" + str(i)))
+            setattr(self, "dsp_c" + str(i), Signal(48, name="dsp_c" + str(i)))
+            setattr(self, "dsp_d" + str(i), Signal(17, name="dsp_d" + str(i)))
+            setattr(self, "dsp_match" + str(i), Signal(name="dsp_match"+str(i)))
+            setattr(self, "dsp_p" + str(i), Signal(48, name="dsp_p"+str(i)))
+            setattr(self, "dsp_p_ce" + str(i), Signal(48, name="dsp_p_ce"+str(i)))
+            setattr(self, "dsp_inmode" + str(i), Signal(5, name="dsp_inmode"+str(i)))
 
         self.timing = ModuleDoc(title="Detailed timing operation", body="""
 
@@ -621,39 +643,46 @@ by the implementation of this code.
   
   { "config": {skin : "default"},
   "signal" : [
-  { "name": "clk",         "wave": "p......|.........|......" },
-  { "name": "go",          "wave": "010...................10" },
-  { "name": "self.a",      "wave": "x2....................2.", "data": ["A0[255:0]","A1[255:0]"] },
-  { "name": "self.b",      "wave": "x2....................2.", "data": ["B0[255:0]","B2[255:0]"] },
-  { "name": "state",       "wave": "2.34......5555...|..8923", "data":["IDLE","SETA","MPY","DLY","PLSB","PMSB","PROP","NORM","DONE","IDLE","SETA"]},
-  { "name": "step",        "wave": "x..2===|==5...55|555xxxx", "data":["0","1", "2", "3","13","14","0","1","2","11","12","13"]},
-  { "name": "dsp.a",       "wave": "x2x2x.............8x..2x", "data": ["A0xx","A19","0", "A1xx"] },
-  { "name": "dsp.b",       "wave": "x2====|==x55xxxxxxx8xx2=", "data": ["19","B00","B01","B02","B03","B13","B14","1or19","1or19","19+C","19","B2_00"] },
-  { "name": "dsp.c",        "wave": "x...2===|=x5x5...|..x...", "data":["Q0","Q1","Q2","Q3","Q13","P0,0","C* >> 17    "]},
-  { "name": "dsp.d",        "wave": "x.........55x.xxxxxx....", "data":["*Q0,1","R0,2"]},
+  { "name": "clk",         "wave": "p......|.........|.......|....." },
+  { "name": "go",          "wave": "010..........................10" },
+  { "name": "self.a",      "wave": "x2...........................2.", "data": ["A0[255:0]","A1[255:0]"] },
+  { "name": "self.b",      "wave": "x2...........................2.", "data": ["B0[255:0]","B2[255:0]"] },
+  { "name": "state",       "wave": "2.34......5555...|..86...|..923", "data":["IDLE","SETA","MPY","DLY","PLSB","PMSB","PROP","NORM","PROP","DONE","IDLE","SETA"]},
+  { "name": "step",        "wave": "x..2===|==5...55|5556.666|66xxx", "data":["0","1", "2", "3","13","14","0","1","2","11","12","13","0","1","2","11","12","13"]},
+  { "name": "prop",        "wave": "x.........5.....|...6....|..xxx", "data":["0","1"]},
+  { "name": "dsp.a",       "wave": "x2x2x.....8x.................2x", "data": ["A0xx","A19","0", "A1xx"] },
+  { "name": "dsp.b",       "wave": "x2====|==x55xxxxxxx8xx.......2=", "data": ["19","B00","B01","B02","B03","B13","B14","1or19","1or19","19","19","B2_00"] },
+  { "name": "dsp.c",        "wave": "x...2===|=x5x5...|..x6...|..xxx", "data":["Q0","Q1","Q2","Q3","Q13","P0,0","C* >> 17    ","C* >> 17    "]},
+  { "name": "dsp.d",        "wave": "x.........55x.xxxxxx...xxxxxxx.", "data":["*Q0,1","R0,2"]},
   {},
-  { "name": "A1_CE",       "wave": "1.010.............10...." },
-  { "name": "A1",          "wave": "x.2.2..............8.x..", "data": ["A0xx","A0xx*19","0"] },
-  { "name": "A2_CE",       "wave": "0..10..............10..." },
-  { "name": "A2",          "wave": "x...2...............8x..", "data":["A0xx","0"] },
-  { "name": "B2_CE",       "wave": "01.......01.0......10..." },
-  { "name": "B2",          "wave": "x.22===|==x55xxxx.xx8x..", "data": ["19","B00","B01","B02","B03","B13","B14","1or19","1or19","19"] },
-  { "name": "D_CE",        "wave": "0.........1.0..........." },
-  { "name": "C",           "wave": "x...2===|==555...|..8x..", "data": ["Q0","Q1","Q2","Q3","Q13","Q14","P0,0","*P","C* >> 17    ","*P"] },
-  { "name": "D",           "wave": "x..........55xx.........", "data": ["Q0,1","R0,2","QS14,1","RS14,2","QS14,1","RS14,2"] },
-  { "name": "inmode",      "wave": "x.2.2.....x5.x.xx.xx8x..", "data":["A1B2","AnB2","DB2","0B2"]},
-  { "name": "opmode",      "wave": "x.2.=.....2555...|..8x..", "data":["M","C+M","C+0","C+M","P+M","C+P","AB/0+P"]},
+  { "name": "A1_CE",       "wave": "1.010.....10..................." },
+  { "name": "A1",          "wave": "x.2.2......8.........x.........", "data": ["A0xx","A0xx*19","0"] },
+  { "name": "A2_CE",       "wave": "0..10......10.................." },
+  { "name": "A2",          "wave": "x...2.......8........x.........", "data":["A0xx","0"] },
+  { "name": "B2_CE",       "wave": "01.......01.0......10.........." },
+  { "name": "B2",          "wave": "x.22===|==x55xxxx.xx8x.........", "data": ["19","B00","B01","B02","B03","B13","B14","1or19","1or19","19"] },
+  { "name": "D_CE",        "wave": "0.........1.0.................." },
+  { "name": "C",           "wave": "x...2===|==555...|..86...|..x..", "data": ["Q0","Q1","Q2","Q3","Q13","Q14","P0,0","*P","C* >> 17    ","C&","C* >> 17    "] },
+  { "name": "D",           "wave": "x..........55xx................", "data": ["Q0,1","R0,2","QS14,1","RS14,2","QS14,1","RS14,2"] },
+  { "name": "inmode",      "wave": "x.2.2.....x5.x.xx.xx8x.........", "data":["A1B2","AnB2","DB2","0B2"]},
+  { "name": "opmode",      "wave": "x.2.=.....2555...|..86...|..xxx", "data":["M","C+M","C+0","C+M","P+M","C+P","AB/0+C","C+P"]},
   {},
-  { "name": "P_CE",        "wave": "0.1.....|....5555|550..1", "data": ["P1", "P2", "P3","P4","P13","P14"] },
-  { "name": "P",           "wave": "x..2====|===55555|5557..", "data": ["A19","P0","P1","P2","P3","P13","P14","P0","PLSB","PMSB","C1","C2","C3","C12", "C13","C14","final"] },
-  { "name": "overflow",    "wave": "x...................2x..", "data":["Y/N"]},
-  { "name": "done",        "wave": "0....................10." },
+  { "name": "P_CE",        "wave": "0.1.....|....5555|5516666|660.1", "data": ["P1", "P2", "P3","P4","P13","P14","P1", "P2", "P3","P4","P13","P14"] },
+  { "name": "P",           "wave": "x..2====|===55555|5552666|666x.", "data": ["A19","P0","P1","P2","P3","P13","P14","P0","PLSB","PMSB","C1","C2","C3","C12", "C13","C14","S+","C1","C2","C3","C12", "C13","C14","final"] },
+  { "name": "overflow",    "wave": "x...................2x.........", "data":["Y/N"]},
+  { "name": "done",        "wave": "0...........................10." },
   ]}
   
-  Note that the final product sum on the first DLY cycle is just a shift to get the
+Notes:
+   
+1. the final product sum on the first DLY cycle is just a shift to get the
   product results into the right unit. Thus, for the load of `dsp.d` `*Q0,1`, it needs
   to pick the result off of the neighboring DSP unit, because it needs to acquire the value
   before the final shift.
+2. The `S+` on the P line is the non-normalized sum. This is basically the final result, but
+   sometimes with the 19 added to the least significant limb, in the case that the result is greater than
+   or equal to $2^{{255}}-19$. This addition must be propagated through the whole result.
+  
           """)
 
         self.diagrams = ModuleDoc(title="Dataflow Diagrams", body="""
@@ -692,6 +721,7 @@ by the implementation of this code.
         self.submodules.mseq = mseq = ClockDomainsRenamer("mul_clk")(FSM(reset_state="IDLE"))
         mseq.act("IDLE",
             NextValue(step, 0),
+            NextValue(prop, 0),
             If(start_pipe,
                 NextState("SETUP_A")
             )
@@ -717,13 +747,21 @@ by the implementation of this code.
             NextState("CARRYPROP")
         )
         mseq.act("CARRYPROP", # PROP
-            If(step == 13,
-                NextState("NORMALIZE")
-            ),
-            NextValue(step, step + 1),
+            If( step == 13,
+               If( prop == 0,
+                   NextState("NORMALIZE"),
+                   NextValue(step, 0),
+               ).Else(
+                   NextState("DONE"),  # if modifying to the "DONE" state, change q-latch statement at the end
+               )
+            ).Else(
+                NextValue(step, step + 1),
+            )
         )
         mseq.act("NORMALIZE", # NORM
-            NextState("DONE")
+            NextState("CARRYPROP"),
+            NextValue(prop, 1),
+            NextValue(step, 0),
         )
         ### note that the post-amble "manually" aligns the mul_clk to eng_clk phases
         ### this can have one of two outcomes if the previous number of states is even or odd
@@ -749,6 +787,7 @@ by the implementation of this code.
         OP_P_PLUS_PCIN17 = 0b101_10_00  # X <- P; Y <- 0; Z <- PCIN >> 17; P <- PCIN>>17 + P + 0
         OP_C_PLUS_P      = 0b010_11_00  # X <- 0; Y <- C; Z <- P; P <- 0 + C + P
         OP_AB_PLUS_P     = 0b010_00_11  # X <- A:B; Y <- 0; Z <- P; P <- A:B + 0 + P + 0
+        OP_AB_PLUS_C     = 0b011_00_11  # X <- A:B; Y <- 0; Z <- C; P <- A:B + 0 + C + 0
         OP_0_PLUS_P      = 0b010_00_00  # X <- 0; Y <- 0; Z <- P; P <- 0 + 0 + P + 0
         OP_C_PLUS_0      = 0b011_00_00  # X <- 0; Y <- 0; Z <- C; P <- C + 0 + 0 + 0
         INMODE_A1 = 0b0001
@@ -812,10 +851,10 @@ by the implementation of this code.
                 )
             ).Elif(mseq.ongoing("NORMALIZE"),
                 dsp_p_ce.eq(1),
-                If(overflow_25519,
-                    dsp_opmode.eq(OP_AB_PLUS_P),
+                If(overflow_25519 | (self.dsp_p14[17] == 1),
+                    dsp_opmode.eq(OP_AB_PLUS_C),
                 ).Else(
-                    dsp_opmode.eq(OP_0_PLUS_P),
+                    dsp_opmode.eq(OP_C_PLUS_0),
                 )
             )
         ]
@@ -840,16 +879,6 @@ by the implementation of this code.
             ).Elif(step == 13, b_step.eq(b_17[14])
             )
         ]
-        for i in range(15):
-            # create all the per-block DSP signals before we loop through and connect them
-            setattr(self, "dsp_a" + str(i), Signal(48, name="dsp_a" + str(i)))
-            setattr(self, "dsp_b" + str(i), Signal(17, name="dsp_b" + str(i)))
-            setattr(self, "dsp_c" + str(i), Signal(48, name="dsp_c" + str(i)))
-            setattr(self, "dsp_d" + str(i), Signal(17, name="dsp_d" + str(i)))
-            setattr(self, "dsp_match" + str(i), Signal(name="dsp_match"+str(i)))
-            setattr(self, "dsp_p" + str(i), Signal(48, name="dsp_p"+str(i)))
-            setattr(self, "dsp_p_ce" + str(i), Signal(48, name="dsp_p_ce"+str(i)))
-            setattr(self, "dsp_inmode" + str(i), Signal(5, name="dsp_inmode"+str(i)))
 
         for i in range(15):
             self.comb += [
@@ -922,6 +951,7 @@ by the implementation of this code.
                     getattr(self, "dsp_c0").eq(zeros), # dsp_c is actually don't care due to the opmode
                     getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_D, INMODE_B2)),
                 ).Elif(mseq.ongoing("NORMALIZE"),
+                    getattr(self, "dsp_c" + str(i)).eq(getattr(self, "dsp_p" + str(i)) & 0x1_ffff),
                     getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_0, INMODE_B2)),
                 )
             ]
@@ -942,7 +972,7 @@ by the implementation of this code.
                         getattr(self, "dsp_p_ce" + str(i)).eq(step == (i-1)),
                     ),
                     If(mseq.ongoing("CARRYPROP") & (step == 13),
-                        getattr(self, "dsp_b" + str(i)).eq(1),  # in the case that we roll over, we're always have to propagate a carry because the psums were all 1's--do it all at once
+                        getattr(self, "dsp_b" + str(i)).eq(0),
                     )
                 ]
             if sim:
@@ -1026,7 +1056,7 @@ by the implementation of this code.
                 )
             ]
             self.sync.mul_clk += [ # this syncs into the eng_clk domain
-                If(mseq.ongoing("DONE"),
+                If(mseq.ongoing("DONE"), ## mod this to sync with the phase that the state machine ends on
                    self.q[i * 17:i * 17 + 17].eq(getattr(self, "dsp_p" + str(i))[:17]),
                 ).Else(
                     self.q[i * 17:i * 17 + 17].eq(self.q[i * 17:i * 17 + 17]),
