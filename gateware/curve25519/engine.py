@@ -621,33 +621,33 @@ by the implementation of this code.
   
   { "config": {skin : "default"},
   "signal" : [
-  { "name": "clk",         "wave": "p........................." },
-  { "name": "go",          "wave": "010.....................10" },
-  { "name": "self.a",      "wave": "x2......................2.", "data": ["A0[255:0]","A1[255:0]"] },
-  { "name": "self.b",      "wave": "x2......................2.", "data": ["B0[255:0]","B2[255:0]"] },
-  { "name": "state",       "wave": "2.34......5555666687777923", "data":["IDLE","SETA","MPY","DLY","PLSB","PMSB","PROP","DLY","PLSB","PMSB","PROP","NORM","DLY","PLSB","PMSB","PROP","DONE","IDLE","SETA"]},
-  { "name": "step",        "wave": "x..2===|==5...6....7...xxx", "data":["0","1", "2", "3","13","14","0","1","2"]},
-  { "name": "dsp.a",       "wave": "x2x2x...........2x......2x", "data": ["A0xx","A19","0", "A1xx","0","13"] },
-  { "name": "dsp.b",       "wave": "x2====|==x55xx66x877x.xx2=", "data": ["19","B00","B01","B02","B03","B13","B14","1or19","1or19","1or19","1or19","13","1or19","1or19","19","B2_00"] },
-  { "name": "dsp.c",        "wave": "x...2===|=x5x5x6x6x7x7x...", "data":["Q0","Q1","Q2","Q3","Q13","P0,0","QS0b>", "PS0","QS1b>","PS1","QS2b>"]},
-  { "name": "dsp.d",        "wave": "x.........55x.66x..77x....", "data":["*Q0,1","R0,2","QS14,1","RS14,2","QS14,1","RS14,2"]},
+  { "name": "clk",         "wave": "p......|.........|......" },
+  { "name": "go",          "wave": "010...................10" },
+  { "name": "self.a",      "wave": "x2....................2.", "data": ["A0[255:0]","A1[255:0]"] },
+  { "name": "self.b",      "wave": "x2....................2.", "data": ["B0[255:0]","B2[255:0]"] },
+  { "name": "state",       "wave": "2.34......5555...|..8923", "data":["IDLE","SETA","MPY","DLY","PLSB","PMSB","PROP","NORM","DONE","IDLE","SETA"]},
+  { "name": "step",        "wave": "x..2===|==5...555|555xxx", "data":["0","1", "2", "3","13","14","0","1","2","3","11","12","13"]},
+  { "name": "dsp.a",       "wave": "x2x2x.............8x..2x", "data": ["A0xx","A19","0", "A1xx","0","13"] },
+  { "name": "dsp.b",       "wave": "x2====|==x55xxxxxxx8xx2=", "data": ["19","B00","B01","B02","B03","B13","B14","1or19","1or19","13","19","B2_00"] },
+  { "name": "dsp.c",        "wave": "x...2===|=x5x5...|..x...", "data":["Q0","Q1","Q2","Q3","Q13","P0,0","C* >> 17    "]},
+  { "name": "dsp.d",        "wave": "x.........55x.xxxxxx....", "data":["*Q0,1","R0,2"]},
   {},
-  { "name": "A1_CE",       "wave": "1.010...........10........" },
-  { "name": "A1",          "wave": "x.2.2............2.....x..", "data": ["A0xx","A0xx*19","0"] },
-  { "name": "A2_CE",       "wave": "0..10............10......." },
-  { "name": "A2",          "wave": "x...2.............2....x..", "data":["A0xx","0"] },
-  { "name": "B2_CE",       "wave": "01.......01.0.1.01..0....." },
-  { "name": "B2",          "wave": "x.22===|==x55xx66x877xx...", "data": ["19","B00","B01","B02","B03","B13","B14","1or19","1or19","1or19","1or19","13","1or19","1or19"] },
-  { "name": "D_CE",        "wave": "0.........1.0.1.0..1.0...." },
-  { "name": "C",           "wave": "x...2===|==555x6668777x...", "data": ["Q0","Q1","Q2","Q3","Q13","Q14","P0,0","*P","QS0b>","PS0,0","*P","QS1b>","*P","PS1,0","*P","QS2b>"] },
-  { "name": "D",           "wave": "x..........55xx66x.77xx...", "data": ["Q0,1","R0,2","QS14,1","RS14,2","QS14,1","RS14,2"] },
-  { "name": "inmode",      "wave": "x.22......x5.x.6.x87.x....", "data":["A1B2","AnB2","DB2","DB2","0B2","DB2"]},
-  { "name": "opmode",      "wave": "x.2.=.....2555x6668x777x..", "data":["M","C+M","C+0","C+M","P+M","C+P","C+M","P+M","C+P","AB/0+P","M","P+M","C+P"]},
+  { "name": "A1_CE",       "wave": "1.010.............10...." },
+  { "name": "A1",          "wave": "x.2.2..............8.x..", "data": ["A0xx","A0xx*19","0"] },
+  { "name": "A2_CE",       "wave": "0..10..............10..." },
+  { "name": "A2",          "wave": "x...2...............8x..", "data":["A0xx","0"] },
+  { "name": "B2_CE",       "wave": "01.......01.0......10..." },
+  { "name": "B2",          "wave": "x.22===|==x55xxxx.xx8x..", "data": ["19","B00","B01","B02","B03","B13","B14","1or19","1or19","13"] },
+  { "name": "D_CE",        "wave": "0.........1.0..........." },
+  { "name": "C",           "wave": "x...2===|==555...|..8x..", "data": ["Q0","Q1","Q2","Q3","Q13","Q14","P0,0","*P","C* >> 17    ","*P"] },
+  { "name": "D",           "wave": "x..........55xx.........", "data": ["Q0,1","R0,2","QS14,1","RS14,2","QS14,1","RS14,2"] },
+  { "name": "inmode",      "wave": "x.22......x5.x.xx.xx8x..", "data":["A1B2","AnB2","DB2","0B2"]},
+  { "name": "opmode",      "wave": "x.2.=.....2555...|..8x..", "data":["M","C+M","C+0","C+M","P+M","C+P","AB/0+P"]},
   {},
-  { "name": "P_CE",        "wave": "0.1.....|.....01...01..0.." },
-  { "name": "P",           "wave": "x..2====|===555.6666.777..", "data": ["A19","P0","P1","P2","P3","P13","P14","P0","PS0a","PS0b","PS0","PS1a","PS1b","PS1c","PS1","PS2a","PS2b","final"] },
-  { "name": "overflow",    "wave": "x.................2x......", "data":[""]},
-  { "name": "done",        "wave": "0......................10." },
+  { "name": "P_CE",        "wave": "0.1.....|............0.1" },
+  { "name": "P",           "wave": "x..2====|===55555|5557..", "data": ["A19","P0","P1","P2","P3","P13","P14","P0","PLSB","PMSB","C1","C2","C3","C12", "C13","C14","final"] },
+  { "name": "overflow",    "wave": "x...................2x..", "data":[""]},
+  { "name": "done",        "wave": "0....................10." },
   ]}
   
   Note that the final product sum on the first DLY cycle is just a shift to get the
@@ -1104,16 +1104,12 @@ Here are the currently implemented opcodes for The Engine:
         # we architecturally guarantee extra setup time from the register file to the point of consumption:
         # read data is stable by the 3rd phase of the RF fetch cycle, and so it is in fact ready even before
         # the other signals that trigger the execute mode, hence 4+1 cycles total setup time
-        platform.add_platform_command("set_multicycle_path 5 -setup -start -from [get_clocks clk200] -to [get_clocks clk50] -through [get_nets *rf_rb_dat*]")
-        platform.add_platform_command("set_multicycle_path 4 -hold -from [get_clocks clk200] -to [get_clocks clk50] -through [get_nets *rf_rb_dat*]")
-        platform.add_platform_command("set_multicycle_path 5 -setup -start -from [get_clocks clk200] -to [get_clocks clk50] -through [get_nets *rf_ra_dat*]")
-        platform.add_platform_command("set_multicycle_path 4 -hold -from [get_clocks clk200] -to [get_clocks clk50] -through [get_nets *rf_ra_dat*]")
+        platform.add_platform_command("set_multicycle_path 5 -setup -start -from [get_clocks clk200] -to [get_clocks clk50] -through [get_cells *rf_r*_dat_reg*]")
+        platform.add_platform_command("set_multicycle_path 4 -hold -from [get_clocks clk200] -to [get_clocks clk50] -through [get_cells *rf_r*_dat_reg*]")
         ### clk200->clk100 multi-cycle paths:
         # same as above, but for the multiplier path.
-        platform.add_platform_command("set_multicycle_path 3 -setup -start -from [get_clocks clk200] -to [get_clocks sys_clk] -through [get_nets *rf_rb_dat*]")
-        platform.add_platform_command("set_multicycle_path 2 -hold -from [get_clocks clk200] -to [get_clocks sys_clk] -through [get_nets *rf_rb_dat*]")
-        platform.add_platform_command("set_multicycle_path 3 -setup -start -from [get_clocks clk200] -to [get_clocks sys_clk] -through [get_nets *rf_ra_dat*]")
-        platform.add_platform_command("set_multicycle_path 2 -hold -from [get_clocks clk200] -to [get_clocks sys_clk] -through [get_nets *rf_ra_dat*]")
+        platform.add_platform_command("set_multicycle_path 3 -setup -start -from [get_clocks clk200] -to [get_clocks sys_clk] -through [get_cells *rf_r*_dat_reg*]")
+        platform.add_platform_command("set_multicycle_path 2 -hold -from [get_clocks clk200] -to [get_clocks sys_clk] -through [get_cells *rf_r*_dat_reg*]")
         ### sys->clk200 multi-cycle paths:
         # microcode fetch is stable 10ns before use by the register file, by design
         platform.add_platform_command("set_multicycle_path 2 -setup -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_nets engine_ra_adr*]")
