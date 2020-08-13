@@ -1,5 +1,5 @@
 from migen import *
-from migen.genlib.cdc import BlindTransfer
+from migen.genlib.cdc import MultiReg
 
 from litex.soc.interconnect.csr import *
 from litex.soc.integration.doc import AutoDoc, ModuleDoc
@@ -626,9 +626,9 @@ by the implementation of this code.
   { "name": "self.a",      "wave": "x2....................2.", "data": ["A0[255:0]","A1[255:0]"] },
   { "name": "self.b",      "wave": "x2....................2.", "data": ["B0[255:0]","B2[255:0]"] },
   { "name": "state",       "wave": "2.34......5555...|..8923", "data":["IDLE","SETA","MPY","DLY","PLSB","PMSB","PROP","NORM","DONE","IDLE","SETA"]},
-  { "name": "step",        "wave": "x..2===|==5...555|555xxx", "data":["0","1", "2", "3","13","14","0","1","2","3","11","12","13"]},
-  { "name": "dsp.a",       "wave": "x2x2x.............8x..2x", "data": ["A0xx","A19","0", "A1xx","0","13"] },
-  { "name": "dsp.b",       "wave": "x2====|==x55xxxxxxx8xx2=", "data": ["19","B00","B01","B02","B03","B13","B14","1or19","1or19","13","19","B2_00"] },
+  { "name": "step",        "wave": "x..2===|==5...55|555xxxx", "data":["0","1", "2", "3","13","14","0","1","2","11","12","13"]},
+  { "name": "dsp.a",       "wave": "x2x2x.............8x..2x", "data": ["A0xx","A19","0", "A1xx"] },
+  { "name": "dsp.b",       "wave": "x2====|==x55xxxxxxx8xx2=", "data": ["19","B00","B01","B02","B03","B13","B14","1or19","1or19","19+C","19","B2_00"] },
   { "name": "dsp.c",        "wave": "x...2===|=x5x5...|..x...", "data":["Q0","Q1","Q2","Q3","Q13","P0,0","C* >> 17    "]},
   { "name": "dsp.d",        "wave": "x.........55x.xxxxxx....", "data":["*Q0,1","R0,2"]},
   {},
@@ -637,16 +637,16 @@ by the implementation of this code.
   { "name": "A2_CE",       "wave": "0..10..............10..." },
   { "name": "A2",          "wave": "x...2...............8x..", "data":["A0xx","0"] },
   { "name": "B2_CE",       "wave": "01.......01.0......10..." },
-  { "name": "B2",          "wave": "x.22===|==x55xxxx.xx8x..", "data": ["19","B00","B01","B02","B03","B13","B14","1or19","1or19","13"] },
+  { "name": "B2",          "wave": "x.22===|==x55xxxx.xx8x..", "data": ["19","B00","B01","B02","B03","B13","B14","1or19","1or19","19"] },
   { "name": "D_CE",        "wave": "0.........1.0..........." },
   { "name": "C",           "wave": "x...2===|==555...|..8x..", "data": ["Q0","Q1","Q2","Q3","Q13","Q14","P0,0","*P","C* >> 17    ","*P"] },
   { "name": "D",           "wave": "x..........55xx.........", "data": ["Q0,1","R0,2","QS14,1","RS14,2","QS14,1","RS14,2"] },
-  { "name": "inmode",      "wave": "x.22......x5.x.xx.xx8x..", "data":["A1B2","AnB2","DB2","0B2"]},
+  { "name": "inmode",      "wave": "x.2.2.....x5.x.xx.xx8x..", "data":["A1B2","AnB2","DB2","0B2"]},
   { "name": "opmode",      "wave": "x.2.=.....2555...|..8x..", "data":["M","C+M","C+0","C+M","P+M","C+P","AB/0+P"]},
   {},
-  { "name": "P_CE",        "wave": "0.1.....|............0.1" },
+  { "name": "P_CE",        "wave": "0.1.....|....5555|550..1", "data": ["P1", "P2", "P3","P4","P13","P14"] },
   { "name": "P",           "wave": "x..2====|===55555|5557..", "data": ["A19","P0","P1","P2","P3","P13","P14","P0","PLSB","PMSB","C1","C2","C3","C12", "C13","C14","final"] },
-  { "name": "overflow",    "wave": "x...................2x..", "data":[""]},
+  { "name": "overflow",    "wave": "x...................2x..", "data":["Y/N"]},
   { "name": "done",        "wave": "0....................10." },
   ]}
   
@@ -717,22 +717,25 @@ by the implementation of this code.
             NextState("CARRYPROP")
         )
         mseq.act("CARRYPROP", # PROP
-            If(step == 1,
+            If(step == 13,
                 NextState("NORMALIZE")
-            ).Elif(step == 2,
-                NextState("DONE"),
-            ).Else(
-                NextState("P_DELAY")
             ),
             NextValue(step, step + 1),
         )
         mseq.act("NORMALIZE", # NORM
-            NextState("P_DELAY")
+            NextState("DONE")
         )
-        mseq.act("DONE", # DONE
+        ### note that the post-amble "manually" aligns the mul_clk to eng_clk phases
+        ### this can have one of two outcomes if the previous number of states is even or odd
+        ### in this case, we end up phase mis-aligned, so we have to burn a dummy cycle to sync clocks
+        ### see q_valid logic at end of this module
+        mseq.act("DONE", # DONE -- we are actually finished on an odd phase of the eng_clk, can't assert RF here
             NextState("DONE2"),
         )
-        mseq.act("DONE2", # second done state, because we are latching into a half-rate clock domain
+        mseq.act("DONE2",  # assert valid to the RF here
+            NextState("DONE3"),
+        )
+        mseq.act("DONE3", # second done state, because we are latching into a half-rate clock domain, so valid is good for one full eng_clk
             NextState("IDLE"),
             # Note: we could, in theory, pipeline the next multiply by detecting if go goes high here,
             # and bypassing IDLE and going straight to SETA, but...
@@ -787,35 +790,28 @@ by the implementation of this code.
                     dsp_b2_ce.eq(0),
                 )
             ).Elif(mseq.ongoing("P_DELAY"),
-                If(step == 0,
-                    dsp_opmode.eq(OP_C_PLUS_0),
-                    dsp_p_ce.eq(1),
-                ).Else(
-                    dsp_p_ce.eq(0),
-                ),
+                dsp_opmode.eq(OP_C_PLUS_0),
+                dsp_p_ce.eq(1),
                 dsp_b2_ce.eq(1),
                 dsp_d_ce.eq(1),
+                dsp_a1_ce.eq(1),
             ).Elif(mseq.ongoing("PSUM_LSB"),
                 dsp_p_ce.eq(1),
                 dsp_b2_ce.eq(1),
                 dsp_d_ce.eq(1),
                 dsp_opmode.eq(OP_M_PLUS_C),
+                dsp_a2_ce.eq(1),
             ).Elif(mseq.ongoing("PSUM_MSB"),
                 dsp_p_ce.eq(1),
                 dsp_opmode.eq(OP_M_PLUS_P),
-                If(step==1,
-                    dsp_a1_ce.eq(1),
-                )
             ).Elif(mseq.ongoing("CARRYPROP"),
-                dsp_p_ce.eq(1),
+                dsp_p_ce.eq(0), # move to individual unit P_CEs for this stage
                 dsp_opmode.eq(OP_C_PLUS_P),
-                If(step==1,
+                If(step==13,
                     dsp_b2_ce.eq(1),
-                    dsp_a2_ce.eq(1),
                 )
             ).Elif(mseq.ongoing("NORMALIZE"),
                 dsp_p_ce.eq(1),
-                dsp_b2_ce.eq(1),
                 If(overflow_25519,
                     dsp_opmode.eq(OP_AB_PLUS_P),
                 ).Else(
@@ -846,18 +842,19 @@ by the implementation of this code.
         ]
         for i in range(15):
             # create all the per-block DSP signals before we loop through and connect them
-            setattr(self, "dsp_a" + str(i), Signal(17, name="dsp_a" + str(i)))
+            setattr(self, "dsp_a" + str(i), Signal(48, name="dsp_a" + str(i)))
             setattr(self, "dsp_b" + str(i), Signal(17, name="dsp_b" + str(i)))
             setattr(self, "dsp_c" + str(i), Signal(48, name="dsp_c" + str(i)))
             setattr(self, "dsp_d" + str(i), Signal(17, name="dsp_d" + str(i)))
             setattr(self, "dsp_match" + str(i), Signal(name="dsp_match"+str(i)))
             setattr(self, "dsp_p" + str(i), Signal(48, name="dsp_p"+str(i)))
+            setattr(self, "dsp_p_ce" + str(i), Signal(48, name="dsp_p_ce"+str(i)))
             setattr(self, "dsp_inmode" + str(i), Signal(5, name="dsp_inmode"+str(i)))
 
         for i in range(15):
             self.comb += [
                 If(mseq.before_entering("SETUP_A"),
-                    getattr( self, "dsp_a" + str(i) ).eq(a_17[i]),
+                    getattr( self, "dsp_a" + str(i) ).eq(Cat(a_17[i], zeros[:(30-17)])),
                     getattr( self, "dsp_b" + str(i) ).eq(19),
                 ).Elif(mseq.ongoing("SETUP_A"),
                     getattr( self, "dsp_inmode" + str(i) ).eq(Cat(INMODE_A1, INMODE_B2)),
@@ -865,39 +862,34 @@ by the implementation of this code.
                 ).Elif(mseq.ongoing("MULTIPLY"),
                     getattr(self, "dsp_c" + str(i)).eq(getattr(self, "dsp_p" + str( (i+1) % 15 ))),
                     If(step == 0,
-                       getattr(self, "dsp_a" + str(i)).eq(getattr(self, "dsp_p" + str(i))),
+                        getattr(self, "dsp_a" + str(i)).eq(getattr(self, "dsp_p" + str(i))),
                     ),
                     If(step < 14,
                         getattr(self, "dsp_b" + str(i)).eq(Cat(b_step, zeros[:1])),  # b_17[step+1]; note that b input is 18 bits wide, so pad with one 0 to prevent a dangling X on the high bit
                     ),
-                    If(i >= step,
-                        getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_A1, INMODE_B2)),
+                    If(step == 0,
+                        getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_A1, INMODE_B2)),  # A1 has Axx on the first step only
+                    ).Elif(i > (14-step), # lay out the diagonal wrap-around of partial sums
+                        getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_A1, INMODE_B2)),  # A1 has Axx*19
                     ).Else(
-                        getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_A2, INMODE_B2)),
+                        getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_A2, INMODE_B2)),  # A2 has Axx for rest of steps
                     )
                 )
             ]
 
-            if i > 0:
+            if i > 0: # sum is different from bottom limb, as the top MSB wraps around
                 self.comb += [
                     If(mseq.ongoing("P_DELAY"),
                         getattr(self, "dsp_c" + str(i)).eq(getattr(self, "dsp_p" + str((i + 1) % 15))),
-                        If(step == 0,
-                            getattr(self, "dsp_d" + str(i)).eq((getattr(self, "dsp_p" + str(i)) >> 17) & 0x1_ffff), # (i-1)+1, the +1 is because the result has not been shifted yet
-                        ).Else(
-                            getattr(self, "dsp_d" + str(i)).eq((getattr(self, "dsp_p" + str(i - 1)) >> 17) & 0x1_ffff),
-                        ),
+                        getattr(self, "dsp_d" + str(i)).eq((getattr(self, "dsp_p" + str(i)) >> 17) & 0x1_ffff), # (i-1)+1, the +1 is because the result has not been shifted yet
                         getattr(self, "dsp_b" + str(i)).eq(1),
                     )]
             else:
                 self.comb += [
                     If(mseq.ongoing("P_DELAY"),
+                        getattr(self, "dsp_a" + str(i)).eq(zeros),
                         getattr(self, "dsp_c" + str(i)).eq(getattr(self, "dsp_p" + str((i + 1) % 15))),
-                        If(step == 0,
-                            getattr(self, "dsp_d" + str(i)).eq((getattr(self, "dsp_p" + str(0)) >> 17) & 0x1_ffff),
-                        ).Else(
-                            getattr(self, "dsp_d" + str(i)).eq((getattr(self, "dsp_p" + str(14)) >> 17) & 0x1_ffff),
-                        ),
+                        getattr(self, "dsp_d" + str(i)).eq((getattr(self, "dsp_p" + str(0)) >> 17) & 0x1_ffff),
                         getattr(self, "dsp_b" + str(i)).eq(19),
                     )]
 
@@ -906,8 +898,7 @@ by the implementation of this code.
                         getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_D, INMODE_B2)),
                         getattr(self, "dsp_c" + str(i)).eq(getattr(self, "dsp_p" + str(i)) & 0x1_ffff),
                     )]
-
-            if i > 1:
+            if i > 1:  # sum-ordering is different for the bottom two limbs, as the top wraps around into two limbs
                 self.comb += [
                     If(mseq.ongoing("PSUM_LSB"),
                         getattr(self, "dsp_d" + str(i)).eq((getattr(self, "dsp_p" + str(i - 2)) >> 34) & 0x1_ffff),
@@ -925,22 +916,22 @@ by the implementation of this code.
                         getattr(self, "dsp_d" + str(i)).eq((getattr(self, "dsp_p" + str(13)) >> 34) & 0x1_ffff),
                         getattr(self, "dsp_b" + str(i)).eq(19),
                     )]
+
             self.comb += [
                 If(mseq.ongoing("PSUM_MSB"),
+                    getattr(self, "dsp_c0").eq(zeros), # dsp_c is actually don't care due to the opmode
                     getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_D, INMODE_B2)),
-                    If(step==1, # load 0 into A register to compliment the "13" loaded into the B register to handle special-case normalization
-                        getattr(self, "dsp_a" + str(i)).eq(zeros),
-                    )
                 ).Elif(mseq.ongoing("NORMALIZE"),
                     getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_0, INMODE_B2)),
                 )
             ]
+
             if i == 0:
                 self.comb += [
                     If(mseq.ongoing("CARRYPROP"),
                         getattr(self, "dsp_c" + str(i)).eq( zeros ),
                     ),
-                    If(mseq.ongoing("CARRYPROP") & (step == 1),
+                    If(mseq.ongoing("CARRYPROP") & (step == 13),
                         getattr(self, "dsp_b" + str(i)).eq( 19 ), # special-case constant to handle normalization in overflow of prime field; a is loded with 0 on previous cycle
                     ),
                 ]
@@ -948,9 +939,10 @@ by the implementation of this code.
                 self.comb += [
                     If(mseq.ongoing("CARRYPROP"),
                         getattr(self, "dsp_c" + str(i)).eq( Cat(getattr(self, "dsp_p" + str(i - 1)) >> 17, zeros[:17]) ),
+                        getattr(self, "dsp_p_ce" + str(i)).eq(step == (i-1)),
                     ),
-                    If(mseq.ongoing("CARRYPROP") & (step == 1),
-                        getattr(self, "dsp_b" + str(i)).eq(0),
+                    If(mseq.ongoing("CARRYPROP") & (step == 13),
+                        getattr(self, "dsp_b" + str(i)).eq(1),  # in the case that we roll over, we're always have to propagate a carry because the psums were all 1's--do it all at once
                     )
                 ]
             if sim:
@@ -992,7 +984,7 @@ by the implementation of this code.
                     p_USE_PATTERN_DETECT="PATDET",
 
                     # signals
-                    i_A=Cat(getattr(self, "dsp_a" + str(i)), zeros[:(30-17)]),
+                    i_A=getattr(self, "dsp_a" + str(i)),
                     i_ALUMODE=dsp_alumode,
                     i_B=Cat(getattr(self, "dsp_b" + str(i)), zeros[:(18-17)]),
                     i_C=getattr(self, "dsp_c" + str(i)),
@@ -1008,7 +1000,7 @@ by the implementation of this code.
                     i_CECARRYIN=0,
                     i_CECTRL=0, # no pipe on opmode
                     i_CED=dsp_d_ce,
-                    i_CEP=dsp_p_ce,
+                    i_CEP=dsp_p_ce | getattr(self, "dsp_p_ce" + str(i)),
                     i_CLK=ClockSignal("mul_clk"),  # run at 2x speed of engine clock
                     i_D=Cat(getattr(self, "dsp_d" + str(i)), zeros[:(25-17)]),
                     i_INMODE=getattr(self, "dsp_inmode" + str(i)),
@@ -1034,14 +1026,20 @@ by the implementation of this code.
                 )
             ]
             self.sync.mul_clk += [ # this syncs into the eng_clk domain
-                If(mseq.ongoing("DONE") | mseq.ongoing("DONE2"),
+                If(mseq.ongoing("DONE"),
                    self.q[i * 17:i * 17 + 17].eq(getattr(self, "dsp_p" + str(i))[:17]),
-                    self.q_valid.eq(1),
                 ).Else(
-                    self.q.eq(self.q),
-                    self.q_valid.eq(0),
-                )
+                    self.q[i * 17:i * 17 + 17].eq(self.q[i * 17:i * 17 + 17]),
+                ),
             ]
+        # whether we are asserting on DONE/DONE2 or DONE2/DONE3 depends on even/odd # of states previously spent to compute the mul
+        self.sync.mul_clk += [
+            If(mseq.ongoing("DONE2") | mseq.ongoing("DONE3"),
+                self.q_valid.eq(1),
+               ).Else(
+                self.q_valid.eq(0),
+            )
+        ]
         # compute special-case detection if the partial sum output is >= 2^255-19
         self.comb += [
             overflow_25519.eq(
@@ -1151,6 +1149,7 @@ Here are the currently implemented opcodes for The Engine:
         rf_depth_raw = 512
         rf_width_raw = 256
         self.submodules.rf = rf = RegisterFile(depth=rf_depth_raw, width=rf_width_raw)
+        self.specials += MultiReg(ResetSignal("eng_clk"), rf.clear, "eng_clk") # sync up the register file's fast clock to our slow clock
 
         self.window = CSRStorage(fields=[
             CSRField("window", size=log2_int(rf_depth_raw) - log2_int(num_registers), description="Selects the current register window to use"),
