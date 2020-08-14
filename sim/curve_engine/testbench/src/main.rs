@@ -166,9 +166,6 @@ fn run(p: &pac::Peripherals) {
         }
     }
 
-    ////////////////////////// TEST EXECUTION UNITS
-    // first we need some simple assembly programs
-
     report(&p, phase);
 
     if pass {
@@ -178,5 +175,5 @@ fn run(p: &pac::Peripherals) {
     }
 
     // set success to indicate to the CI framework that the test has passed
-    p.SIMSTATUS.simstatus.modify(|_r, w| w.success().bit(true));
+    p.SIMSTATUS.simstatus.modify(|_r, w| w.success().bit(pass));
 }
