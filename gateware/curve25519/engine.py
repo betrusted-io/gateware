@@ -209,10 +209,10 @@ class Curve25519Const(Module, AutoDoc):
         global did_const_doc
         constant_defs = {
             0: [0, "zero", "The number zero"],
-            1: [121665, "a24", "The value $\\frac{{A-2}}{{4}}$"],
-            2: [0x7FFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFED, "field", f"Binary coding of {prime_string}"],
-            3: [0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF, "neg1", "Binary -1"],
-            4: [1, "one", "The number one"],
+            1: [1, "one", "The number one"],
+            2: [121665, "a24", "The value $\\frac{{A-2}}{{4}}$"],
+            3: [0x7FFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFED, "field", f"Binary coding of {prime_string}"],
+            4: [0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF, "neg1", "Binary -1"],
         }
         self.adr = Signal(5)
         self.const = Signal(256)
@@ -1390,6 +1390,8 @@ Here are the currently implemented opcodes for The Engine:
 
         ### merge execution path signals with host access paths
         self.comb += [
+            ra_const.eq(instruction.ca),
+            rb_const.eq(instruction.cb),
             ra_adr.eq(instruction.ra),
             rb_adr.eq(instruction.rb),
             self.ra_const_rom.adr.eq(ra_adr),
@@ -1440,8 +1442,8 @@ Here are the currently implemented opcodes for The Engine:
             )
         ]
 
-        sext_immediate = Signal((log2_int(microcode_depth), True)) # make this signal signed
-        self.comb += sext_immediate.eq(instruction.immediate) # does this automatically do sign extension? who knows. migen claims "user-friendly sign extension rules, (a la MyHDL)", with no further explanation. :-P
+        sext_immediate = Signal(log2_int(microcode_depth))
+        self.comb += sext_immediate.eq(Cat(instruction.immediate, instruction.immediate[8])) # migen signed math failed us. so manually sign extend. this breaks the configurability of the code.
 
         ### Microcode sequencer. Very simple: it can only run linear sections of microcode. Feature not bug;
         ### constant time operation is a defense against timing attacks.
@@ -1514,14 +1516,16 @@ Here are the currently implemented opcodes for The Engine:
         seq.act("DO_BRZ",
             If(ra_dat == 0,
                 If( (rb_dat[:mpc.nbits] < mpc_stop) & (rb_dat[:mpc.nbits] >= self.mpstart.fields.mpstart), # validate new PC is in range
-                   NextValue(mpc, sext_immediate + mpc + 1),
+                    NextState("FETCH"),
+                    NextValue(mpc, sext_immediate + mpc + 1),
                 ).Else(
                     NextState("IDLE"),
                     NextValue(running, 0),
                 )
             ).Else(
                 If(mpc < mpc_stop,
-                   NextValue(mpc, mpc + 1),
+                    NextState("FETCH"),
+                    NextValue(mpc, mpc + 1),
                 ).Else(
                     NextState("IDLE"),
                     NextValue(running, 0),
