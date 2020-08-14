@@ -595,6 +595,44 @@ even if we are just adding 0.
 
 Once this is finished, we have the final result.
 
+Potential corner case
+---------------------
+
+There is a potential corner case where if the carry-propagated result going into 
+"normalize" is between
+
+  0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFDA and
+  0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFEC
+
+In this case, the top bit would be wrapped around, multiplied by 19, and added to 
+the LSB, but the result would not be a member of $2^{{255}}-19$ (it would be one
+of the 19 numbers just short of $2^{{255}}-1$), and the multiplier would pass it
+on as if it were a valid result. 
+
+In some cases, this isn't even a problem, because if the subsequent result goes through
+any operation that includes a "TRD" instruction, it should reduce the number
+correctly.
+
+However, I do not think this corner case is possible, because the overflow path to set the
+high bit is from the top limb going from 0x1_FFFF -> 0x2_0000 (that is, 0x7FFFC -> 0x80000
+when written MSB-aligned) due to a carry coming in from the lower limb, and
+it would require the carry to be very large, not just +1 as shown in the simple
+rollover case, but a value from 0x1_FFED-0x1_FFDB.  
+
+I don't have a formal mathematical proof of this, but I strongly suspect that 
+carry values going into the top limb cannot approach these large numbers, and therefore
+it is not possible to hit this corner case.
+
+In the case that it _could_ be hit, the fix would be to add an additional
+detection stage to handle the case that the result is not normalized, and 
+to add 19 to the final sum. This can be accelerated to a single cycle by also
+adding 1 into the partial products, short-circuiting the carry propagate because
+this should be the only special case we're trying to check for (we should definitely
+not be able to re-overflow because we are only adding at most 19 to the final result
+in the previous step).
+
+It'd be great to have a real mathematician comment if this is a real corner case.
+
 """)
         # array of 15, 17-bit wide signals = 255 bits
         a_17 = [Signal(17),Signal(17),Signal(17),Signal(17),Signal(17),
