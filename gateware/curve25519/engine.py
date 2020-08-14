@@ -50,7 +50,7 @@ but only if used in "SDP" (simple dual port) mode. In SDP, you have one read, on
 However, the register file needs to produce two operands per cycle, while accepting up to
 one operand per cycle. 
 
-In order to do this, we stipulate that the RF runs at `rf_clk` (200MHz), but uses two phases 
+In order to do this, we stipulate that the RF runs at `rf_clk` (200MHz), but uses four phases 
 to produce/consume data. "Engine clock" `eng_clk` (50MHz) runs at a lower rate to accommodate
 large-width arithmetic in a single cycle.
 
@@ -60,7 +60,10 @@ Phase 0:
   - read from port A
 Phase 1:
   - read from port B
+Phase 2:
   - write data
+Phase 3:
+  - quite cycle, used to create extra setup time for next stage (requires multicycle-path constraints)
   
 The writing of data is done in the second phase so that in the case you are writing
 to the same address as being read, we guarantee the value read is the old value.
@@ -69,6 +72,7 @@ The register file is unavailable for {} `eng_clk` cycles after reset.
 
 When configured as a 64 bit memory, the depth of the block is 512 bits, corresponding to 
 an address width of 9 bits.
+
         """.format(reset_cycles))
 
         instruction = Record(instruction_layout)
@@ -244,6 +248,8 @@ class ExecUnit(Module, AutoDoc):
       - `q` is the output
       - `instruction_out` is the instruction for the result present at the `q` output 
       - `q_valid` is a single cycle pulse that indicates that the `q` result and `wa_out` value is valid
+      
+      
             """)
         self.instruction = Record(instruction_layout)
 
@@ -294,6 +300,7 @@ passthrough.
 * NOT returns the result of !A
 * PSA returns the value of A
 * PSB returns the value of B
+
 """)
 
         self.sync.eng_clk += [
@@ -392,6 +399,7 @@ Thus the reduction algorithm is as follows:
   - Otherwise return 0
 2. Subtract
   - Subtract the return value of TestReduce from the tested value
+
         """)
         self.sync.eng_clk += [
             If( (self.a >= 0x7FFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFED),
@@ -690,30 +698,31 @@ Notes:
 .. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/mpy_pipe.png
    :alt: data flow block diagram of the multiplier core
       
-  Above is the relevant elements of the DSP48E1 block as configured for the systolic dataflow for the "schoolbook"
-  multiply operation. Items shaded in gray are external to the DSP48E1 block.
+Above is the relevant elements of the DSP48E1 block as configured for the systolic dataflow for the "schoolbook"
+multiply operation. Items shaded in gray are external to the DSP48E1 block.
   
 .. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/psum.png
    :alt: data flow block diagram of the partial sum step
       
-  Above is the configuration of the DSP48E1 block for the partial sum steps. Partial sum takes two cycles to
-  sum together the three 17-bit segments of the partial sums.
+Above is the configuration of the DSP48E1 block for the partial sum steps. Partial sum takes two cycles to
+sum together the three 17-bit segments of the partial sums.
   
 .. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/carry_prop.png
    :alt: data flow block diagram of the carry propagate
 
-  Above is the configuration of the DSP48E1 block for the carry propagate step. This step must be repeated 
-  14 times to handle the worst-case carry propagate path. During the carry propagate step, the pattern
-  detector is active, and on the final step we check it to see if the result overflows $2^{{255}}-19$.
+Above is the configuration of the DSP48E1 block for the carry propagate step. This step must be repeated 
+14 times to handle the worst-case carry propagate path. During the carry propagate step, the pattern
+detector is active, and on the final step we check it to see if the result overflows $2^{{255}}-19$.
   
 .. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/normalize.png
    :alt: data flow block diagram of the normalization step
   
-  Above is the configuration of the DSP48E1 block for the normalization step. If the result overflows $2^{{255}}-19$,
-  we must add 19 to make it a member of the prime field once again. We can do this in a single cycle by
-  short-circuiting the carry propagate: we already know we will have to propagate a carry to handle the overflow
-  case (there are only 19 possible numbers that will overflow this, and all of them have 1's set up the entire
-  chain), so we pre-add the carry simultaneous with adding the number 19 to the least significant limb.
+Above is the configuration of the DSP48E1 block for the normalization step. If the result overflows $2^{{255}}-19$,
+we must add 19 to make it a member of the prime field once again. We can do this in a single cycle by
+short-circuiting the carry propagate: we already know we will have to propagate a carry to handle the overflow
+case (there are only 19 possible numbers that will overflow this, and all of them have 1's set up the entire
+chain), so we pre-add the carry simultaneous with adding the number 19 to the least significant limb.
+
         """)
 
         start_pipe = Signal()
