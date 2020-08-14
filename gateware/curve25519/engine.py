@@ -714,7 +714,7 @@ Above is the configuration of the DSP48E1 block for the carry propagate step. Th
 14 times to handle the worst-case carry propagate path. During the carry propagate step, the pattern
 detector is active, and on the final step we check it to see if the result overflows $2^{{255}}-19$.
   
-.. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/normalize.png
+.. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/normalize2.png
    :alt: data flow block diagram of the normalization step
   
 Above is the configuration of the DSP48E1 block for the normalization step. If the result overflows $2^{{255}}-19$,
