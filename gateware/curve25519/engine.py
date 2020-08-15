@@ -487,15 +487,72 @@ A[2:0] and B[2:0].
      (overflow)         (not overflowing)
 
 The result of schoolbook multiplication is a result that potentially has
-2x the number of bits than the either multiplicand. Since we're doing modular
-multiplication in a finite field, the overflow "wraps around", so that the
-result is always a number within the finite field. 
+2x the number of limbs than the either multiplicand. 
 
-Mapping the overflow around is a process called reduction. There's a magical
-trick that happens which I don't understand the math behind that makes this
-operation really easy with the parameters chosen for Curve25519, but it 
-looks like this:
+Mapping the overflow back into the prime field (e.g. wrapping the overflow around)
+is a process called reduction. It turns out that for
+a prime field like {field_latex}, reduction works out to taking the limbs that
+extend beyond the base number of limbs in the field, shifting them right by the
+number of limbs, multiplying it by 19, and adding it back in; and if the result
+isn't a member of the field, add 19 one last time, and take the result as just
+the bottom 255 bits (ignore any carry overflow). 
 
+This trick works because the form of the field is $2^{{n}}-p$: it is a power
+of 2, reduced by some small amount $p$. By starting from a power of 2,
+most of the binary numbers representable in an n-bit word are valid members of
+the field. The only ones that are not valid field members are the numbers that are equal 
+to $2^{{n}}-p$ but less than $2^{{n}}-1$ (the biggest number that fits in n bits).
+To turn these invalid binary numbers into members of the field, you just need 
+to add $p$, and the reduction is complete. 
+
+Observe that $2^{{n}}-1$ reduces to $p-1$. Adding 1 results in $2^{{n}}$, which reduces
+to $p$: that is, the top bit, wrapped around, and multiplied
+it by $p$. Likewise, it works out that $2^{{n+1}}$ reduces to $2*p$. Thus modular
+reduction of natural binary numbers that are larger than our field $2^{{n}}-p$
+consists of taking the bits that overflow an $n$-bit representation, shifting them to 
+the right by $n$, and multiplying by $p$. 
+
+A more tractable example to compute than {field_latex} is the field $\mathbf{{F}}_{{{{2^{{6}}}}-5}} = 59$. 
+The members of the field are from 0-58, and reduction is done by taking any number modulo 59. Thus,
+the number 59 reduces to 0; 60 reduces to 1; 61 reduces to 2, and so forth, until we get to 64, which 
+reduces to 5 -- the value of the overflowed bits (1) times $p$. 
+
+Let's look at some more examples. First, recall that the biggest member of the 
+field, 58, in binary is 0b00_11_1010. 
+
+Let's consider a simple case where we are presented a partial sum that overflows
+the field by one bit, say, the number 0b01_11_0000, which is decimal 112. In this case, we take
+the overflowed bit, shift it to the right, multiply by 5:
+
+  0b01_11_0000
+     ^ move this bit to the right multiply by 0b101 (5)
+  0b00_11_0000 + 0b101 = 0b00_11_0101 = 53
+
+And we can confirm using a calculator that 112 % 59 = 53. Now let's overflow
+by yet another bit, say, the number 0b11_11_0000. Let's try the math again:
+
+  0b11_11_0000
+     ^ move to the right and multiply by 0b101: 0b101 * 0b11 = 0b1111
+  0b00_11_0000 + 0b1111 = 0b00_11_1111
+
+This result is still not a member of the field, as the maximum value is 0b0011_1010. 
+In this case, we need to add the number 5 once again to resolve this "special-case"
+overflow where we have a binary number that fits in $n$ bits but is in that sliver
+between $2^{{n}}-p$ and $2^{{n}}-1$:
+  
+  0b00_11_1111 + 0b101 = 0b01_00_0100
+
+At this step, we can discard the MSB overflow, and the result is 0b0100 = 4; 
+and we can check with a calculator that 240 % 59 = 4.
+
+Therefore, when doing schoolbook multiplication, the partial products that start to 
+overflow to the left can be brought back around to the right hand side, after
+multiplying by $p$, in this case, the number 19. This magical property is one
+of the reasons why {field_latex} is quite amenable to math on binary machines.
+
+Let's use this finding to rewrite the straight schoolbook
+multiplication form from above, but now with the modular reduction applied to 
+the partial sums, so it all wraps around into this compact form:
 ::
 
                    |    A2        A1       A0
@@ -507,12 +564,17 @@ looks like this:
                  ----------------------------
                         S2        S1       S0
 
-Basically, by taking each overflowed limb, wrapping it around, and multiplying 
-it by 19, you can "wrap the result" around, creating a number of partial sums 
-S[2:0] that are equal to your limbs, but with each partial sum potentially 
-overflowing the limb. Thus, the inputs to a limb are 17 bits wide, but we
-retain precision up to 48 bits during the partial sum stage, and then do a 
+As discussed above, each overflowed limb is wrapped around and multiplied by 19,
+creating a number of partial sums S[2:0] that now has as many terms as
+there are limbs, but with each partial sum still potentially
+overflowing the native width of the limb. Thus, the inputs to a limb are 17 bits wide, 
+but we retain precision up to 48 bits during the partial sum stage, and then do a 
 subsequent condensation of partial sums to reduce things back down to 17 bits again.
+The condensation is done in the next three steps, "collapse partial sums", "propagate carries",
+and finally "normalize". 
+
+However, before moving on to those sections, there is an additional trick we need
+to apply for an efficient implementation of this multiplication step in hardware.
 
 In order to minimize the amount of data movement, we observe that for each row,
 the "B" values are shared between all the multipliers, and the "A" values are
@@ -706,6 +768,16 @@ not be able to re-overflow because we are only adding at most 19 to the final re
 in the previous step).
 
 It'd be great to have a real mathematician comment if this is a real corner case.
+
+Maybe this is a more solid reasoning why this corner case can't happen:
+
+The biggest value of a partial sum is 0x53_FFAC_0015 (0x1_FFFF * 0x1_FFFF * 15).
+This means the biggest value of the third overflowed 17-bit limb is 0x14. Therefore
+the biggest value resulting from the "collapse partial sums" stage is 
+0x1_FFFF + 0x1_FFFF + 0x14 = 0x4_0012. Thus the largest carry term that has
+to propagate is 0x4_0012 >> 17 = 2. 2 is much smaller than the amount required
+to trigger this condition, that is, a value in the range of 0x1_FFED-0x1_FFDB.
+Thus, perhaps this condition simply can't happen?
 
 """)
         # array of 15, 17-bit wide signals = 255 bits
