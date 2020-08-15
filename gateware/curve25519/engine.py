@@ -525,7 +525,9 @@ number during the computation.
    :alt: Mapping schoolbook multiply onto the hardware array to minimize data movement
 
 The diagram above illustrates how the schoolbook multiply is mapped onto the hardware
-array. Each colored block corresponds to a given DSP48E1 block. The red arrow
+array. The top diagram is an exact redrawing of the previous text box, where the
+partial sums that would extend to the left have been multiplied by 19 and wrapped around.
+Each colored block corresponds to a given DSP48E1 block. The red arrow
 illustrates the path of a partial sum in both the schoolbook form and the unrwapped
 form for hardware implementation. In the bottom diagram, one can clearly see that
 the Ax coefficients are constant for each column, and that for each row, the Bx 
