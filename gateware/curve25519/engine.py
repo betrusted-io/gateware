@@ -436,24 +436,28 @@ At a high level, the steps to compute the multiplication are:
 1. Schoolbook multiplication 
 2. Collapse partial sums
 3. Propagate carries
-4. Catch the special case of results $\geq$ $2^{{255}}-19$, or the 256th bit set
-5. Add 19 or 0 depending on the outcome of (4)
-6. Propagate carries again, in case these overflow (rarely, but they do)
+4. Is the sum $\geq$ $2^{{255}}-19$?
+5. If yes, add 19; else add 0
+6. Propagate carries again, in case the addition by 19 causes overflows
 
 The multiplier would run about 30% faster if step (6) were skipped. This step happens
 in a fairly small minority of cases, maybe a fraction of 1%, and the worst-case
-carry propagate is diminishingly rare. The test for
-whether or not to propagate carries is fairly straightforward. However, this creates
-a timing side-channel, therefore we prefer a slower but safer implementation, even if
-we are spending a bunch of cycles most of the time doing nothing.
+carry propagate through every limb (mathspeak for "digits") is diminishingly rare. The test for
+whether or not to propagate carries is fairly straightforward. However, short-circuiting
+the carry propagate step based upon the properties of the data creates
+a timing side-channel. Therefore, we prefer a slower but safer implementation, even if
+we are spending a bunch of cycles propagating zeros most of the time.
 
 A constant-time optimization would be for the multiplier to simply produce a 256-bit
 result, and then use a subsequent TRD/SUB instruction pair. However, the non-pipelined
-version of this core takes 60ns per instrution, or 120ns total to compute this, whereas
-iterating another carry would take 140ns total (as the mul core runs 2x speed of the
-rest of the engine). This is basically a wash. However, if pipelining (and bypassing) 
-were implemented, this might be a viable optimization, but bypassing such a wide core
-would also have resource and speed implications of its own.
+version of the engine25519 executes at a rate of 60ns per instrution, or 120ns total to 
+compute the TRD/SUB combination, whereas iterating through the carry propagates 
+would take 140ns total (as the mul core runs 2x clock speed of the rest of the engine). 
+This is basically a wash. 
+
+However, if pipelining (and bypassing) were implemented, this might become a viable 
+optimization, but bypassing such a wide core would also have resource and speed 
+implications of its own.
 
 The above steps are coordinated by the `mseq` state machine. Control lines for 
 the DSP48E blocks are grouped into two sets, one controls the global state of
@@ -502,9 +506,12 @@ looks like this:
                  ----------------------------
                         P2        P1       P0
 
-Basically, by taking each overflowed limb and multiplying it by 19, you can
-"wrap the result" around, creating a number of partial sums P[2:0] that are
-equal to your limbs, but each partial sum potentially overflowing the limb.
+Basically, by taking each overflowed limb, wrapping it around, and multiplying 
+it by 19, you can "wrap the result" around, creating a number of partial sums 
+P[2:0] that are equal to your limbs, but with each partial sum potentially 
+overflowing the limb. Thus, the inputs to a limb are 17 bits wide, but we
+retain precision up to 48 bits during the partial sum stage, and then do a 
+subsequent condensation of partial sums to reduce things back down to 17 bits again.
 
 In C, the code basically looks like this:
 
@@ -530,11 +537,14 @@ In C, the code basically looks like this:
      }}
    }}
 
+This completes in 15 cycles.
+
 Collapse Partial Sums
 ---------------------
 
-The potential width of the partial sum is up to 43 bits wide. This step
-divides the partial sums up into 17-bit words, and then shifts the higher
+The potential width of the partial sum is up to 43 bits wide (according to
+the paper cited above; the native partial sum precision of the DSP48E1 is 48 bits). 
+This step divides the partial sums up into 17-bit words, and then shifts the higher
 to the next limbs over, allowing them to collapse into a smaller sum that 
 overflows less.
 
@@ -557,6 +567,9 @@ to add back in. This is what the C code looks like for this operation.
          prop[bitslice] = (p[bitslice] & 0x1ffff) + ((p[bitslice - 1] >> 17) & 0x1ffff) + ((p[bitslice - 2] >> 34));
      }}
 
+This completes in 2 cycles after a one-cycle pipeline stall delay penalty to retrieve
+the partial sum result from the previous step.
+
 Propagate Carries
 -----------------
 
@@ -572,26 +585,40 @@ chain. The C-code equivalent of this looks as follows:
      }}
    }}
 
+This completes in 14 cycles.
+
 Normalize
 ---------
 
-Unfortunately, at this point, the carries can generate carries, so a second round
-of this partial sum and carry is required.
+We're almost here, except that $0 \leq result \leq 2^{{256}}-1$, which is slightly
+larger than the range of {field_latex}. 
 
-The result at this point is basically correct, except there is one case that
-is not handled well: where the result is between $2^{{255}}-19$ and $2^{{256}}-1$.
-In this case, the number will basically be somewhere in between 0x7ff....ffed and
-0x7ff....ffff, or the 255th bit will be set. In this case, we need to add 19 to 
-the result, so that the result is a member of the field $2^{{255}}-19$.
+Thus we need to check if number is somewhere in between 0x7ff....ffed and
+0x7ff....ffff, or if the 256th bit will be set. In these cases, we need to add 19 to 
+the result, so that the result is a member of the field $2^{{255}}-19$ (the 256th bit
+is dropped automatically when concatenating the fifteen 17-bit limbs together).
 
-We do a simple pattern detect to detect the "1's" in bit positions 255-5, and a
-LUT to check the final 5 bits, OR'd with a check of the 256th bit being 1. 
-If it falls within this special case, we add the number 19, otherwise, we add 0.
+We use the DSP48E1 block to help accelerate the test for this case, so that it
+can complete in a single cycle without slowing down the machine. We use the "pattern
+detect" (PD) feature of the DSP48E1 to check for all "1's" in bit positions 255-5, and a
+single LUT to compare the final 5 bits to check for numbers between {prime_string} and
+$2^{{255}}-1$. We then OR this result with the 256th bit.
 
-After adding the number 19, we have to once again propagate carries. For simplicity,
-in this implementation we repeat the whole sum-and-propagate process once again. For
-constant time, regardless of whether we need to add 0 or 19, we do this process,
-even if we are just adding 0.
+If the result falls within this special "overflow" case, we add the number 19, otherwise, 
+we add 0. Note that this add-by-19-or-0 step is implemented by pre-loading the number 19 into the A:B
+pipeline registers of the DSP4E1 block during the "propagate" stage. Selection of
+whether to add 19 or 0 relies on the fact that the DSP48E1 block has an input multiplexer
+to its internal adder that can pick data from multiple sources, including the ability to
+pick no source by loading the number 0. Thus the operation mode of the DSP48E1 is adjusted
+to either pull an input from A:B (that is, the number 19) or the number 0, based on the 
+result of the overflow computation. Thus the PD feature is important in preventing this
+step from being rate-limiting. With the PD feature we only have to check an effective 16 
+intermediate results, instead of 256 raw bits, and then drive set the operation mode of
+the ALU, all within a single cycle.
+
+After adding the number 19, we have to once again propagate carries. Even if we add the number
+0, we also have to "propagate carries" for constant-time operation. This is done by simply
+running the carry propagate operation described above a second time.
 
 Once this is finished, we have the final result.
 
@@ -684,6 +711,32 @@ It'd be great to have a real mathematician comment if this is a real corner case
 Below is a detailed timing diagram that illustrates the expected sequence of events
 by the implementation of this code.
 
+Signal descriptions:
+
+* `clk` is `mul_clk`, nominally 100MHz (2x engine clock)
+* `go` is the signal from the microcode sequencer to latch inputs and start computation
+* `self.a` is the `a` operand
+* `self.b` is the `b` operand
+* `state` is the current `mseq` state machine's state
+* `step` is a counter used by `mseq` to control how many iterations to run in a given state
+* `prop` is a counter used to count which iteration of the carry propagate we're on
+* `dsp.a`-`dsp.d` is the `a-d` inputs to the DSP48E1 blocks
+* `A1_CE` is the enable to the A1 pipe register. Note that we configure 2x pipeline registers on the A input. 
+* `A1` is a pipe register internal to the DSP48E1 block
+* `A2_CE` is the enable to the A2 pipe register
+* `A2` is a pipe register internal to the DSP48E1 block
+* `B2_CE` is the enable to the B2 pipe register. Note that we configure 1x pipeline registers on the B input, and when 1x register is selected, the second pipe register (B2) is used. Thus there is no B1 register.
+* `B2` is a pipe register internal to the DSP48E1 block
+* `C` is the C input value. Note that this one input is *not* pipelined, and thus there is no register enable for it. Because it is not pipelined it's also likely to be critical-path. We use this mainly to loop P results back into the ALU with masking operations applied within a single cycle.
+* `D_CE` is the enable to the D pipe register. There is only one possible D register in the DSP48E1
+* `D` is a pipe register internal to the DSP48E1 block that feeds the pre-adder
+* `inmode` configures the input mode to the DSP48E1 ALU blocks. It is not pipelined and allows us to re-route data from A, B, C, and D to various ALU internals.
+* `opmode` configures what computation to perform by the DSP48E1 ALU on the current cycle. It is not pipelined. 
+* `P_CE` is the enable for the output product register.
+* `P` is the output product register presented by the DSP48E1 ALU.
+* `overflow` is the overflow detection output from the DSP48E1 ALU. Its result timing is synchronous with the `P` register.
+* `done` is the signal from the multiplier back to the microcode sequencer to latch the result and finish computation
+
 .. wavedrom::
   :caption: Detailed timing of the multiply operation
   
@@ -707,8 +760,8 @@ by the implementation of this code.
   { "name": "A2",          "wave": "x...2.......8........x.........", "data":["A0xx","0"] },
   { "name": "B2_CE",       "wave": "01.......01.0......10.........." },
   { "name": "B2",          "wave": "x.22===|==x55xxxx.xx8x.........", "data": ["19","B00","B01","B02","B03","B13","B14","1or19","1or19","19"] },
-  { "name": "D_CE",        "wave": "0.........1.0.................." },
   { "name": "C",           "wave": "x...2===|==555...|..86...|..x..", "data": ["Q0","Q1","Q2","Q3","Q13","Q14","P0,0","*P","C* >> 17    ","C&","C* >> 17    "] },
+  { "name": "D_CE",        "wave": "0.........1.0.................." },
   { "name": "D",           "wave": "x..........55xx................", "data": ["Q0,1","R0,2","QS14,1","RS14,2","QS14,1","RS14,2"] },
   { "name": "inmode",      "wave": "x.2.2.....x5.x.xx.xx8x.........", "data":["A1B2","AnB2","DB2","0B2"]},
   { "name": "opmode",      "wave": "x.2.=.....2555...|..86...|..xxx", "data":["M","C+M","C+0","C+M","P+M","C+P","AB/0+C","C+P"]},
@@ -728,11 +781,61 @@ Notes:
 2. The `S+` on the P line is the non-normalized sum. This is basically the final result, but
    sometimes with the 19 added to the least significant limb, in the case that the result is greater than
    or equal to $2^{{255}}-19$. This addition must be propagated through the whole result.
+3. The "done" state is slightly more complicated than illustrated here. Because the multiplier runs at
+   twice the speed of the sequencing engine (two `mul_clk` per `eng_clk`), "done" actually spans between 
+   2 and 3 states. In the case that the computation finishes in-phase with the slower engine clock, we assert 
+   "done" for two cycles. In the case that we finish out of phase, have to wait a half `eng_clk` cycle 
+   (one state in `mul_clk`) before asserting the done pulse for two `mul_clk` cycles (thus 3 total cycles). 
+   The computation is fixed-time, so the determination of how many wait states is done at the design stage and
+   hard-coded. However, anytime the algorithm is adjusted, the designer needs to re-check the number of 
+   cycles it took and pick the correct "done" sequencing.
   
           """)
 
         self.diagrams = ModuleDoc(title="Dataflow Diagrams", body="""
-        
+
+Here's a collection of data flow diagrams that help illustrate how to configure the DSP48E1 block.
+The DSP48E1 block has a lot of configuration options, so instead of overlaying on the messy overall
+diagram of the DSP48E1, we simplify its construction and draw only the pieces relevant to each phase
+of the algorithm.
+
+There's no substitute for consulting Xilinx UG479 (https://www.xilinx.com/support/documentation/user_guides/ug479_7Series_DSP48E1.pdf),
+but if you're just getting started here's a few breadcrumbs to help you steer around the block.
+
+1. The block contains a pre-adder, multiplier, and "ALU".
+2. It has four major inputs, A, B, C, and D. A/B are typically multiplier inputs, C is mostly intended for
+  carry propagation and shuttling partial sums, and D is a pre-adder input. Thus a common form of computation
+  is P = (A+D)*B + C.
+3. Almost any input can be zero'd out, and so if you wanted to compute just A*B, what is actually computed is
+  (A+D)*B + C but with the C and D values zero'd out. This is controlled by combinations of `inmode` and `opmode`.
+4. Inputs A-D and output P can all be registered, and for this implementation we put two registers on A, one register
+  on B, zero registers on C, one register on D, and one register on P. 
+5. Inputs A and B can have two pipeline registers. While the datasheet makes it look like you could be able
+  to selectively write from the DSP48E1 input to either A1/A2 or B1/B2, in fact, you can't. 
+  A2 can only get a value from A1 (thus setting A2 necessitates overwriting the value in A1). 
+  However, you can gate the A2's enable, so it can hold a value indefinitely,
+  and the multiplier can route an input from either A1 or A2. We use this to our advantage and load `dsp.a` into
+  the A2 register, and `dsp.a*19` into the A1 register, and then use the `inmode` configuration to switch between
+  these two inputs based on which partial sum we're computing at the moment. I think normally this feature is used
+  to implement pipelining and pipeline bypassing in other applications, and we are slightly abusing it here to our advantage.  
+6. Because we configured C to have no input register, it can be used for cycle-to-cycle feedback of partial sums.
+  Introducing an input register here (per DRC recco spit out by Vivado) could speed up the clock rate but it also
+  introduces a single-cycle stall every time we have to do a partial sum feedback, which is a greater performance
+  impact for our implementation.
+7. The "ALU" part of the DSP48E1 is used as the partial sum adder in our implementation (but it can also do logic
+  operations and other fun things that we don't need). It actually adds four numbers: P <- X + Y + Z + Carry bit.  
+  We don't use the carry "bit" as it is only one-bit wide and we are propgating several bits of carry at once, so
+  it is hard-wired to 0. X/Y/Z are up to 48 bits wide, and allows us to add combinations of the multiplier output,
+  a concatenation of A:B (A as MSB, B as LSB), C, P, the number 0, and a couple other source options we don't 
+  use in this implementation. This is controlled by `opmode`.
+8. In parallel to the "ALU" is a pattern detector. The pattern being detected is hard-coded into the bitstream,
+  and in this case we are looking for a run of `1`'s to help accelerate the overflow detection problem. The output
+  of the pattern detector is always being computed, and dataflow-synchronous to the P output.  
+9. Unused bits of verilog instances in Migen need to be tied to 0; Migen does not automatically extend/pad
+  shorter `Signal` values to match verilog input widths. This is important because the DSP48E1 input
+  widths don't always exactly match the Migen widths. We create a "zeros" signal and `Cat()` it onto the MSBs
+  as necessary to ensure all inputs to the DSP48E1 are properly specified.
+
 .. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/mpy_pipe3.png
    :alt: data flow block diagram of the multiplier core
       
@@ -829,6 +932,7 @@ carries that have already been propagated. If we fail to do this, then we re-pro
         )
 
         # DSP48E opcode encodings
+        # general DSP48E computation is P <- X + Y + Z + C
         OP_PASS_M        = 0b000_01_01  # X:Y <- M; Z <-0;    P <- 0 + M + 0
         OP_M_PLUS_PCIN   = 0b001_01_01  # X:Y <- M; Z <-PCIN; P <- PCIN + M + 0
         OP_M_PLUS_C      = 0b011_01_01  # X:Y <- M; Z <-C;    P <- C + M + 0
@@ -1065,7 +1169,7 @@ carries that have already been propagated. If we fail to do this, then we re-pro
                     # signals
                     i_A=getattr(self, "dsp_a" + str(i)),
                     i_ALUMODE=dsp_alumode,
-                    i_B=Cat(getattr(self, "dsp_b" + str(i)), zeros[:(18-17)]),
+                    i_B=Cat(getattr(self, "dsp_b" + str(i)), zeros[:(18-17)]), # extra bits must be set to zero
                     i_C=getattr(self, "dsp_c" + str(i)),
                     i_CARRYIN=0,
                     i_CARRYINSEL=zeros[:3],
@@ -1087,7 +1191,7 @@ carries that have already been propagated. If we fail to do this, then we re-pro
                     o_P=getattr(self, "dsp_p" + str(i)),
                     o_PATTERNDETECT=getattr(self, "dsp_match" + str(i)),
 
-                    # tie unused CE to active
+                    # tie unused CE
                     i_CEM=0,
                     i_CEINMODE=1,
 
@@ -1153,21 +1257,27 @@ The Engine loosely resembles a Harvard architecture microcoded CPU, with a singl
 512-entry, 256-bit wide 2R1W windowed-register file, a handful of execution units, and a "mailbox"
 unit (like a load/store, but transactional to wishbone). The Engine's microcode is 
 contained in a 1k-entry, 32-bit wide microcode block. Microcode procedures are written to
-the block, and execution can only proceed in a linear fashion (no branches supported) from
-a given offset, and execution will stop after a certain length run.
+the block, and execution will start from the `mpstart` offset when the `go` bit is set.  
+Execution will stop after either one of two conditions are met: either a `FIN` instruction 
+is executed, or the microcode program counter (mpc) goes past the stop threshold, computed
+as `mpstart` + `mplen`.
 
 The register file is "windowed". A single window consists of 32x256-bit wide registers,
 and there are up to 16 windows. The concept behind windows is that core routines, such
-as point doubling and point addition, can be coded using no more than 32 intermediate
-results. The same microcode can be used, then, to operate on up to 16 different point
-sets at the same time, selectable by the window.
+as point doubling and point addition, are codable using no more than 32 intermediate
+registers. The same microcode can be used, then, to serve point operations to up to
+16 different clients, selectable by setting the appropriate window. Note that the register
+file will stripe across four 4kiB pages, which means that memory protection can be
+enforced at page-level boundaries by hardware (with the help of the OS) for up to four 
+separate clients, each getting four register windows.
 
 Every register read can be overridden from a constant ROM, by asserting `ca` or `cb` for
 registers a and b respectively. When either of these bits are asserted, the respective
-register address is fed into a constant table, and the result of that table lookup is
-replaced for the constant value. This means up to 32 commonly used constants may be stored.
+register address is fed into a "constants" lookup table, and the result of that table lookup is
+replaced for the constant value. This means up to 32 commonly used constants may be stored
+in the hardware for quick retrieval.
 
-The Engine address space is divided up as follows::
+The Engine address space is divided up as follows (expressed as offset from base)::
 
  0x0_0000 - 0x0_0fff: microcode (one 4k byte page)
  0x1_0000 - 0x1_3fff: memory-mapped register file (4 x 4k pages = 16kbytes)
