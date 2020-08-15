@@ -504,14 +504,46 @@ looks like this:
                    | A1*B1     A0*B1 19*A2*B1
                  + | A0*B2  19*A2*B2 19*A1*B2
                  ----------------------------
-                        P2        P1       P0
+                        S2        S1       S0
 
 Basically, by taking each overflowed limb, wrapping it around, and multiplying 
 it by 19, you can "wrap the result" around, creating a number of partial sums 
-P[2:0] that are equal to your limbs, but with each partial sum potentially 
+S[2:0] that are equal to your limbs, but with each partial sum potentially 
 overflowing the limb. Thus, the inputs to a limb are 17 bits wide, but we
 retain precision up to 48 bits during the partial sum stage, and then do a 
 subsequent condensation of partial sums to reduce things back down to 17 bits again.
+
+In order to minimize the amount of data movement, we observe that for each row,
+the "B" values are shared between all the multipliers, and the "A" values are
+constant along the diagonals. Thus we can avoid re-loading the "A" values every
+cycle by shifting the partial sums diagonally through the computation, allowing
+the "A" values to be loaded as "A" and "A*19" into holding register once before
+the computations starts, and selecting between the two options based on the step
+number during the computation. 
+
+.. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/mapping.png
+   :alt: Mapping schoolbook multiply onto the hardware array to minimize data movement
+
+The diagram above illustrates how the schoolbook multiply is mapped onto the hardware
+array. Each colored block corresponds to a given DSP48E1 block. The red arrow
+illustrates the path of a partial sum in both the schoolbook form and the unrwapped
+form for hardware implementation. In the bottom diagram, one can clearly see that
+the Ax coefficients are constant for each column, and that for each row, the Bx 
+values are identical across all blocks in each step. Thus each column corresponds to
+a single DSP48E1 block. We take advantage of the ability of the DSP48E1 block to
+hold two selectable A values to pre-load Ax and Ax*19 before the computation starts, and
+we bus together the Bx values and change them in sequence with each round. The
+partial sums are then routed to the "down and right" to complete the mapping. The final
+result is one cycle shifted from the canonical mapping.
+
+We have a one-cycle structural pipeline delay going from this step to the next one, so
+we use this pipeline delay to do a shift with no add by setting the `opmode` from `C+M` to
+`C+0` (in other words, instead of adding to the current multiplication output for the last
+step, we squash that input and set it to 0). 
+
+The fact that we pipeline the data also gives us an opportunity to pick up the upper limb
+of the partial sum collapse "for free" by copying it into the "D" register of the DSP48E1
+during the shift step.
 
 In C, the code basically looks like this:
 
@@ -803,38 +835,18 @@ There's no substitute for consulting Xilinx UG479 (https://www.xilinx.com/suppor
 but if you're just getting started here's a few breadcrumbs to help you steer around the block.
 
 1. The block contains a pre-adder, multiplier, and "ALU".
-2. It has four major inputs, A, B, C, and D. A/B are typically multiplier inputs, C is mostly intended for
-  carry propagation and shuttling partial sums, and D is a pre-adder input. Thus a common form of computation
-  is P = (A+D)*B + C.
-3. Almost any input can be zero'd out, and so if you wanted to compute just A*B, what is actually computed is
-  (A+D)*B + C but with the C and D values zero'd out. This is controlled by combinations of `inmode` and `opmode`.
-4. Inputs A-D and output P can all be registered, and for this implementation we put two registers on A, one register
-  on B, zero registers on C, one register on D, and one register on P. 
-5. Inputs A and B can have two pipeline registers. While the datasheet makes it look like you could be able
-  to selectively write from the DSP48E1 input to either A1/A2 or B1/B2, in fact, you can't. 
-  A2 can only get a value from A1 (thus setting A2 necessitates overwriting the value in A1). 
-  However, you can gate the A2's enable, so it can hold a value indefinitely,
-  and the multiplier can route an input from either A1 or A2. We use this to our advantage and load `dsp.a` into
-  the A2 register, and `dsp.a*19` into the A1 register, and then use the `inmode` configuration to switch between
-  these two inputs based on which partial sum we're computing at the moment. I think normally this feature is used
-  to implement pipelining and pipeline bypassing in other applications, and we are slightly abusing it here to our advantage.  
+2. It has four major inputs, A, B, C, and D. A/B are typically multiplier inputs, C is mostly intended for carry propagation and shuttling partial sums, and D is a pre-adder input. Thus a common form of computation is P = (A+D)*B + C.
+3. Almost any input can be zero'd out, and so if you wanted to compute just A*B, what is actually computed is (A+D)*B + C but with the C and D values zero'd out. This is controlled by combinations of `inmode` and `opmode`.
+4. Inputs A-D and output P can all be registered, and for this implementation we put two registers on A, one register on B, zero registers on C, one register on D, and one register on P. 
+5. Inputs A and B can have two pipeline registers. While the datasheet makes it look like you could be able to selectively write from the DSP48E1 input to either A1/A2 or B1/B2, in fact, you can't. 
+  A2 can only get a value from A1 (thus setting A2 necessitates overwriting the value in A1). However, you can gate the A2's enable, so it can hold a value indefinitely, and the multiplier can route an input from either A1 or A2. We use this to our advantage and load `dsp.a` into the A2 register, and `dsp.a*19` into the A1 register, and then use the `inmode` configuration to switch between these two inputs based on which partial sum we're computing at the moment. 
+  I think normally this feature is used to implement pipelining and pipeline bypassing in other applications, and we are slightly abusing it here to our advantage.  
 6. Because we configured C to have no input register, it can be used for cycle-to-cycle feedback of partial sums.
-  Introducing an input register here (per DRC recco spit out by Vivado) could speed up the clock rate but it also
-  introduces a single-cycle stall every time we have to do a partial sum feedback, which is a greater performance
-  impact for our implementation.
-7. The "ALU" part of the DSP48E1 is used as the partial sum adder in our implementation (but it can also do logic
-  operations and other fun things that we don't need). It actually adds four numbers: P <- X + Y + Z + Carry bit.  
-  We don't use the carry "bit" as it is only one-bit wide and we are propgating several bits of carry at once, so
-  it is hard-wired to 0. X/Y/Z are up to 48 bits wide, and allows us to add combinations of the multiplier output,
-  a concatenation of A:B (A as MSB, B as LSB), C, P, the number 0, and a couple other source options we don't 
-  use in this implementation. This is controlled by `opmode`.
-8. In parallel to the "ALU" is a pattern detector. The pattern being detected is hard-coded into the bitstream,
-  and in this case we are looking for a run of `1`'s to help accelerate the overflow detection problem. The output
-  of the pattern detector is always being computed, and dataflow-synchronous to the P output.  
-9. Unused bits of verilog instances in Migen need to be tied to 0; Migen does not automatically extend/pad
-  shorter `Signal` values to match verilog input widths. This is important because the DSP48E1 input
-  widths don't always exactly match the Migen widths. We create a "zeros" signal and `Cat()` it onto the MSBs
-  as necessary to ensure all inputs to the DSP48E1 are properly specified.
+  Introducing an input register here (per DRC recco spit out by Vivado) could speed up the clock rate but it also introduces a single-cycle stall every time we have to do a partial sum feedback, which is a greater performance impact for our implementation.
+7. The "ALU" part of the DSP48E1 is used as the partial sum adder in our implementation (but it can also do logic operations and other fun things that we don't need). It actually adds four numbers: P <- X + Y + Z + Carry bit.  
+  We don't use the carry "bit" as it is only one-bit wide and we are propgating several bits of carry at once, so it is hard-wired to 0. X/Y/Z are up to 48 bits wide, and allows us to add combinations of the multiplier output, a concatenation of A:B (A as MSB, B as LSB), C, P, the number 0, and a couple other source options we don't use in this implementation. This is controlled by `opmode`.
+8. In parallel to the "ALU" is a pattern detector. The pattern being detected is hard-coded into the bitstream, and in this case we are looking for a run of `1`'s to help accelerate the overflow detection problem. The output of the pattern detector is always being computed, and dataflow-synchronous to the P output.  
+9. Unused bits of verilog instances in Migen need to be tied to 0; Migen does not automatically extend/pad shorter `Signal` values to match verilog input widths. This is important because the DSP48E1 input widths don't always exactly match the Migen widths. We create a "zeros" signal and `Cat()` it onto the MSBs as necessary to ensure all inputs to the DSP48E1 are properly specified.
 
 .. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/mpy_pipe3.png
    :alt: data flow block diagram of the multiplier core
@@ -889,7 +901,8 @@ carries that have already been propagated. If we fail to do this, then we re-pro
                 NextValue(step, 0),
             )
         )
-        mseq.act("P_DELAY", # DLY - due to pipelining of P register delaying feedback by one cycle
+        mseq.act("P_DELAY", # DLY - due to pipelining of P register, we have a structural hazard that delays feedback by one cycle
+            # we take advantage of this time to (1) shift the results into canonical position and (2) nab a copy of the data for the PSUM_MSB state
             NextState("PSUM_LSB")
         )
         mseq.act("PSUM_LSB", # PLSB
