@@ -65,8 +65,9 @@ Phase 2:
 Phase 3:
   - quite cycle, used to create extra setup time for next stage (requires multicycle-path constraints)
   
-The writing of data is done in the second phase so that in the case you are writing
-to the same address as being read, we guarantee the value read is the old value.
+The writing of data is done in the second phase means that write happen to the same address
+as being read, you get the old value. For pipelined operation, it could be desirable to shift
+the write to happen before the reads, but as of now the implementation is not pipelined.
 
 The register file is unavailable for {} `eng_clk` cycles after reset.
 
@@ -1303,6 +1304,40 @@ registers a and b respectively. When either of these bits are asserted, the resp
 register address is fed into a "constants" lookup table, and the result of that table lookup is
 replaced for the constant value. This means up to 32 commonly used constants may be stored
 in the hardware for quick retrieval.
+
+.. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/block_diagram.png
+   :alt: High-level block diagram of the Curev25519 engine
+   
+Above is a high-level block diagram of the Curve25519 engine. Four clocks are present
+in this microarchitecture, and they are phase-aligned thanks to the 7-Series MMCM
+and low-skew global clock network. `eng_clk` is 50MHz, `mul_clk` is 100MHz, and 
+`rf_clk` is 200MHz. The slowest 50MHz `eng_clk` clock controls the `seq` state machine, whose
+state names are listed on the left. A 50MHz base clock is chosen because this allows a 
+single-cycle 256-bit add/sub using hardware carry chains in the Spartan7 -1L speed grade,
+greatly simplifying most of the arithmetic blocks. Faster clocks are used to pump the microcode
+RAM (100MHz) and register file (200MHz), so that we are wasting less time fetching instructions
+and operands. In particular, the register file uses four phases because we are emulating
+a three-port register file (2R1W) using a single-port memory primitive, and the microcode RAM
+runs at 100MHz (sysclk) for convenience of reading/writing instructions from the Wishbone bus.
+Not shown in the diagram are the global "window" register bits, or the multiplexers that
+switch off the datapaths when the system is not running allowing Wishbone full access to
+the machine state.
+
+Execution units are subclasses of "ExecUnit", and their instantiation is controlled by
+inclusion in the `exec_units` dictionary. Likewise, opcodes are defined in the `opcodes`,
+dictionary, and opcodes are bound to ExecUnits by passing them as the `opcode_list` argument
+to the execution units.
+
+Note that execution units can take an arbitrary amount of time to complete. Most will complete
+in one cycle, but for example, the multiplier takes 52 cycles @ 100MHz, or 26 `eng_clk` cycles.
+The current implementation does not allow pipelined operation; registered stages are provided
+to break combinational paths and bring up the base clock rate, but every instruction must go through 
+the entire FETCH-EXEC-WAIT_DONE cycle before the next one can issue. 
+
+The design is partially outfitted with registers to facilitate pipelining in the future, but 
+the current simplified implementation is expected to provide adequate speedup. It's 
+probably not worth the additional resources to do e.g. pipeline bypassing and hazard checking, 
+as the target FPGA design is nearly at capacity.  
 
 The Engine address space is divided up as follows (expressed as offset from base)::
 
