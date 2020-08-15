@@ -1656,7 +1656,7 @@ Here are the currently implemented opcodes for The Engine:
             # one cycle latency for instruction fetch
             NextState("EXEC"),
         )
-        seq.act("EXEC",
+        seq.act("EXEC", # not a great name. This is actually where the register file fetches its contents.
             If(instruction.opcode == opcodes["BRZ"][0],
                 NextState("DO_BRZ"),
             ).Elif(instruction.opcode == opcodes["FIN"][0],
@@ -1669,7 +1669,7 @@ Here are the currently implemented opcodes for The Engine:
                 NextState("ILLEGAL_OPCODE"),
             )
         )
-        seq.act("WAIT_DONE",
+        seq.act("WAIT_DONE", # this is where the actual instruction execution happens.
             If(done, # TODO: for now, we just wait for each instruction to finish; but the foundations are around for pipelining...
                 If(mpc < mpc_stop,
                    NextState("FETCH"),
