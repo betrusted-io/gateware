@@ -582,21 +582,31 @@ This step divides the partial sums up into 17-bit words, and then shifts the hig
 to the next limbs over, allowing them to collapse into a smaller sum that 
 overflows less.
 
+:: 
+
    ... P2[16:0]   P1[16:0]      P0[16:0]
    ... P1[33:17]  P0[33:17]     P14[33:17]*19
    ... P0[50:34]  P14[50:34]*19 P13[50:34]*19
 
 Again, the magic number 19 shows up to allow sums which "wrapped around"
-to add back in. This is what the C code looks like for this operation.
+to add back in. Note that in the timing diagram below, we refer to the
+mid- and upper- words of the shifted partial sums as "Q" and "R" respectively,
+because the timing diagram lacks the width within a data bubble to
+write out the full notation: so `Q0,1` is P14[33:17] and `R0,2` is P13[50:34] for P0[16:0]. 
+
+This is what the C code equivalent looks like for this operation.
 
 .. code-block:: c
 
+     // the lowest limb has to handle two upper limbs wrapping around (Q/R)
      prop[0] = (p[0] & 0x1ffff) +
        (((p[14] * 1) >> 17) & 0x1ffff) * 19 +
        (((p[13] * 1) >> 34) & 0x1ffff) * 19;
+     // the second lowest limb has to handle just one limb wrapping around (Q)
      prop[1] = (p[1] & 0x1ffff) +
        ((p[0] >> 17) & 0x1ffff) +
        (((p[14] * 1) >> 34) & 0x1ffff) * 19;
+     // the rest are just shift-and-add without the modular wrap-around
      for(int bitslice = 2; bitslice < 15; bitslice += 1) {{
          prop[bitslice] = (p[bitslice] & 0x1ffff) + ((p[bitslice - 1] >> 17) & 0x1ffff) + ((p[bitslice - 2] >> 34));
      }}
@@ -648,13 +658,15 @@ to either pull an input from A:B (that is, the number 19) or the number 0, based
 result of the overflow computation. Thus the PD feature is important in preventing this
 step from being rate-limiting. With the PD feature we only have to check an effective 16 
 intermediate results, instead of 256 raw bits, and then drive set the operation mode of
-the ALU, all within a single cycle.
+the ALU.
+
+Thus, this operation completes in a single cycle.
 
 After adding the number 19, we have to once again propagate carries. Even if we add the number
-0, we also have to "propagate carries" for constant-time operation. This is done by simply
+0, we also have to "propagate carries" for constant-time operation. This is done by
 running the carry propagate operation described above a second time.
 
-Once this is finished, we have the final result.
+Once the second carry propagate is finished, we have the final result.
 
 Potential corner case
 ---------------------
