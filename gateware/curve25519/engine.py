@@ -509,15 +509,15 @@ to add $p$, and the reduction is complete.
    :alt: A diagram illustrating modular reduction
 
 The diagram above draws out the number lines for both a simple binary number line,
-and for some field $\mathbf{{F}}_{{{{2^{{n}}}}-p}}. Both lines start at 0 on the left,
-and increment until they roll over. The point at which $\mathbf{{F}}_{{{{2^{{n}}}}-p}}
+and for some field $\mathbf{{F}}_{{{{2^{{n}}}}-p}}$. Both lines start at 0 on the left,
+and increment until they roll over. The point at which $\mathbf{{F}}_{{{{2^{{n}}}}-p}}$
 rolls over is a distance $p$ from the end of the binary number line: thus, we can
 observe that $2^{{n}}-1$ reduces to $p-1$. Adding 1 results in $2^{{n}}$, which reduces
 to $p$: that is, the top bit, wrapped around, and multiplied
 it by $p$. 
 
 As we continue toward the right, the numbers continue to go up and wrap around, and
-for each wrap the distance between the binary wrap point and the $\mathbf{{F}}_{{{{2^{{n}}}}-p}}
+for each wrap the distance between the binary wrap point and the $\mathbf{{F}}_{{{{2^{{n}}}}-p}}$
 wrap point increases by a factor of $p$, such that $2^{{n+1}}$ reduces to $2*p$. Thus modular
 reduction of natural binary numbers that are larger than our field $2^{{n}}-p$
 consists of taking the bits that overflow an $n$-bit representation, shifting them to 
