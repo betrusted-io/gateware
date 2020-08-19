@@ -162,6 +162,13 @@ an address width of 9 bits.
             ),
             wren_pipe.eq((phase == 1) & self.we),  # we want wren to hit on phase==2, but we pipeline it to relax timing. so capture the input to the pipe on phase == 1
         ]
+        wd_bwe_pipe = Signal(width//8)
+        self.sync.rf_clk += [
+            # add a register to relax timing on wd_bwe. This offsets the signal by one rf_clk (clk200) period,
+            # but because write happens on phase 2 and the signal is valid on eng_clk (clk50) edges, this will
+            # not affect the functionality
+            wd_bwe_pipe.eq(self.wd_bwe)
+        ]
 
         for word in range(int(256/64)):
             self.specials += Instance("BRAM_SDP_MACRO", name="RF_RAMB" + str(word),
@@ -183,7 +190,7 @@ an address width of 9 bits.
                 i_RDEN = self.running, # reduce power when not running
                 i_WREN = wren_pipe, # (phase == 2) & self.we, but pipelined one stage
                 i_RST = eng_sync,
-                i_WE = self.wd_bwe[word*8 : word*8 + 8],
+                i_WE = wd_bwe_pipe[word*8 : word*8 + 8],
 
                 i_REGCE = 1, # should be ignored, but added to quiet down simulation warnings
             )
@@ -286,8 +293,10 @@ Here is an example of how to swap the contents of `ra` and `rb` based on the val
 """)
         self.sync.eng_clk += [
             self.q_valid.eq(self.start),
-            self.q.eq(self.b & Replicate(self.a[0], width)),
             self.instruction_out.eq(self.instruction_in),
+        ]
+        self.comb += [
+            self.q.eq(self.b & Replicate(self.a[0], width)),
         ]
 
 class ExecLogic(ExecUnit):
@@ -306,6 +315,9 @@ passthrough.
 
         self.sync.eng_clk += [
             self.q_valid.eq(self.start),
+            self.instruction_out.eq(self.instruction_in),
+        ]
+        self.comb += [
             If(self.instruction.opcode == opcodes["XOR"][0],
                self.q.eq(self.a ^ self.b)
             ).Elif(self.instruction.opcode == opcodes["NOT"][0],
@@ -315,7 +327,6 @@ passthrough.
             ).Elif(self.instruction.opcode == opcodes["PSB"][0],
                 self.q.eq(self.b),
             ),
-            self.instruction_out.eq(self.instruction_in),
         ]
 
 class ExecAddSub(ExecUnit, AutoDoc):
@@ -359,13 +370,14 @@ In all the examples above, Ra and Rb must be members of {field_latex}.
 
         self.sync.eng_clk += [
             self.q_valid.eq(self.start),
+            self.instruction_out.eq(self.instruction_in),
+        ]
+        self.comb += [
             If(self.instruction.opcode == opcodes["ADD"][0],
                self.q.eq(self.a + self.b),
             ).Elif(self.instruction.opcode == opcodes["SUB"][0],
                self.q.eq(self.a - self.b),
             ),
-
-            self.instruction_out.eq(self.instruction_in),
         ]
 
 class ExecTestReduce(ExecUnit, AutoDoc):
@@ -403,13 +415,15 @@ Thus the reduction algorithm is as follows:
 
         """)
         self.sync.eng_clk += [
+            self.q_valid.eq(self.start),
+            self.instruction_out.eq(self.instruction_in),
+        ]
+        self.comb += [
             If( (self.a >= 0x7FFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFED),
                 self.q.eq(0x7FFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFED)
             ).Else(
                 self.q.eq(0x0)
             ),
-            self.q_valid.eq(self.start),
-            self.instruction_out.eq(self.instruction_in),
         ]
 
 class ExecMul(ExecUnit, AutoDoc):
@@ -875,12 +889,12 @@ Signal descriptions:
   { "name": "clk",         "wave": "p......|.........|.......|....." },
   { "name": "go",          "wave": "010..........................10" },
   { "name": "self.a",      "wave": "x2...........................2.", "data": ["A0[255:0]","A1[255:0]"] },
-  { "name": "self.b",      "wave": "x2...........................2.", "data": ["B0[255:0]","B2[255:0]"] },
+  { "name": "self.b",      "wave": "x2...........................2.", "data": ["B0[255:0]","B1[255:0]"] },
   { "name": "state",       "wave": "2.34......5555...|..86...|..923", "data":["IDLE","SETA","MPY","DLY","PLSB","PMSB","PROP","NORM","PROP","DONE","IDLE","SETA"]},
   { "name": "step",        "wave": "x..2===|==5...55|5556.666|66xxx", "data":["0","1", "2", "3","13","14","0","1","2","11","12","13","0","1","2","11","12","13"]},
   { "name": "prop",        "wave": "x.........5.....|...6....|..xxx", "data":["0","1"]},
   { "name": "dsp.a",       "wave": "x2x2x.....8x.................2x", "data": ["A0xx","A19","0", "A1xx"] },
-  { "name": "dsp.b",       "wave": "x2====|==x55xxxxxxx8xx.......2=", "data": ["19","B00","B01","B02","B03","B13","B14","1or19","1or19","19","19","B2_00"] },
+  { "name": "dsp.b",       "wave": "x2====|==x55xxxxxxx8xx.......2=", "data": ["19","B00","B01","B02","B03","B13","B14","1or19","1or19","19","19","B1_00"] },
   { "name": "dsp.c",        "wave": "x...2===|=x5x5...|..x6...|..xxx", "data":["Q0","Q1","Q2","Q3","Q13","P0,0","C* >> 17    ","C* >> 17    "]},
   { "name": "dsp.d",        "wave": "x.........55x.xxxxxx...xxxxxxx.", "data":["*Q0,1","R0,2"]},
   {},
@@ -1432,6 +1446,7 @@ Here are the currently implemented opcodes for The Engine:
         """.format(opdoc))
 
         ##### TIMING CONSTRAINTS -- you want these. Trust me.
+        # registered exec units need this set of rules
         ### clk200->clk50 multi-cycle paths:
         # we architecturally guarantee extra setup time from the register file to the point of consumption:
         # read data is stable by the 3rd phase of the RF fetch cycle, and so it is in fact ready even before
@@ -1442,6 +1457,15 @@ Here are the currently implemented opcodes for The Engine:
         # same as above, but for the multiplier path.
         platform.add_platform_command("set_multicycle_path 3 -setup -start -from [get_clocks clk200] -to [get_clocks sys_clk] -through [get_cells *rf_r*_dat_reg*]")
         platform.add_platform_command("set_multicycle_path 2 -hold -from [get_clocks clk200] -to [get_clocks sys_clk] -through [get_cells *rf_r*_dat_reg*]")
+
+        # unregistered exec units need this set of rules
+        ### clk200->clk200 multi-cycle paths:
+        # this is for the case when we don't register the data, and just go straight from RF out put RF input. In the worst case
+        # we have three (? maybe five?) clk200 cycles to compute as we phase through the reads and writes
+        platform.add_platform_command("set_multicycle_path 3 -setup -from [get_clocks clk200] -to [get_clocks clk200] -through [get_cells *rf_r*_dat_reg*]")
+        platform.add_platform_command("set_multicycle_path 2 -hold -from [get_clocks clk200] -to [get_clocks clk200] -through [get_cells *rf_r*_dat_reg*]")
+
+        # other paths
         ### sys->clk200 multi-cycle paths:
         # microcode fetch is stable 10ns before use by the register file, by design
         platform.add_platform_command("set_multicycle_path 2 -setup -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_nets engine_ra_adr*]")
@@ -1466,11 +1490,11 @@ Here are the currently implemented opcodes for The Engine:
         platform.add_platform_command("set_multicycle_path 2 -setup -from [get_clocks clk50] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/ADDR*ADDR*]")
         platform.add_platform_command("set_multicycle_path 1 -hold -end -from [get_clocks clk50] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/ADDR*ADDR*]")
         ### sys->clk200 multi-cycle paths:
-        # data writeback happens on phase==2, and thus is stable for at least two clk200 clocks extra
-        platform.add_platform_command("set_multicycle_path 2 -setup -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/DI*DI*]")
-        platform.add_platform_command("set_multicycle_path 1 -hold -end -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/DI*DI*]")
-        platform.add_platform_command("set_multicycle_path 2 -setup -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/ADDR*ADDR*]")
-        platform.add_platform_command("set_multicycle_path 1 -hold -end -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/ADDR*ADDR*]")
+        # data writeback happens on phase==2, and thus is stable for at least two clk200 clocks extra + one full eng_clk (total 25ns)
+        platform.add_platform_command("set_multicycle_path 4 -setup -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/DI*DI*]")
+        platform.add_platform_command("set_multicycle_path 3 -hold -end -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/DI*DI*]")
+        platform.add_platform_command("set_multicycle_path 4 -setup -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/ADDR*ADDR*]")
+        platform.add_platform_command("set_multicycle_path 3 -hold -end -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/ADDR*ADDR*]")
 
         microcode_width = 32
         microcode_depth = 1024
