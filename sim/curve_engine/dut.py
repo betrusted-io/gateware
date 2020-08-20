@@ -94,12 +94,6 @@ def generate_top():
     global dutio
     global boot_from_spi
 
-    # build the test vectors for the curve engine
-    ret = os.system("cd testbench/curve25519-dalek && cargo test field::test::make_vectors")
-    if ret:
-        print("Problem generating test vectors, aborting.")
-        sys.exit(1)
-
     # we have to do two passes: once to make the SVD, without compiling the BIOS
     # second, to compile the BIOS, which is then built into the gateware.
 
@@ -113,6 +107,12 @@ def generate_top():
     soc.do_exit(vns)
 
     BiosHelper(soc, boot_from_spi) # marshals cargo to generate the BIOS from Rust files
+
+    # build the test vectors for the curve engine
+    ret = os.system("cd testbench/curve25519-dalek && cargo test field::test::make_vectors")
+    if ret:
+        print("Problem generating test vectors, aborting.")
+        sys.exit(1)
 
     # pass #2 -- generate the SoC, incorporating the now-built BIOS
     platform = Platform(dutio)

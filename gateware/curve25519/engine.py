@@ -216,12 +216,12 @@ class Curve25519Const(Module, AutoDoc):
     def __init__(self, insert_docs=False):
         global did_const_doc
         constant_defs = {
+            # Note: Adding a 6th constant noticeably impacts the routability of the design
             0: [0, "zero", "The number zero"],
             1: [1, "one", "The number one"],
             2: [121665, "am24", "The value $\\frac{{A-2}}{{4}}$"],
             3: [0x7FFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFED, "field", f"Binary coding of {prime_string}"],
             4: [121666, "ap24", "The value $\\frac{{A+2}}{{4}}"],
-            5: [0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF, "neg1", "Binary -1"],
         }
         self.adr = Signal(5)
         self.const = Signal(256)
