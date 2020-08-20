@@ -22,8 +22,10 @@ opcodes = {  # mnemonic : [bit coding, docstring]
     "MUL" : [7, f"Wd $\gets$ Ra * Rb  // multiplication in {field_latex} - result is reduced"],
     "TRD" : [8, "If Ra $\geqq 2^{{255}}-19$ then Wd $\gets$ $2^{{255}}-19$, else Wd $\gets$ 0  // Test reduce"],
     "BRZ" : [9, "If Ra == 0 then mpc[9:0] $\gets$ mpc[9:0] + immediate[9:0], else mpc $\gets$ mpc + 1  // Branch if zero"],
-    "FIN" : [10, "hast execution and assert interrupt to host CPU that microcode execution is done"],
-    "MAX" : [11, "Maximum opcode number (for bounds checking)"]
+    "FIN" : [10, "halt execution and assert interrupt to host CPU that microcode execution is done"],
+    "SHL" : [11, "Wd $\gets$ Ra << 1  // shift Ra left by one and store in Wd"],
+    "XBT" : [12, "Wd[0] $\gets$ Ra[254]  // extract the 255th bit of Ra and put it into the 0th bit of Wd"],
+    "MAX" : [13, "Maximum opcode number (for bounds checking)"],
 }
 
 num_registers = 32
@@ -216,7 +218,6 @@ class Curve25519Const(Module, AutoDoc):
     def __init__(self, insert_docs=False):
         global did_const_doc
         constant_defs = {
-            # Note: Adding a 6th constant noticeably impacts the routability of the design
             0: [0, "zero", "The number zero"],
             1: [1, "one", "The number one"],
             2: [121665, "am24", "The value $\\frac{{A-2}}{{4}}$"],
@@ -302,7 +303,7 @@ Here is an example of how to swap the contents of `ra` and `rb` based on the val
 
 class ExecLogic(ExecUnit):
     def __init__(self, width=256):
-        ExecUnit.__init__(self, width, ["XOR", "NOT", "PSA", "PSB"])
+        ExecUnit.__init__(self, width, ["XOR", "NOT", "PSA", "PSB", "XBT", "SHL"])
         self.intro = ModuleDoc(title="Logic ExecUnit Subclass", body=f"""
 This execution unit implements bit-wise logic operations: XOR, NOT, and 
 passthrough. 
@@ -311,9 +312,12 @@ passthrough.
 * NOT returns the result of !A
 * PSA returns the value of A
 * PSB returns the value of B
+* SHL returns A << 1
+* XBT returns the 255th bit of A, reported in the 0th bit of the result
 
 """)
 
+        zeros = Signal(255, reset=0)
         self.sync.eng_clk += [
             self.q_valid.eq(self.start),
             self.instruction_out.eq(self.instruction_in),
@@ -327,6 +331,10 @@ passthrough.
                 self.q.eq(self.a),
             ).Elif(self.instruction.opcode == opcodes["PSB"][0],
                 self.q.eq(self.b),
+            ).Elif(self.instruction.opcode == opcodes["XBT"][0],
+                self.q.eq(Cat(self.a[254], zeros))
+            ).Elif(self.instruction.opcode == opcodes["SHL"][0],
+                self.q.eq(Cat(0, self.a[:255])),
             ),
         ]
 
@@ -1437,6 +1445,13 @@ the current simplified implementation is expected to provide adequate speedup. I
 probably not worth the additional resources to do e.g. pipeline bypassing and hazard checking, 
 as the target FPGA design is nearly at capacity.  
 
+A conservative implementation (no optimization of intermediate values, immediate reduction of
+every add/sub operation) of Montgomery scalar multiplication using Engine25519
+completes one scalar multiply operation in 2.270ms, compared to 103ms in software. 
+This does not include the time required to do the final affine inversion (done in software,
+with significant overhead -- about 100ms), or the time to load the microcode and operands (about 5us).
+The affine inversion can also be microcoded, it just hasn't been done yet. 
+
 The Engine address space is divided up as follows (expressed as offset from base)::
 
  0x0_0000 - 0x0_0fff: microcode (one 4k byte page)
@@ -1795,7 +1810,7 @@ Here are the currently implemented opcodes for The Engine:
         )
         seq.act("DO_BRZ",
             If(ra_dat == 0,
-                If( (rb_dat[:mpc.nbits] < mpc_stop) & (rb_dat[:mpc.nbits] >= self.mpstart.fields.mpstart), # validate new PC is in range
+                If( (sext_immediate + mpc + 1 < mpc_stop) & (sext_immediate + mpc + 1 >= self.mpstart.fields.mpstart), # validate new PC is in range
                     NextState("FETCH"),
                     NextValue(mpc, sext_immediate + mpc + 1),
                 ).Else(
