@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "sim/curve_engine/testbench",
+    "sim/template/testbench",
+    "sim_support/rust/bios",
+    "sim_support/rust/pac",
+    "sim_support/rust/macros",
+]
