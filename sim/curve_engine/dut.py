@@ -94,6 +94,12 @@ def generate_top():
     global dutio
     global boot_from_spi
 
+    if ~os.path.isfile('testbench/curve25519-dalek/test_vectors.bin'):
+        # create a dummy file so that DUT can bootstrap and build soc.svd, required for building test vectors
+        with open('testbench/curve25519-dalek/test_vectors.bin', 'wb') as out:
+            out.seek(1024)
+            out.write('\0')
+
     # we have to do two passes: once to make the SVD, without compiling the BIOS
     # second, to compile the BIOS, which is then built into the gateware.
 
