@@ -1380,7 +1380,7 @@ carries that have already been propagated. If we fail to do this, then we re-pro
 
 
 class Engine(Module, AutoCSR, AutoDoc):
-    def __init__(self, platform, prefix, sim=False):
+    def __init__(self, platform, prefix, sim=False, build_prefix=""):
         opdoc = "\n"
         for mnemonic, description in opcodes.items():
             opdoc += f" * **{mnemonic}** ({str(description[0])}) -- {description[1]} \n"
@@ -1484,10 +1484,10 @@ Here are the currently implemented opcodes for The Engine:
         # other paths
         ### sys->clk200 multi-cycle paths:
         # microcode fetch is stable 10ns before use by the register file, by design
-        platform.add_platform_command("set_multicycle_path 2 -setup -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_nets engine_ra_adr*]")
-        platform.add_platform_command("set_multicycle_path 1 -hold -end -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_nets engine_ra_adr*]")
-        platform.add_platform_command("set_multicycle_path 2 -setup -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_nets engine_rb_adr*]")
-        platform.add_platform_command("set_multicycle_path 1 -hold -end -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_nets engine_rb_adr*]")
+        platform.add_platform_command("set_multicycle_path 2 -setup -from [get_clocks sys_clk] -to [get_clocks sys_clk] -through [get_nets {}engine_ra_const*]".format(build_prefix))
+        platform.add_platform_command("set_multicycle_path 1 -hold -end -from [get_clocks sys_clk] -to [get_clocks sys_clk] -through [get_nets {}engine_ra_const*]".format(build_prefix))
+        platform.add_platform_command("set_multicycle_path 2 -setup -from [get_clocks sys_clk] -to [get_clocks sys_clk] -through [get_nets {}engine_rb_const*]".format(build_prefix))
+        platform.add_platform_command("set_multicycle_path 1 -hold -end -from [get_clocks sys_clk] -to [get_clocks sys_clk] -through [get_nets {}engine_rb_const*]".format(build_prefix))
         # ignore the clk200 reset path for timing purposes -- there is >1 cycle guaranteed after reset for everything to settle before anything moves on these paths
         platform.add_platform_command("set_false_path -through [get_nets clk200_rst]")
         # ignore the clk50 reset path for timing purposes -- there is > 1 cycle guaranteed after reset for everything to settle before anything moves on these paths (applies for other crypto engines, (SHA/AES) as well)
@@ -1498,8 +1498,8 @@ Here are the currently implemented opcodes for The Engine:
         platform.add_platform_command("set_multicycle_path 1 -hold -from [get_clocks sys_clk] -to [get_clocks clk50] -through [get_cells microcode_reg*]")
         ### clk50->clk200 multi-cycle paths:
         # engine running will set up a full eng_clk cycle before any RF accesses need to be valid
-        platform.add_platform_command("set_multicycle_path 4 -setup -from [get_clocks clk50] -to [get_clocks clk200] -through [get_nets engine_running*]")
-        platform.add_platform_command("set_multicycle_path 3 -hold -end -from [get_clocks clk50] -to [get_clocks clk200] -through [get_nets engine_running*]")
+        platform.add_platform_command("set_multicycle_path 4 -setup -from [get_clocks clk50] -to [get_clocks clk200] -through [get_nets {}engine_running*]".format(build_prefix))
+        platform.add_platform_command("set_multicycle_path 3 -hold -end -from [get_clocks clk50] -to [get_clocks clk200] -through [get_nets {}engine_running*]".format(build_prefix))
         # data writeback happens on phase==2, and thus is stable for at least two clk200 clocks extra
         platform.add_platform_command("set_multicycle_path 2 -setup -from [get_clocks clk50] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/DI*DI*]")
         platform.add_platform_command("set_multicycle_path 1 -hold -end -from [get_clocks clk50] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/DI*DI*]")
