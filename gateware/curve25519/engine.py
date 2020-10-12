@@ -1380,7 +1380,7 @@ carries that have already been propagated. If we fail to do this, then we re-pro
 
 
 class Engine(Module, AutoCSR, AutoDoc):
-    def __init__(self, platform, prefix, sim=False, build_prefix=""):
+    def __init__(self, platform, prefix, sim=False, build_prefix="", new_xdc=False):
         opdoc = "\n"
         for mnemonic, description in opcodes.items():
             opdoc += f" * **{mnemonic}** ({str(description[0])}) -- {description[1]} \n"
@@ -1460,57 +1460,6 @@ The Engine address space is divided up as follows (expressed as offset from base
 Here are the currently implemented opcodes for The Engine:
 {}  
         """.format(opdoc))
-
-        ##### TIMING CONSTRAINTS -- you want these. Trust me.
-        # registered exec units need this set of rules
-        ### clk200->clk50 multi-cycle paths:
-        # we architecturally guarantee extra setup time from the register file to the point of consumption:
-        # read data is stable by the 3rd phase of the RF fetch cycle, and so it is in fact ready even before
-        # the other signals that trigger the execute mode, hence 4+1 cycles total setup time
-        platform.add_platform_command("set_multicycle_path 5 -setup -start -from [get_clocks clk200] -to [get_clocks clk50] -through [get_cells *rf_r*_dat_reg*]")
-        platform.add_platform_command("set_multicycle_path 4 -hold -from [get_clocks clk200] -to [get_clocks clk50] -through [get_cells *rf_r*_dat_reg*]")
-        ### clk200->clk100 multi-cycle paths:
-        # same as above, but for the multiplier path.
-        platform.add_platform_command("set_multicycle_path 3 -setup -start -from [get_clocks clk200] -to [get_clocks sys_clk] -through [get_cells *rf_r*_dat_reg*]")
-        platform.add_platform_command("set_multicycle_path 2 -hold -from [get_clocks clk200] -to [get_clocks sys_clk] -through [get_cells *rf_r*_dat_reg*]")
-
-        # unregistered exec units need this set of rules
-        ### clk200->clk200 multi-cycle paths:
-        # this is for the case when we don't register the data, and just go straight from RF out put RF input. In the worst case
-        # we have three (? maybe five?) clk200 cycles to compute as we phase through the reads and writes
-        platform.add_platform_command("set_multicycle_path 3 -setup -from [get_clocks clk200] -to [get_clocks clk200] -through [get_cells *rf_r*_dat_reg*]")
-        platform.add_platform_command("set_multicycle_path 2 -hold -from [get_clocks clk200] -to [get_clocks clk200] -through [get_cells *rf_r*_dat_reg*]")
-
-        # other paths
-        ### sys->clk200 multi-cycle paths:
-        # microcode fetch is stable 10ns before use by the register file, by design
-        platform.add_platform_command("set_multicycle_path 2 -setup -from [get_clocks sys_clk] -to [get_clocks sys_clk] -through [get_nets {}engine_ra_const*]".format(build_prefix))
-        platform.add_platform_command("set_multicycle_path 1 -hold -end -from [get_clocks sys_clk] -to [get_clocks sys_clk] -through [get_nets {}engine_ra_const*]".format(build_prefix))
-        platform.add_platform_command("set_multicycle_path 2 -setup -from [get_clocks sys_clk] -to [get_clocks sys_clk] -through [get_nets {}engine_rb_const*]".format(build_prefix))
-        platform.add_platform_command("set_multicycle_path 1 -hold -end -from [get_clocks sys_clk] -to [get_clocks sys_clk] -through [get_nets {}engine_rb_const*]".format(build_prefix))
-        # ignore the clk200 reset path for timing purposes -- there is >1 cycle guaranteed after reset for everything to settle before anything moves on these paths
-        platform.add_platform_command("set_false_path -through [get_nets clk200_rst]")
-        # ignore the clk50 reset path for timing purposes -- there is > 1 cycle guaranteed after reset for everything to settle before anything moves on these paths (applies for other crypto engines, (SHA/AES) as well)
-        platform.add_platform_command("set_false_path -through [get_nets clk50_rst]")
-        ### sys->clk50 multi-cycle paths:
-        # microcode fetch is guaranteed not to transition in the middle of an exec computation
-        platform.add_platform_command("set_multicycle_path 2 -setup -start -from [get_clocks sys_clk] -to [get_clocks clk50] -through [get_cells microcode_reg*]")
-        platform.add_platform_command("set_multicycle_path 1 -hold -from [get_clocks sys_clk] -to [get_clocks clk50] -through [get_cells microcode_reg*]")
-        ### clk50->clk200 multi-cycle paths:
-        # engine running will set up a full eng_clk cycle before any RF accesses need to be valid
-        platform.add_platform_command("set_multicycle_path 4 -setup -from [get_clocks clk50] -to [get_clocks clk200] -through [get_nets {}engine_running*]".format(build_prefix))
-        platform.add_platform_command("set_multicycle_path 3 -hold -end -from [get_clocks clk50] -to [get_clocks clk200] -through [get_nets {}engine_running*]".format(build_prefix))
-        # data writeback happens on phase==2, and thus is stable for at least two clk200 clocks extra
-        platform.add_platform_command("set_multicycle_path 2 -setup -from [get_clocks clk50] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/DI*DI*]")
-        platform.add_platform_command("set_multicycle_path 1 -hold -end -from [get_clocks clk50] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/DI*DI*]")
-        platform.add_platform_command("set_multicycle_path 2 -setup -from [get_clocks clk50] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/ADDR*ADDR*]")
-        platform.add_platform_command("set_multicycle_path 1 -hold -end -from [get_clocks clk50] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/ADDR*ADDR*]")
-        ### sys->clk200 multi-cycle paths:
-        # data writeback happens on phase==2, and thus is stable for at least two clk200 clocks extra + one full eng_clk (total 25ns)
-        platform.add_platform_command("set_multicycle_path 4 -setup -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/DI*DI*]")
-        platform.add_platform_command("set_multicycle_path 3 -hold -end -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/DI*DI*]")
-        platform.add_platform_command("set_multicycle_path 4 -setup -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/ADDR*ADDR*]")
-        platform.add_platform_command("set_multicycle_path 3 -hold -end -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/ADDR*ADDR*]")
 
         microcode_width = 32
         microcode_depth = 1024
@@ -1879,3 +1828,111 @@ Here are the currently implemented opcodes for The Engine:
         self.comb += [
             rf_write.eq(done),
         ]
+
+        if new_xdc:
+            ##### TIMING CONSTRAINTS -- you want these. Trust me.
+            # registered exec units need this set of rules
+            ### clk200->clk50 multi-cycle paths:
+            # we architecturally guarantee extra setup time from the register file to the point of consumption:
+            # read data is stable by the 3rd phase of the RF fetch cycle, and so it is in fact ready even before
+            # the other signals that trigger the execute mode, hence 4+1 cycles total setup time
+            platform.add_platform_command("set_multicycle_path 5 -setup -start -from [get_clocks clk200] -to [get_clocks clk50] -through [get_cells *rf_r*_dat_reg*]")
+            platform.add_platform_command("set_multicycle_path 4 -hold -from [get_clocks clk200] -to [get_clocks clk50] -through [get_cells *rf_r*_dat_reg*]")
+            ### clk200->clk100 multi-cycle paths:
+            # same as above, but for the multiplier path.
+            platform.add_platform_command("set_multicycle_path 3 -setup -start -from [get_clocks clk200] -to [get_clocks sys_clk] -through [get_cells *rf_r*_dat_reg*]")
+            platform.add_platform_command("set_multicycle_path 2 -hold -from [get_clocks clk200] -to [get_clocks sys_clk] -through [get_cells *rf_r*_dat_reg*]")
+
+            # unregistered exec units need this set of rules
+            ### clk200->clk200 multi-cycle paths:
+            # this is for the case when we don't register the data, and just go straight from RF out put RF input. In the worst case
+            # we have three (? maybe five?) clk200 cycles to compute as we phase through the reads and writes
+            platform.add_platform_command("set_multicycle_path 3 -setup -from [get_clocks clk200] -to [get_clocks clk200] -through [get_cells *rf_r*_dat_reg*]")
+            platform.add_platform_command("set_multicycle_path 2 -hold -from [get_clocks clk200] -to [get_clocks clk200] -through [get_cells *rf_r*_dat_reg*]")
+
+            # other paths
+            ### sys->clk200 multi-cycle paths:
+            # microcode fetch is stable 10ns before use by the register file, by design
+            platform.add_signal_command("set_multicycle_path 2 -setup -from [get_clocks sys_clk] -to [get_clocks sys_clk] -through [get_nets @]", ra_const)
+            platform.add_signal_command("set_multicycle_path 1 -hold -end -from [get_clocks sys_clk] -to [get_clocks sys_clk] -through [get_nets @]", ra_const)
+            platform.add_signal_command("set_multicycle_path 2 -setup -from [get_clocks sys_clk] -to [get_clocks sys_clk] -through [get_nets @]", rb_const)
+            platform.add_signal_command("set_multicycle_path 1 -hold -end -from [get_clocks sys_clk] -to [get_clocks sys_clk] -through [get_nets @]", rb_const)
+            platform.add_signal_command("set_multicycle_path 2 -setup -from [get_clocks sys_clk] -to [get_clocks sys_clk] -through [get_nets @]", self.ra_const_rom.adr)
+            platform.add_signal_command("set_multicycle_path 1 -hold -end -from [get_clocks sys_clk] -to [get_clocks sys_clk] -through [get_nets @]", self.ra_const_rom.adr)
+            platform.add_signal_command("set_multicycle_path 2 -setup -from [get_clocks sys_clk] -to [get_clocks sys_clk] -through [get_nets @]", self.rb_const_rom.adr)
+            platform.add_signal_command("set_multicycle_path 1 -hold -end -from [get_clocks sys_clk] -to [get_clocks sys_clk] -through [get_nets @]", self.rb_const_rom.adr)
+            # ignore the clk200 reset path for timing purposes -- there is >1 cycle guaranteed after reset for everything to settle before anything moves on these paths
+            platform.add_platform_command("set_false_path -through [get_nets clk200_rst]")
+            # ignore the clk50 reset path for timing purposes -- there is > 1 cycle guaranteed after reset for everything to settle before anything moves on these paths (applies for other crypto engines, (SHA/AES) as well)
+            platform.add_platform_command("set_false_path -through [get_nets clk50_rst]")
+            ### sys->clk50 multi-cycle paths:
+            # microcode fetch is guaranteed not to transition in the middle of an exec computation
+            platform.add_platform_command("set_multicycle_path 2 -setup -start -from [get_clocks sys_clk] -to [get_clocks clk50] -through [get_cells microcode_reg*]")
+            platform.add_platform_command("set_multicycle_path 1 -hold -from [get_clocks sys_clk] -to [get_clocks clk50] -through [get_cells microcode_reg*]")
+            ### clk50->clk200 multi-cycle paths:
+            # engine running will set up a full eng_clk cycle before any RF accesses need to be valid
+            platform.add_signal_command("set_multicycle_path 4 -setup -from [get_clocks clk50] -to [get_clocks clk200] -through [get_nets {@ @ @}]", running, running_r, rf.running)
+            platform.add_signal_command("set_multicycle_path 3 -hold -end -from [get_clocks clk50] -to [get_clocks clk200] -through [get_nets {@ @ @}]", running, running_r, rf.running)
+            # data writeback happens on phase==2, and thus is stable for at least two clk200 clocks extra
+            platform.add_platform_command("set_multicycle_path 2 -setup -from [get_clocks clk50] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/DI*DI*]")
+            platform.add_platform_command("set_multicycle_path 1 -hold -end -from [get_clocks clk50] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/DI*DI*]")
+            platform.add_platform_command("set_multicycle_path 2 -setup -from [get_clocks clk50] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/ADDR*ADDR*]")
+            platform.add_platform_command("set_multicycle_path 1 -hold -end -from [get_clocks clk50] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/ADDR*ADDR*]")
+            ### sys->clk200 multi-cycle paths:
+            # data writeback happens on phase==2, and thus is stable for at least two clk200 clocks extra + one full eng_clk (total 25ns)
+            platform.add_platform_command("set_multicycle_path 4 -setup -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/DI*DI*]")
+            platform.add_platform_command("set_multicycle_path 3 -hold -end -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/DI*DI*]")
+            platform.add_platform_command("set_multicycle_path 4 -setup -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/ADDR*ADDR*]")
+            platform.add_platform_command("set_multicycle_path 3 -hold -end -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/ADDR*ADDR*]")
+        else:
+            ##### TIMING CONSTRAINTS -- you want these. Trust me.
+            # registered exec units need this set of rules
+            ### clk200->clk50 multi-cycle paths:
+            # we architecturally guarantee extra setup time from the register file to the point of consumption:
+            # read data is stable by the 3rd phase of the RF fetch cycle, and so it is in fact ready even before
+            # the other signals that trigger the execute mode, hence 4+1 cycles total setup time
+            platform.add_platform_command("set_multicycle_path 5 -setup -start -from [get_clocks clk200] -to [get_clocks clk50] -through [get_cells *rf_r*_dat_reg*]")
+            platform.add_platform_command("set_multicycle_path 4 -hold -from [get_clocks clk200] -to [get_clocks clk50] -through [get_cells *rf_r*_dat_reg*]")
+            ### clk200->clk100 multi-cycle paths:
+            # same as above, but for the multiplier path.
+            platform.add_platform_command("set_multicycle_path 3 -setup -start -from [get_clocks clk200] -to [get_clocks sys_clk] -through [get_cells *rf_r*_dat_reg*]")
+            platform.add_platform_command("set_multicycle_path 2 -hold -from [get_clocks clk200] -to [get_clocks sys_clk] -through [get_cells *rf_r*_dat_reg*]")
+
+            # unregistered exec units need this set of rules
+            ### clk200->clk200 multi-cycle paths:
+            # this is for the case when we don't register the data, and just go straight from RF out put RF input. In the worst case
+            # we have three (? maybe five?) clk200 cycles to compute as we phase through the reads and writes
+            platform.add_platform_command("set_multicycle_path 3 -setup -from [get_clocks clk200] -to [get_clocks clk200] -through [get_cells *rf_r*_dat_reg*]")
+            platform.add_platform_command("set_multicycle_path 2 -hold -from [get_clocks clk200] -to [get_clocks clk200] -through [get_cells *rf_r*_dat_reg*]")
+
+            # other paths
+            ### sys->clk200 multi-cycle paths:
+            # microcode fetch is stable 10ns before use by the register file, by design
+            platform.add_platform_command("set_multicycle_path 2 -setup -from [get_clocks sys_clk] -to [get_clocks sys_clk] -through [get_nets {}engine_ra_const*]".format(build_prefix))
+            platform.add_platform_command("set_multicycle_path 1 -hold -end -from [get_clocks sys_clk] -to [get_clocks sys_clk] -through [get_nets {}engine_ra_const*]".format(build_prefix))
+            platform.add_platform_command("set_multicycle_path 2 -setup -from [get_clocks sys_clk] -to [get_clocks sys_clk] -through [get_nets {}engine_rb_const*]".format(build_prefix))
+            platform.add_platform_command("set_multicycle_path 1 -hold -end -from [get_clocks sys_clk] -to [get_clocks sys_clk] -through [get_nets {}engine_rb_const*]".format(build_prefix))
+            # ignore the clk200 reset path for timing purposes -- there is >1 cycle guaranteed after reset for everything to settle before anything moves on these paths
+            platform.add_platform_command("set_false_path -through [get_nets clk200_rst]")
+            # ignore the clk50 reset path for timing purposes -- there is > 1 cycle guaranteed after reset for everything to settle before anything moves on these paths (applies for other crypto engines, (SHA/AES) as well)
+            platform.add_platform_command("set_false_path -through [get_nets clk50_rst]")
+            ### sys->clk50 multi-cycle paths:
+            # microcode fetch is guaranteed not to transition in the middle of an exec computation
+            platform.add_platform_command("set_multicycle_path 2 -setup -start -from [get_clocks sys_clk] -to [get_clocks clk50] -through [get_cells microcode_reg*]")
+            platform.add_platform_command("set_multicycle_path 1 -hold -from [get_clocks sys_clk] -to [get_clocks clk50] -through [get_cells microcode_reg*]")
+            ### clk50->clk200 multi-cycle paths:
+            # engine running will set up a full eng_clk cycle before any RF accesses need to be valid
+            platform.add_platform_command("set_multicycle_path 4 -setup -from [get_clocks clk50] -to [get_clocks clk200] -through [get_nets {}engine_running*]".format(build_prefix))
+            platform.add_platform_command("set_multicycle_path 3 -hold -end -from [get_clocks clk50] -to [get_clocks clk200] -through [get_nets {}engine_running*]".format(build_prefix))
+            # data writeback happens on phase==2, and thus is stable for at least two clk200 clocks extra
+            platform.add_platform_command("set_multicycle_path 2 -setup -from [get_clocks clk50] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/DI*DI*]")
+            platform.add_platform_command("set_multicycle_path 1 -hold -end -from [get_clocks clk50] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/DI*DI*]")
+            platform.add_platform_command("set_multicycle_path 2 -setup -from [get_clocks clk50] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/ADDR*ADDR*]")
+            platform.add_platform_command("set_multicycle_path 1 -hold -end -from [get_clocks clk50] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/ADDR*ADDR*]")
+            ### sys->clk200 multi-cycle paths:
+            # data writeback happens on phase==2, and thus is stable for at least two clk200 clocks extra + one full eng_clk (total 25ns)
+            platform.add_platform_command("set_multicycle_path 4 -setup -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/DI*DI*]")
+            platform.add_platform_command("set_multicycle_path 3 -hold -end -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/DI*DI*]")
+            platform.add_platform_command("set_multicycle_path 4 -setup -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/ADDR*ADDR*]")
+            platform.add_platform_command("set_multicycle_path 3 -hold -end -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/ADDR*ADDR*]")
+

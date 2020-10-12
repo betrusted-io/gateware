@@ -43,7 +43,7 @@ class SRAM32(Module, AutoCSR):
         self.specials += data.get_tristate(pads.d)
 
         store           = Signal()
-        load            = Signal()
+        self.load = load = Signal()
         config          = Signal()
         config_override = Signal()
         config_ce_n     = Signal(reset=1)
@@ -96,7 +96,7 @@ class SRAM32(Module, AutoCSR):
                 If(store | config | (self.bus.cyc & self.bus.stb & ~self.bus.we), comb_ce_n.eq(0))
             )
         ]
-        sync_oe_n = Signal()
+        self.sync_oe_n = sync_oe_n = Signal()
         self.sync += sync_oe_n.eq(comb_oe_n) # Register internally to match ODDR
         self.comb += data.oe.eq(sync_oe_n)
 
