@@ -503,8 +503,7 @@ dependencies = [
 [[package]]
 name = "riscv-rt-macros"
 version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3525f8341898dec060782087b7a15969e1cfe52818afacc47709265c19a23d53"
+source = "git+https://github.com/betrusted-io/riscv-rt.git?tag=v0.6.2#e270f6a57e0166c598509ea46013eed99f9e3bbd"
 dependencies = [
  "proc-macro2 0.4.30",
  "quote 0.6.13",
@@ -515,7 +514,8 @@ dependencies = [
 [[package]]
 name = "riscv-rt-macros"
 version = "0.1.6"
-source = "git+https://github.com/betrusted-io/riscv-rt.git?tag=v0.6.2#e270f6a57e0166c598509ea46013eed99f9e3bbd"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3525f8341898dec060782087b7a15969e1cfe52818afacc47709265c19a23d53"
 dependencies = [
  "proc-macro2 0.4.30",
  "quote 0.6.13",
