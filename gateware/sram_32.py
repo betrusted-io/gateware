@@ -151,8 +151,8 @@ class SRAM32(Module, AutoCSR):
                 i_D=data.i[i], o_Q1=self.bus.dat_r[i]
             ),
 
-        counter       = Signal(max=max(rd_timing, wr_timing, 15)+1)
-        counter_limit = Signal(max=max(rd_timing, wr_timing, 15)+1)
+        counter       = Signal(max=max(rd_timing, wr_timing, page_rd_timing, 15)+1)
+        counter_limit = Signal(max=max(rd_timing, wr_timing, page_rd_timing, 15)+1)
         counter_en    = Signal()
         counter_done  = Signal()
         self.comb += counter_done.eq(counter == counter_limit)
