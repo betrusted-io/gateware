@@ -1168,12 +1168,40 @@ carries that have already been propagated. If we fail to do this, then we re-pro
         ]
 
         for i in range(15):
+            # INMODE is a critical path, so rewrite code not in computation order but in signal use order to better
+            # understand how to optimize it.
+            self.comb += [
+                If(mseq.ongoing("SETUP_A"),
+                    getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_A1, INMODE_B2)),
+                ),
+                If(mseq.ongoing("MULTIPLY"),
+                    If(step == 0,
+                        getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_A1, INMODE_B2)),
+                        # A1 has Axx on the first step only
+                    ).Elif(i > (14 - step),  # lay out the diagonal wrap-around of partial sums
+                        getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_A1, INMODE_B2)),  # A1 has Axx*19
+                    ).Else(
+                        getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_A2, INMODE_B2)),
+                        # A2 has Axx for rest of steps
+                    )
+                ),
+                If(mseq.ongoing("PSUM_LSB"),
+                    getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_D, INMODE_B2)),
+                ),
+                If(mseq.ongoing("PSUM_MSB"),
+                    getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_D, INMODE_B2)),
+                ),
+                If(mseq.ongoing("NORMALIZE"),
+                    getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_0, INMODE_B2)),
+                )
+            ]
+
+            # rest of signals are in computation order below
             self.comb += [
                 If(mseq.before_entering("SETUP_A"),
                     getattr( self, "dsp_a" + str(i) ).eq(Cat(a_17[i], zeros[:(30-17)])),
                     getattr( self, "dsp_b" + str(i) ).eq(19),
                 ).Elif(mseq.ongoing("SETUP_A"),
-                    getattr( self, "dsp_inmode" + str(i) ).eq(Cat(INMODE_A1, INMODE_B2)),
                     getattr(self, "dsp_b" + str(i)).eq(b_17[0]), # preload B00
                 ).Elif(mseq.ongoing("MULTIPLY"),
                     getattr(self, "dsp_c" + str(i)).eq(getattr(self, "dsp_p" + str( (i+1) % 15 ))),
@@ -1183,13 +1211,6 @@ carries that have already been propagated. If we fail to do this, then we re-pro
                     If(step < 14,
                         getattr(self, "dsp_b" + str(i)).eq(Cat(b_step, zeros[:1])),  # b_17[step+1]; note that b input is 18 bits wide, so pad with one 0 to prevent a dangling X on the high bit
                     ),
-                    If(step == 0,
-                        getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_A1, INMODE_B2)),  # A1 has Axx on the first step only
-                    ).Elif(i > (14-step), # lay out the diagonal wrap-around of partial sums
-                        getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_A1, INMODE_B2)),  # A1 has Axx*19
-                    ).Else(
-                        getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_A2, INMODE_B2)),  # A2 has Axx for rest of steps
-                    )
                 )
             ]
 
@@ -1211,7 +1232,6 @@ carries that have already been propagated. If we fail to do this, then we re-pro
 
             self.comb += [
                     If(mseq.ongoing("PSUM_LSB"),
-                        getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_D, INMODE_B2)),
                         getattr(self, "dsp_c" + str(i)).eq(getattr(self, "dsp_p" + str(i)) & 0x1_ffff),
                     )]
             if i > 1:  # sum-ordering is different for the bottom two limbs, as the top wraps around into two limbs
@@ -1236,10 +1256,8 @@ carries that have already been propagated. If we fail to do this, then we re-pro
             self.comb += [
                 If(mseq.ongoing("PSUM_MSB"),
                     getattr(self, "dsp_c0").eq(zeros), # dsp_c is actually don't care due to the opmode
-                    getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_D, INMODE_B2)),
                 ).Elif(mseq.ongoing("NORMALIZE"),
                     getattr(self, "dsp_c" + str(i)).eq(getattr(self, "dsp_p" + str(i)) & 0x1_ffff),
-                    getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_0, INMODE_B2)),
                 )
             ]
 
