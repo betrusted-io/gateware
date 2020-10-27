@@ -87,7 +87,7 @@ class Dut(Sim):
         Sim.__init__(self, platform, custom_clocks=local_clocks, spiboot=spiboot, **kwargs) # SoC magic is in here
 
         # external SRAM
-        self.submodules.sram_ext = sram_32.SRAM32(platform.request("sram"), rd_timing=7, wr_timing=6, page_rd_timing=2)
+        self.submodules.sram_ext = sram_32.SRAM32(platform.request("sram"), rd_timing=7, wr_timing=6, page_rd_timing=6)
         self.add_csr("sram_ext")
         self.register_mem("sram_ext", self.mem_map["sram_ext"],
                   self.sram_ext.bus, size=0x1000000)

@@ -60,6 +60,12 @@ class SRAM32(Module, AutoCSR):
 
         comb_oe_n.reset, comb_we_n.reset = 1, 1
         comb_zz_n.reset, comb_ce_n.reset = 1, 1
+        data_reg = Signal(32)
+        self.sync += [
+            # this extra cycle is OK because data only needs to be stable 23ns before the rising edge of WE
+            # and this helps relax the timing from wishbone to the ODDR devices by adding a retiming register
+            data_reg.eq(self.bus.dat_w)
+        ]
         self.comb += [
             comb_oe_n.eq(1),
             comb_we_n.eq(1),
@@ -87,7 +93,7 @@ class SRAM32(Module, AutoCSR):
                     comb_adr.eq(self.bus.adr),
                     comb_dm_n.eq(~self.bus.sel),
                     If(self.bus.we,
-                       comb_data_o.eq(self.bus.dat_w)
+                       comb_data_o.eq(data_reg)
                     ).Else(
                         comb_oe_n.eq(0)
                     )
