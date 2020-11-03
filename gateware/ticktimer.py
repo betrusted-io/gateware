@@ -22,12 +22,13 @@ class TickTimer(Module, AutoCSR, AutoDoc):
         the increment for a tick is 0.5ms. 
         """)
 
+        resolution_in_ms = 1000 * (self.clkspertick / clkfreq)
         self.note = ModuleDoc(title="Configuration",
             body="This timer was configured with {} bits, which rolls over in {:.2f} years, with each bit giving {}ms resolution".format(
-                bits, (2**bits / (60*60*24*365)) * (self.clkspertick / clkfreq), 1000 * (self.clkspertick / clkfreq)))
+                bits, (2**bits / (60*60*24*365)) * (self.clkspertick / clkfreq), resolution_in_ms))
 
         prescaler = Signal(max=self.clkspertick, reset=self.clkspertick)
-        timer = Signal(bits)  # offer up to 48 bits of system time
+        timer = Signal(bits)
 
         self.control = CSRStorage(2, fields=[
             CSRField("reset", description="Write a `1` to this bit to reset the count to 0", pulse=True),
@@ -53,4 +54,18 @@ class TickTimer(Module, AutoCSR, AutoDoc):
 
         self.comb += self.time.status.eq(timer)
 
+        self.msleep = ModuleDoc("""msleep extension
+        
+        The msleep extension is a Xous-specific add-on to aid the implementation of the msleep server.
+        
+        msleep fires an interrupt when the requested time is less than or equal to the current elapsed time in
+        systicks. The interrupt remains active until a new target is set, or masked. 
+        """)
+        self.msleep_target = CSRStorage(size=64, description="Target time in {}ms ticks".format(resolution_in_ms))
+        self.submodules.ev = EventManager()
+        alarm = Signal()
+        self.ev.alarm = EventSourceLevel()
+        self.comb += self.ev.alarm.trigger.eq(alarm)
+
+        self.comb += alarm.eq(self.msleep_target.storage <= timer)
 
