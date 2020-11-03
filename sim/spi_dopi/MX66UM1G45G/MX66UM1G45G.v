@@ -157,10 +157,10 @@ module MX66UM1G45G( SCLK,
                 tECSV           = 10,        // ECS# pin go low delay time
                 tCEH            = 20,         // CS# high time after program
                 tBP             = 150_000,      //  Byte program time
-                tSE             = 25_000_000,      // Sector erase time  
+                tSE             = 25_000,      // Sector erase time        // was 25_000_000, sped up for simulation
                 tBE             = 250_000_000,      // Block erase time
                 tCE             = 150_000,      // unit is ms instead of ns  
-                tPP             = 150_000,      // Program time
+                tPP             = 45_00,      // Program time                 // was 150_000, sped up for simulation
                 tWR_END         = 2_000,          // the time of write operation going to end, suspend not work 
                 tW              = 40_000_000,       // Write Status/Configuration Register Cycle Time
                 tW2V            = 40,     // Write Configuration Register 2 volatile bit

@@ -92,7 +92,7 @@ add the submodules we're testing to the SoC, which is encapsulated in the Sim cl
 """
 class Dut(Sim):
     def __init__(self, platform, spiboot=False, **kwargs):
-        Sim.__init__(self, platform, custom_clocks=local_clocks, spiboot=spiboot, **kwargs) # SoC magic is in here
+        Sim.__init__(self, platform, custom_clocks=local_clocks, spiboot=spiboot, bus_timeout=200, **kwargs) # SoC magic is in here
 
         # Add an IDELAYCTRL primitive for the SpiOpi block
         reset_counter = Signal(5, reset=31)  # 155ns @ 200MHz, min 59.28ns
@@ -113,7 +113,7 @@ class Dut(Sim):
         sclk_instance_name = "SCLK_ODDR"
         iddr_instance_name = "SPI_IDDR"
         cipo_instance_name = "cipo_FDRE"
-        self.submodules.spinor = S7SPIOPI(platform.request("spiflash_8x"),
+        self.submodules.spinor = S7SPIOPI(platform, "spiflash_8x",
                                                sclk_name=sclk_instance_name, iddr_name=iddr_instance_name,
                                                cipo_name=cipo_instance_name, sim=True)
         platform.add_source("../../gateware/spimemio.v") ### NOTE: this actually doesn't help for SIM, but it reminds us to scroll to the bottom of this file and add it to the xvlog imports
@@ -161,7 +161,11 @@ or tweak the simulator in unusual ways (e.g. translate a .bin to a .init file)
 before calling SimRunner
 """
 def run_sim(ci=False):
-    extra_cmds = ["cd run && xvlog ../MX66UM1G45G/MX66UM1G45G.v", "cd run && xvlog ../../../gateware/spimemio.v"]
+    extra_cmds = ["cd run && xvlog ../MX66UM1G45G/MX66UM1G45G.v",
+                  "cd run && xvlog ../../../gateware/spimemio.v",
+                  "cd run && xvlog ../IDELAYE2.v",
+                  "cd run && xvlog ../BUFR.v"
+                  ]
     SimRunner(ci, extra_cmds)
 
 

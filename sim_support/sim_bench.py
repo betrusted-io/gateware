@@ -165,7 +165,8 @@ class BiosHelper():
             ret += os.system("cd testbench && cargo +nightly build --target {} --release".format(target))
         else:
             ret += os.system("cd testbench && cargo build --target {} --release".format(target))
-        ret += os.system("riscv64-unknown-elf-objcopy -j .text -j .rodata -O binary ../../target/{}/release/{} run/software/bios/bios.bin".format(target, sim_name))
+        ret += os.system("riscv64-unknown-elf-objcopy -j .text -j .rodata -j .data -O binary ../../target/{}/release/{} run/software/bios/bios.bin".format(target, sim_name))
+        # -d makes a much smaller file; but you need -D to capture the .data section
         ret += os.system("riscv64-unknown-elf-objdump -d ../../target/{}/release/{} > run/bios.S".format(target, sim_name))
         if ret != 0:
             sys.exit(1)  # fail the build
