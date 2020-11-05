@@ -17,6 +17,7 @@ pub fn report(p: &pac::Peripherals, data: u32) {
     }
 }
 
+// locate this in the "data" section so it's running out of RAM. Cannot XIP & program flash at the same time!
 #[no_mangle]
 #[link_section = ".data"]
 #[inline(never)]
@@ -24,8 +25,24 @@ pub fn write_tests(p: &pac::Peripherals) {
     let rom_ptr: *mut u32 = 0x2000_0000 as *mut u32;
     let rom = rom_ptr as *mut Volatile<u32>;
 
-    let mut phase = 0x8000_0000;
+    let mut phase = 0x5000_0000;
     report(&p, phase); phase += 1;
+
+    unsafe {
+        p.SPINOR.cmd_arg.write(|w| w.cmd_arg().bits(0));
+        p.SPINOR.command.write(|w| w
+            .exec_cmd().set_bit()
+            .cmd_code().bits(0x9f) // RDID
+            .dummy_cycles().bits(4)
+            .data_words().bits(2)
+            .has_arg().set_bit()
+        );
+    }
+    while p.SPINOR.status.read().wip().bit_is_set() {}
+
+    let status = p.SPINOR.cmd_rbk_data.read().bits();
+    report(&p, status);
+
     unsafe {
         p.SPINOR.command.write(|w| w
             .lock_reads().set_bit()
@@ -50,6 +67,61 @@ pub fn write_tests(p: &pac::Peripherals) {
      report(&p, phase); phase += 1;
      while p.SPINOR.status.read().wip().bit_is_set() {}
      report(&p, p.SPINOR.cmd_rbk_data.read().bits());
+
+    // sector erase
+    let mut phase = 0x6000_0000;
+    report(&p, phase); phase += 1;
+    unsafe {
+        p.SPINOR.cmd_arg.write(|w| w.cmd_arg().bits(0x03_CC00));
+        p.SPINOR.command.write(|w| w
+            .lock_reads().set_bit()
+            .exec_cmd().set_bit()
+            .cmd_code().bits(0x21) // SE4B
+            //.dummy_cycles().bits(0)
+            //.data_words().bits(0)
+            .has_arg().set_bit()
+        );
+     }
+     report(&p, phase); phase += 1;
+     while p.SPINOR.status.read().wip().bit_is_set() {}
+     report(&p, phase); phase += 1;
+
+    // try to do a read, should be locked out -- bus will freeze until timeout, but at least it doesn't crash the state machine
+    report(&p, unsafe{(*(rom.add(0x1140))).read()});
+
+     // status register readback, wait until sector erase is done
+     loop {
+        unsafe {
+            p.SPINOR.cmd_arg.write(|w| w.cmd_arg().bits(0));
+            p.SPINOR.command.write(|w| w
+                .lock_reads().set_bit()
+                .exec_cmd().set_bit()
+                .cmd_code().bits(0x05) // RDSR
+                .dummy_cycles().bits(4)
+                .data_words().bits(1)
+                .has_arg().set_bit()
+            );
+        }
+        while p.SPINOR.status.read().wip().bit_is_set() {}
+        let status = p.SPINOR.cmd_rbk_data.read().bits();
+        report(&p, status);
+        if (status & 1) == 0 {
+            break;
+        }
+    }
+
+    unsafe {
+        p.SPINOR.command.write(|w| w
+            .lock_reads().set_bit()
+            .exec_cmd().set_bit()
+            .cmd_code().bits(0x06) // WREN
+        );
+     }
+     report(&p, phase); phase += 1;
+     while p.SPINOR.status.read().wip().bit_is_set() {}
+
+    let mut phase = 0x8000_0000;
+     // page program some data
      unsafe {
         p.SPINOR.wdata.write(|w| w
             .wdata().bits(0xbeef)
@@ -57,10 +129,12 @@ pub fn write_tests(p: &pac::Peripherals) {
         p.SPINOR.wdata.write(|w| w
             .wdata().bits(0xc0de)
         );
-        for i in 0..14 {
+        for i in 0..7 {
+            /*
             p.SPINOR.wdata.write(|w| w
                 .wdata().bits(0x6000 + i)
-            );
+            );*/
+            (*rom.add(i)).write( (0x5500 + i*2 | (0x5500 + i*2 + 1) << 16) as u32);
         }
     }
     report(&p, phase); phase += 1;
@@ -77,9 +151,6 @@ pub fn write_tests(p: &pac::Peripherals) {
      report(&p, phase); phase += 1;
      while p.SPINOR.status.read().wip().bit_is_set() {}
      report(&p, phase); phase += 1;
-
-     // try to do a read, should be locked out -- bus will freeze until timeout, but at least it doesn't crash the state machine
-     report(&p, unsafe{(*(rom.add(0x1140))).read()});
 
      // status register readback, wait until page program is done
      loop {
