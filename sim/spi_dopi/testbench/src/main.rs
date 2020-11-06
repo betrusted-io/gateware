@@ -122,6 +122,7 @@ pub fn write_tests(p: &pac::Peripherals) {
 
     let mut phase = 0x8000_0000;
      // page program some data
+     // CSR is provided for non-cached writes
      unsafe {
         p.SPINOR.wdata.write(|w| w
             .wdata().bits(0xbeef)
@@ -129,14 +130,18 @@ pub fn write_tests(p: &pac::Peripherals) {
         p.SPINOR.wdata.write(|w| w
             .wdata().bits(0xc0de)
         );
-        for i in 0..7 {
+    }
+        for i in 0..16 {  // overfill a bit to flush cache
             /*
             p.SPINOR.wdata.write(|w| w
                 .wdata().bits(0x6000 + i)
             );*/
-            (*rom.add(i)).write( (0x5500 + i*2 | (0x5500 + i*2 + 1) << 16) as u32);
+            unsafe {
+                // this is not actually reliable in the test bench because it's cached from the CPU
+                (*rom.add(i)).write( (0x5500 + i*2 | (0x5500 + i*2 + 1) << 16) as u32);
+            }
         }
-    }
+
     report(&p, phase); phase += 1;
     unsafe {
         p.SPINOR.cmd_arg.write(|w| w.cmd_arg().bits(0x03_CC00));
