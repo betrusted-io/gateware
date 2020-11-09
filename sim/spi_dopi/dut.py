@@ -113,7 +113,7 @@ class Dut(Sim):
         sclk_instance_name = "SCLK_ODDR"
         iddr_instance_name = "SPI_IDDR"
         cipo_instance_name = "cipo_FDRE"
-        self.submodules.spinor = S7SPIOPI(platform, "spiflash_8x",
+        self.submodules.spinor = S7SPIOPI(platform.request("spiflash_8x"),
                                                sclk_name=sclk_instance_name, iddr_name=iddr_instance_name,
                                                cipo_name=cipo_instance_name, sim=True)
         platform.add_source("../../gateware/spimemio.v") ### NOTE: this actually doesn't help for SIM, but it reminds us to scroll to the bottom of this file and add it to the xvlog imports
