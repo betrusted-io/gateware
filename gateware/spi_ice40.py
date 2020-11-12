@@ -190,9 +190,22 @@ class SpiFifoPeripheral(Module, AutoCSR, AutoDoc):
         run much faster, and also the implementation is extremely small.     
         """)
 
+        self.protocol = ModuleDoc("""Enhanced Protocol for COM
+        The large performance differential between the SoC and the EC in Precursor/Betrusted means that
+        it's very easy for the EC to be overwhelmed with requests from the SoC. 
+        
+        We extend the SPI protocol with a "hold" signal to inform the SoC that read data is not yet ready.
+        
+        This, in essence, is a matter of tying the Tx FIFO's "read empty" signal to the hold pin. 
+        The EC signals readiness to accept new commands by writing a single word to the Tx FIFO.
+        Upon receipt of the word, the FIFO will empty, raising the "read empty" signal and producing a
+        "hold" condition until the next data is made available for reading.
+        """)
+
         self.cipo = pads.cipo
         self.copi = pads.copi
         self.csn = pads.csn
+        self.hold = pads.hold
 
         ### clock is not wired up in this module, it's moved up to CRG for implementation-dependent buffering
 
@@ -344,7 +357,8 @@ class SpiFifoPeripheral(Module, AutoCSR, AutoDoc):
         tx_data = Signal(16)
         self.comb += [
             If(self.tx_fifo.readable, tx_data.eq(self.tx_fifo.dout)
-            ).Else(tx_data.eq(0xDDDD)) # in case of underflow send an error code
+            ).Else(tx_data.eq(0xDDDD)), # in case of underflow send an error code
+            self.hold.eq(~self.tx_fifo.readable),
         ]
         self.sync.spi_peripheral += [
             # "Sloppy" clock boundary crossing allowed because rx is, in theory, static when donepulse happens
