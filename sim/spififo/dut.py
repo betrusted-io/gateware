@@ -59,6 +59,7 @@ dutio = [
      Subsignal("cipo", Pins("P16"), IOStandard("LVCMOS18")),
      Subsignal("copi", Pins("N18"), IOStandard("LVCMOS18")),
      Subsignal("sclk", Pins("R16"), IOStandard("LVCMOS18")),
+     Subsignal("hold", Pins("L13"), IOStandard("LVCMOS18")),
      ),
 
     # peripheral interface for testing UP5K side
@@ -68,6 +69,7 @@ dutio = [
      Subsignal("copi", Pins("dummy2")),
      Subsignal("sclk", Pins("dummy3")),
      Subsignal("irq", Pins("dummy4")),
+     Subsignal("hold", Pins("dummy5")),
      ),
 ]
 

@@ -43,6 +43,9 @@ class SPIController(Module, AutoCSR, AutoDoc):
         self.copi = pads.copi
         self.sclk = pads.sclk
         self.csn  = pads.csn
+        self.hold = pads.hold
+        hold = Signal()
+        self.specials += MultiReg(self.hold, hold)
 
         # self.comb += self.sclk.eq(~ClockSignal("spi"))  # TODO: add clock gating to save power; note receiver reqs for CS pre-clocks
         # generate a clock, this is Artix-specific
@@ -64,15 +67,20 @@ class SPIController(Module, AutoCSR, AutoDoc):
         self.rx = CSRStatus(16, name="rx", description="""Rx data, from CIPO""")
         self.control = CSRStorage(fields=[
             CSRField("intena", description="Enable interrupt on transaction finished"),
+            CSRField("autohold", description="Disallow transmission start if hold if asserted"),
         ])
         self.status = CSRStatus(fields=[
             CSRField("tip", description="Set when transaction is in progress"),
+            CSRField("hold", description="Set when peripheral asserts hold"),
         ])
+        self.comb += self.status.fields.hold.eq(hold)
 
         self.submodules.ev = EventManager()
         self.ev.spi_int    = EventSourceProcess()  # Falling edge triggered
+        self.ev.spi_hold   = EventSourceProcess()  # triggers when hold drops
         self.ev.finalize()
         self.comb += self.ev.spi_int.trigger.eq(self.control.fields.intena & self.status.fields.tip)
+        self.comb += self.ev.spi_hold.trigger.eq(hold)
 
         # Replicate CSR into "spi" clock domain
         self.tx_r       = Signal(16)
@@ -108,7 +116,7 @@ class SPIController(Module, AutoCSR, AutoDoc):
         self.submodules += fsm
         spicount = Signal(4)
         fsm.act("IDLE",
-            If(tx_go,
+            If(tx_go & ~(self.control.fields.autohold & hold),
                 NextState("RUN"),
                 NextValue(self.tx_r, Cat(0, self.tx.storage[:15])),
                 # Stability guaranteed so no synchronizer necessary
