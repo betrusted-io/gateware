@@ -63,6 +63,7 @@ dutio = [
      Subsignal("wakeup", Pins("B")),
      Subsignal("res_n", Pins("C")),
      Subsignal("wirq", Pins("D")),
+     Subsignal("hold", Pins("L13"), IOStandard("LVCMOS18")),
      ),
 
     # slave interface for testing UP5K side
@@ -71,6 +72,7 @@ dutio = [
      Subsignal("cipo", Pins("dummy1")),
      Subsignal("copi", Pins("dummy2")),
      Subsignal("sclk", Pins("dummy3")),
+     Subsignal("hold", Pins("dummy5")),
      ),
 ]
 
