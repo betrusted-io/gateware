@@ -61,7 +61,7 @@ class TickTimer(Module, AutoCSR, AutoDoc):
         msleep fires an interrupt when the requested time is less than or equal to the current elapsed time in
         systicks. The interrupt remains active until a new target is set, or masked. 
         """)
-        self.msleep_target = CSRStorage(size=64, description="Target time in {}ms ticks".format(resolution_in_ms))
+        self.msleep_target = CSRStorage(size=bits, description="Target time in {}ms ticks".format(resolution_in_ms))
         self.submodules.ev = EventManager()
         alarm = Signal()
         self.ev.alarm = EventSourceLevel()
