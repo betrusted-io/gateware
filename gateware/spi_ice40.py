@@ -227,7 +227,7 @@ class SpiFifoPeripheral(Module, AutoCSR, AutoDoc):
             CSRField("tx_over", description="Set when Tx FIFO overflows"),
             CSRField("tx_under", description = "Set when Tx FIFO underflows"),
         ])
-        self.submodules.ev = EventManager()
+        self.submodules.ev = EventManager(document_fields=True)
         self.ev.spi_avail = EventSourcePulse(description="Triggered when Rx FIFO leaves empty state")  # rising edge triggered
         self.ev.spi_event = EventSourceProcess(description="Triggered every time a packet completes")  # falling edge triggered
         self.ev.spi_err = EventSourcePulse(description="Triggered when any error condition occurs") # rising edge
