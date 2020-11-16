@@ -50,7 +50,7 @@ class HardI2C(Module, AutoCSR, AutoDoc):
             self.sda.get_tristate(pads.sda),
         ]
 
-        self.submodules.ev = EventManager()
+        self.submodules.ev = EventManager(document_fields=True)
         self.ev.i2c_int = EventSourcePulse(description="I2C cycle completed")
         self.ev.gg_int = EventSourcePulse(description="Gas gauge interrupt")
         self.ev.gyro_int = EventSourcePulse(description="Gyro interrupt")

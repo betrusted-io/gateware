@@ -62,7 +62,7 @@ class TickTimer(Module, AutoCSR, AutoDoc):
         systicks. The interrupt remains active until a new target is set, or masked. 
         """)
         self.msleep_target = CSRStorage(size=bits, description="Target time in {}ms ticks".format(resolution_in_ms))
-        self.submodules.ev = EventManager()
+        self.submodules.ev = EventManager(document_fields=True)
         alarm = Signal()
         self.ev.alarm = EventSourceLevel()
         self.comb += self.ev.alarm.trigger.eq(alarm)

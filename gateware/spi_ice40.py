@@ -53,7 +53,7 @@ class SpiController(Module, AutoCSR, AutoDoc):
             pads.res_n.eq(~self.wifi.fields.reset),
         ]
 
-        self.submodules.ev = EventManager()
+        self.submodules.ev = EventManager(document_fields=True)
         # self.ev.spi_int = EventSourceProcess(description="Triggered on conclusion of each transaction")  # falling edge triggered
         self.ev.wirq = EventSourcePulse(description="Interrupt request from wifi chip") # rising edge triggered
         self.ev.finalize()
@@ -399,7 +399,7 @@ class SpiPeripheral(Module, AutoCSR, AutoDoc):
             CSRField("rxover", description="Set if Rx register was not read before another transaction was started")
         ])
 
-        self.submodules.ev = EventManager()
+        self.submodules.ev = EventManager(document_fields=True)
         self.ev.spi_int = EventSourceProcess()  # falling edge triggered
         self.ev.finalize()
         self.comb += self.ev.spi_int.trigger.eq(self.control.fields.intena & self.status.fields.tip)
