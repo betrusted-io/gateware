@@ -114,7 +114,7 @@ impl Engine512 {
         ret.p.SHA512.command.write(|w|{ w.hash_start().set_bit() });
 
         // enable "done" events
-        unsafe{ ret.p.SHA512.ev_enable.write(|w| {w.enable().bits(Sha512Event::SHA512_DONE.bits() as u8)}); }
+        unsafe{ ret.p.SHA512.ev_enable.write(|w| {w.sha512_done().set_bit()}); }
         ret
     }
 

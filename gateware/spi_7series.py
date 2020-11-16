@@ -75,7 +75,7 @@ class SPIController(Module, AutoCSR, AutoDoc):
         ])
         self.comb += self.status.fields.hold.eq(hold)
 
-        self.submodules.ev = EventManager()
+        self.submodules.ev = EventManager(document_fields=True)
         self.ev.spi_int    = EventSourceProcess()  # Falling edge triggered
         self.ev.spi_hold   = EventSourceProcess()  # triggers when hold drops
         self.ev.finalize()
@@ -179,7 +179,7 @@ class SPIPeripheral(Module, AutoCSR, AutoDoc):
             CSRField("rxover", description="Set if Rx register was not read before another transaction was started")
         ])
 
-        self.submodules.ev = EventManager()
+        self.submodules.ev = EventManager(document_fields=True)
         self.ev.spi_int    = EventSourceProcess()  # Falling edge triggered
         self.ev.finalize()
         self.comb += self.ev.spi_int.trigger.eq(self.control.fields.intena & self.status.fields.tip)
