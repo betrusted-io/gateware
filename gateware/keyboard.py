@@ -166,7 +166,7 @@ class KeyScan(Module, AutoCSR, AutoDoc):
         ]
         self.sync.kbd += col_r.eq(self.coldecoder.o)
 
-        self.submodules.ev = EventManager()
+        self.submodules.ev = EventManager(document_fields=True)
         self.ev.keypressed = EventSourcePulse(description="Triggered every time there is a difference in the row state") # Rising edge triggered
         self.ev.finalize()
         # Extract any changes just before the shadow takes its new values

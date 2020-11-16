@@ -77,7 +77,7 @@ class Hmac(Module, AutoDoc, AutoCSR):
 
         self.msg_length = CSRStatus(size=64, description="Bottom 64 bits of length of digested message, in bits")
 
-        self.submodules.ev = EventManager()
+        self.submodules.ev = EventManager(document_fields=True)
         self.ev.err_valid = EventSourcePulse(description="Error flag was generated")
         self.ev.fifo_full = EventSourcePulse(description="FIFO is full")
         self.ev.sha512_done = EventSourcePulse(description="SHA512 is done")

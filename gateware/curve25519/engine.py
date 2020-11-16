@@ -1511,7 +1511,7 @@ Here are the currently implemented opcodes for The Engine:
         ])
         self.comb += self.status.fields.running.eq(running)
 
-        self.submodules.ev = EventManager()
+        self.submodules.ev = EventManager(document_fields=True)
         self.ev.finished = EventSourcePulse(description="Microcode run finished execution")
         self.ev.illegal_opcode = EventSourcePulse(description="Illegal opcode encountered")
         self.ev.finalize()

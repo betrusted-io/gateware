@@ -53,7 +53,7 @@ class RTLI2C(Module, AutoCSR, AutoDoc):
             CSRField("RxACK",   size=1, description="Received acknowledge from slave. 1 = no ack received, 0 = ack received"),
         ])
 
-        self.submodules.ev = EventManager()
+        self.submodules.ev = EventManager(document_fields=True)
         self.ev.i2c_int    = EventSourcePulse()  # rising edge triggered
         self.ev.finalize()
 
