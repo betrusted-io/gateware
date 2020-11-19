@@ -75,7 +75,7 @@ class SPIController(Module, AutoCSR, AutoDoc):
         ])
         self.comb += self.status.fields.hold.eq(hold)
 
-        self.submodules.ev = EventManager(document_fields=True)
+        self.submodules.ev = EventManager()
         self.ev.spi_int    = EventSourceProcess()  # Falling edge triggered
         self.ev.spi_hold   = EventSourceProcess()  # triggers when hold drops
         self.ev.finalize()
