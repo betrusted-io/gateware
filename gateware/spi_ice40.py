@@ -202,10 +202,23 @@ class SpiFifoPeripheral(Module, AutoCSR, AutoDoc):
         "hold" condition until the next data is made available for reading.
         """)
 
-        self.cipo = pads.cipo
+        self.cipo = Signal()
         self.copi = pads.copi
         self.csn = pads.csn
-        self.hold = pads.hold
+        self.hold = Signal()
+        self.oe = Signal()  # used to disable driving signals to the target device when it is powered down
+        self.cipo_ts = TSTriple(1)
+        self.hold_ts = TSTriple(1)
+        self.specials += [
+            self.cipo_ts.get_tristate(pads.cipo),
+            self.hold_ts.get_tristate(pads.hold)
+        ]
+        self.comb += [
+            self.cipo_ts.oe.eq(self.oe),
+            self.hold_ts.oe.eq(self.oe),
+            self.cipo_ts.o.eq(self.cipo),
+            self.hold_ts.o.eq(self.hold),
+        ]
 
         ### clock is not wired up in this module, it's moved up to CRG for implementation-dependent buffering
 
