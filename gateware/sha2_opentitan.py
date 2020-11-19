@@ -66,7 +66,7 @@ class Hmac(Module, AutoDoc, AutoCSR):
         self.msg_length = CSRStatus(size=64, description="Length of digested message, in bits")
         self.error_code = CSRStatus(size=32, description="Error code")
 
-        self.submodules.ev = EventManager(document_fields=True)
+        self.submodules.ev = EventManager()
         self.ev.err_valid = EventSourcePulse(description="Error flag was generated")
         self.ev.fifo_full = EventSourcePulse(description="FIFO is full")
         self.ev.hash_done = EventSourcePulse(description="HMAC is done")
