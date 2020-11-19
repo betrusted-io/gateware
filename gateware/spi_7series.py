@@ -179,7 +179,7 @@ class SPIPeripheral(Module, AutoCSR, AutoDoc):
             CSRField("rxover", description="Set if Rx register was not read before another transaction was started")
         ])
 
-        self.submodules.ev = EventManager(document_fields=True)
+        self.submodules.ev = EventManager()
         self.ev.spi_int    = EventSourceProcess()  # Falling edge triggered
         self.ev.finalize()
         self.comb += self.ev.spi_int.trigger.eq(self.control.fields.intena & self.status.fields.tip)
