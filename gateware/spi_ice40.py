@@ -53,7 +53,7 @@ class SpiController(Module, AutoCSR, AutoDoc):
             pads.res_n.eq(~self.wifi.fields.reset),
         ]
 
-        self.submodules.ev = EventManager(document_fields=True)
+        self.submodules.ev = EventManager()
         # self.ev.spi_int = EventSourceProcess(description="Triggered on conclusion of each transaction")  # falling edge triggered
         self.ev.wirq = EventSourcePulse(description="Interrupt request from wifi chip") # rising edge triggered
         self.ev.finalize()
@@ -240,7 +240,7 @@ class SpiFifoPeripheral(Module, AutoCSR, AutoDoc):
             CSRField("tx_over", description="Set when Tx FIFO overflows"),
             CSRField("tx_under", description = "Set when Tx FIFO underflows"),
         ])
-        self.submodules.ev = EventManager(document_fields=True)
+        self.submodules.ev = EventManager()
         self.ev.spi_avail = EventSourceProcess(description="Triggered when Rx FIFO leaves empty state")  # rising edge triggered
         self.ev.spi_event = EventSourceProcess(description="Triggered every time a packet completes")  # falling edge triggered
         self.ev.spi_err = EventSourceProcess(description="Triggered when any error condition occurs") # rising edge
