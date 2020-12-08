@@ -474,7 +474,7 @@ we are spending a bunch of cycles propagating zeros most of the time.
 
 A constant-time optimization would be for the multiplier to simply produce a 256-bit
 result, and then use a subsequent TRD/SUB instruction pair. However, the non-pipelined
-version of the engine25519 executes at a rate of 60ns per instrution, or 120ns total to 
+version of the engine25519 executes at a rate of 60ns per instruction, or 120ns total to 
 compute the TRD/SUB combination, whereas iterating through the carry propagates 
 would take 140ns total (as the mul core runs 2x clock speed of the rest of the engine). 
 This is basically a wash. 
@@ -625,7 +625,7 @@ The diagram above illustrates how the schoolbook multiply is mapped onto the har
 array. The top diagram is an exact redrawing of the previous text box, where the
 partial sums that would extend to the left have been multiplied by 19 and wrapped around.
 Each colored block corresponds to a given DSP48E1 block. The red arrow
-illustrates the path of a partial sum in both the schoolbook form and the unrwapped
+illustrates the path of a partial sum in both the schoolbook form and the unwrapped
 form for hardware implementation. In the bottom diagram, one can clearly see that
 the Ax coefficients are constant for each column, and that for each row, the Bx 
 values are identical across all blocks in each step. Thus each column corresponds to
@@ -965,7 +965,7 @@ but if you're just getting started here's a few breadcrumbs to help you steer ar
 6. Because we configured C to have no input register, it can be used for cycle-to-cycle feedback of partial sums.
   Introducing an input register here (per DRC recco spit out by Vivado) could speed up the clock rate but it also introduces a single-cycle stall every time we have to do a partial sum feedback, which is a greater performance impact for our implementation.
 7. The "ALU" part of the DSP48E1 is used as the partial sum adder in our implementation (but it can also do logic operations and other fun things that we don't need). It actually adds four numbers: P <- X + Y + Z + Carry bit.  
-  We don't use the carry "bit" as it is only one-bit wide and we are propgating several bits of carry at once, so it is hard-wired to 0. X/Y/Z are up to 48 bits wide, and allows us to add combinations of the multiplier output, a concatenation of A:B (A as MSB, B as LSB), C, P, the number 0, and a couple other source options we don't use in this implementation. This is controlled by `opmode`.
+  We don't use the carry "bit" as it is only one-bit wide and we are propagating several bits of carry at once, so it is hard-wired to 0. X/Y/Z are up to 48 bits wide, and allows us to add combinations of the multiplier output, a concatenation of A:B (A as MSB, B as LSB), C, P, the number 0, and a couple other source options we don't use in this implementation. This is controlled by `opmode`.
 8. In parallel to the "ALU" is a pattern detector. The pattern being detected is hard-coded into the bitstream, and in this case we are looking for a run of `1`'s to help accelerate the overflow detection problem. The output of the pattern detector is always being computed, and dataflow-synchronous to the P output.  
 9. Unused bits of verilog instances in Migen need to be tied to 0; Migen does not automatically extend/pad shorter `Signal` values to match verilog input widths. This is important because the DSP48E1 input widths don't always exactly match the Migen widths. We create a "zeros" signal and `Cat()` it onto the MSBs as necessary to ensure all inputs to the DSP48E1 are properly specified.
 
@@ -996,7 +996,7 @@ we must add 19 to make it a member of the prime field once again. We can do this
 short-circuiting the carry propagate: we already know we will have to propagate a carry to handle the overflow
 case (there are only 19 possible numbers that will overflow this, and all of them have 1's set up the entire
 chain), so we pre-add the carry simultaneous with adding the number 19 to the least significant limb. We also
-use this step to mask out the upper level bits on the partial sums, because the to pbits are now the old
+use this step to mask out the upper level bits on the partial sums, because the top bits are now the old
 carries that have already been propagated. If we fail to do this, then we re-propagate the carries from the last step.
 
         """)
