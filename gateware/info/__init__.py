@@ -14,14 +14,15 @@ from gateware.info import platform as platform_info
 
 
 class Info(Module, AutoCSR):
-    def __init__(self, platform, target_name, analog_pads=None):
+    def __init__(self, platform, target_name, use_xadc=True, analog_pads=None):
         self.submodules.dna = dna.DNA()
         self.submodules.git = git.GitInfo()
         target = target_name.lower()[:-3]
         self.submodules.platform = platform_info.PlatformInfo(platform.name, target)
 
-        if "xc7" in platform.device:
-            self.submodules.xadc = xadc.XADC(analog_pads)
-            if analog_pads != None:
-                self.xadc.expose_drp()
+        if use_xadc:
+            if "xc7" in platform.device:
+                self.submodules.xadc = xadc.XADC(analog_pads)
+                if analog_pads != None:
+                    self.xadc.expose_drp()
 
