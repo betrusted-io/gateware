@@ -148,14 +148,14 @@ The refill mark is configured at {} entries.
             NextValue(av_powerstate, 0),
             If(av_ena,
                 NextValue(av_delay_ctr, server.av_config.fields.powerdelay),
-                NextValue(av_micros_ctr, 99),
+                NextValue(av_micros_ctr, 100),
                 NextState("WAIT"),
             )
         )
         avpwr.act("WAIT",
             NextValue(av_powerstate, 0),
             If(av_micros_ctr == 0,
-                NextValue(av_micros_ctr, 99),
+                NextValue(av_micros_ctr, 100),
                 If(av_delay_ctr == 0,
                     NextState("UP")
                 ).Else(
@@ -209,18 +209,18 @@ The refill mark is configured at {} entries.
             If(av_powerstate,
                 NextState("ASSEMBLE"),
             ),
-            av_noiseout_ready.eq(0),
-            NextValue(av_noisecnt, 7),
+            NextValue(av_noiseout_ready, 0),
+            NextValue(av_noisecnt, 8),
             NextValue(av_noiseout, 0),
         )
         avn.act("ASSEMBLE",
-            av_noiseout_ready.eq(0),
+            NextValue(av_noiseout_ready, 0),
             If(av_noisecnt == 0,
                 NextState("READY")
             ).Else(
                 If(av_noise0_fresh & av_noise1_fresh,
                     NextValue(av_noisecnt, av_noisecnt - 1),
-                    NextValue(av_noiseout, Cat(av_noise0_data[:4] ^ av_noise1_data[:4],av_noiseout[4:])),
+                    NextValue(av_noiseout, Cat(av_noise0_data[:4] ^ av_noise1_data[:4], av_noiseout[:28])),
                     av_noise0_read.eq(1),
                     av_noise1_read.eq(1),
                 )
@@ -228,9 +228,10 @@ The refill mark is configured at {} entries.
         )
         avn.act("READY",
             If(av_noiseout_read,
+                NextValue(av_noiseout_ready, 0),
                 NextState("IDLE")
             ).Else(
-                av_noiseout_ready.eq(1)
+                NextValue(av_noiseout_ready, 1)
             )
         )
 
@@ -247,8 +248,8 @@ The refill mark is configured at {} entries.
             self.ringosc.gang.eq(server.ro_config.fields.gang),
             self.ringosc.dwell.eq(server.ro_config.fields.dwell),
             self.ringosc.delay.eq(server.ro_config.fields.delay),
-            ro_rand.eq(self.ringosc.rand_out),
             ro_fresh.eq(self.ringosc.fresh),
+            ro_rand.eq(self.ringosc.rand_out),
             self.ringosc.rand_read.eq(ro_rand_read),
         ]
 
