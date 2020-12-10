@@ -62,7 +62,8 @@ crg_config = {
 
 class Platform(XilinxPlatform):
     def __init__(self, simio):
-        XilinxPlatform.__init__(self, "", simio + benchio)
+        part = "xc7s" + "50" + "-csga324-1il"
+        XilinxPlatform.__init__(self, part, simio + benchio, toolchain="vivado")
 
 
 class CRG(Module):
