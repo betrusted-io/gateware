@@ -5,10 +5,10 @@ from litex.soc.interconnect.csr import *
 from litex.soc.integration.doc import AutoDoc, ModuleDoc
 from litex.soc.interconnect.csr_eventmanager import *
 
-class TrngManagedUser(Module, AutoCSR, AutoDoc):
+class TrngManagedKernel(Module, AutoCSR, AutoDoc):
     def __init__(self):
         self.intro = ModuleDoc("""
-Userspace-visible register interface for the TrngManaged core. Must be created as a submodule in
+kernel-visible register interface for the TrngManaged core. Must be created as a submodule in
 the top-level SoC and passed to TrngManaged as an argument.
         """)
         self.status = CSRStatus(fields=[
@@ -23,23 +23,23 @@ the top-level SoC and passed to TrngManaged as an argument.
         ])
 
         self.submodules.ev = EventManager()
-        self.ev.avail = EventSourceLevel(description="Triggered anytime there is data available on the user interface")
-        self.ev.error = EventSourcePulse(description="Triggered whenever an underrun condition first occurs on the user interface")
+        self.ev.avail = EventSourceLevel(description="Triggered anytime there is data available on the kernel interface")
+        self.ev.error = EventSourcePulse(description="Triggered whenever an underrun condition first occurs on the kernel interface")
         self.ev.finalize()
 
 
-class TrngManagedPriv(Module, AutoCSR, AutoDoc):
+class TrngManagedServer(Module, AutoCSR, AutoDoc):
     def __init__(self):
         self.refill_mark = 512  # point at which manager automatically powers on the block and refills the FIFO
 
         self.intro = ModuleDoc("""
-Kernel-private register interface for the TrngManaged core. Must be created as a submodule in
+server register interface for the TrngManaged core. Must be created as a submodule in
 the top-level SoC and passed to TrngManaged as an argument.
         """)
         self.control = CSRStorage(fields=[
-            CSRField("enable", size=1, description="Power on the management interface and auto-fill random numbers"),
-            CSRField("ro_dis", size=1, description="When set, disables the ring oscillator as an entropy source"),
-            CSRField("av_dis", size=1, description="When set, disables the avalanche generator as an entropy source"),
+            CSRField("enable", size=1, description="Power on the management interface and auto-fill random numbers", reset=1),
+            CSRField("ro_dis", size=1, description="When set, disables the ring oscillator as an entropy source", reset=0),
+            CSRField("av_dis", size=1, description="When set, disables the avalanche generator as an entropy source", reset=0),
             CSRField("powersave", size=1, description="When set, TRNGs are automatically turned off until low water mark of {} entries is hit; when cleared, TRNGs are always on".format(self.refill_mark), reset=1),
             CSRField("no_check", size=1, description="When set, disables on-line health checking (for power saving)"),
             CSRField("clr_err", size=1, description="Write ``1`` to this bit to clear the ``errors`` register", pulse=True)
@@ -70,49 +70,109 @@ the top-level SoC and passed to TrngManaged as an argument.
         ])
 
         self.errors = CSRStatus(fields=[
-            CSRField("priv_underrun", size=10, description="If non-zero, a privileged underrun has occurred. Will count number of underruns up to max field size"),
-            CSRField("user_underrun", size=10, description="If non-zero, a user underrun has occurred. Will count number of underruns up to max field size"),
-            CSRField("ro_health", size=1, description="Ring oscillator has failed an on-line health test"),
-            CSRField("av_health", size=1, description="Avalanche generator has failed an on-line health test"),
+            CSRField("server_underrun", size=10, description="If non-zero, a server underrun has occurred. Will count number of underruns up to max field size"),
+            CSRField("kernel_underrun", size=10, description="If non-zero, a kernel underrun has occurred. Will count number of underruns up to max field size"),
+            CSRField("ro_health", size=1, description="When `1`, Ring oscillator has failed an on-line health test"),
+            CSRField("av_health", size=1, description="When `1`, Avalanche generator has failed an on-line health test"),
         ])
 
         self.submodules.ev = EventManager()
-        self.ev.avail = EventSourceLevel(description="Triggered anytime there is data available on the privileged interface")
-        self.ev.error = EventSourcePulse(description="Triggered whenever an error condition first occurs on the privileged interface")
+        self.ev.avail = EventSourceLevel(description="Triggered anytime there is data available on the server interface")
+        self.ev.error = EventSourcePulse(description="Triggered whenever an error condition first occurs on the server interface")
+        self.ev.health = EventSourcePulse(description="Triggered whenever a health event first occurs")
         self.ev.finalize()
 
 
+class TrngOnlineCheck(Module, AutoDoc):
+    def __init__(self):
+        self.intro = ModuleDoc("""
+This is a placeholder for online health checks on the TRNG. Right now we just check for very gross
+errors (stuck state). Do not rely on the output of this until it has been made more robust!
+        """)
+        self.enable = Signal()
+        self.healthy = Signal() # if currently healthy or not
+        self.rand = Signal(32)  # the random number to check
+        self.update = Signal()  # update the health checker state
+
+        last_rand = Signal(32)
+        self.sync += [
+            If(self.enable,
+                If(self.update,
+                    last_rand.eq(self.rand)
+                ),
+                If(last_rand == self.rand,
+                    self.healthy.eq(0)
+                ).Else(
+                    self.healthy.eq(1)
+                )
+            )
+        ]
+
 class TrngManaged(Module, AutoCSR, AutoDoc):
-    def __init__(self, platform, analog_pads, priv, user):
+    def __init__(self, platform, analog_pads, noise_pads, kernel, server):
         self.intro = ModuleDoc("""
 TrngManaged wraps a management interface around two TRNG sources for the Precursor platform.
 The management interface provides:
 
   - FIFOs that are automatically filled, to supply limited amounts of entropy in fast bursts
   - Detection of underrun conditions in the FIFOs
-  - A separate, dedicated kernel page for kernel processes to acquire TRNGs
+  - A separate, dedicated kernel page for kernel functions to acquire TRNGs
   - Basic health monitoring of TRNG sources
   - Combination/selection of both external (avalanche, XADC-based) and internal (ring oscillator based) sources
 
 Installing TrngManaged overrides the Litex-default Info XADC interface. Therefore it cannot be
 instantiated concurrently with the XADC in the Info block. It also is intended to manage
-the ring oscillator, so e.g. stand-alone TrngRingOscV2's are not reccommended to be installed in
+the ring oscillator, so e.g. stand-alone TrngRingOscV2's are not recommended to be installed in
 the same design.
 
 The refill mark is configured at {} entries.
-        """.format(priv.refill_mark))
+        """.format(server.refill_mark))
         refill_needed = Signal()
+        powerup = Signal()
 
-        # todo: refactor noisebias/noise power pads to end up in this interface
-        # external avalanche generators should be powered down when block is disabled
-        # we're also going to need a power-up delay timer based on `refill_needed`
-        # we're going to need an FSM that:
-        #  1. checks if refill_needed
-        #  2. powers on generators
-        #  3. clears stale values
-        #  4. samples from ro & av (depending on enablement status), and XORs them and puts into queue when both become available
-        #  5. when FIFO Is full, powers down the blocks
-        # we also need a "health checker" primitive -- initially just a simple repeating value checker
+        # this state machine manages the avalanche generator's power-on delay. It ensures that
+        # the generator always gets at least the minimum specified time to turn on and stabilize
+        av_ena = Signal()
+        self.comb += [
+            av_ena.eq( (~server.control.fields.av_dis & server.control.fields.enable)
+                                & (powerup | ~server.control.fields.powersave)),
+            noise_pads.noisebias_on.eq(av_ena),
+            noise_pads.noise_on.eq(Cat(av_ena, av_ena)),
+        ]
+        av_powerstate = Signal()
+        av_delay_ctr = Signal(20)
+        av_micros_ctr = Signal(7)
+        avpwr = FSM(reset_state="DOWN")
+        self.submodules += avpwr
+        avpwr.act("DOWN",
+            NextValue(av_powerstate, 0),
+            If(av_ena,
+                NextValue(av_delay_ctr, server.av_config.fields.powerdelay),
+                NextValue(av_micros_ctr, 99),
+                NextState("WAIT"),
+            )
+        )
+        avpwr.act("WAIT",
+            NextValue(av_powerstate, 0),
+            If(av_micros_ctr == 0,
+                NextValue(av_micros_ctr, 99),
+                If(av_delay_ctr == 0,
+                    NextState("UP")
+                ).Else(
+                    NextValue(av_delay_ctr, av_delay_ctr - 1)
+                )
+            ).Else(
+                NextValue(av_micros_ctr, av_micros_ctr - 1),
+            )
+        )
+        avpwr.act("UP",
+            NextValue(av_powerstate, 1),
+            If(~av_ena,
+                NextState("DOWN")
+            )
+        )
+
+        # This the XADC module -- it gives us raw noise values that we have to assemble into a 32-bit value
         self.submodules.xadc = TrngXADC(analog_pads)
         av_noise0_read = Signal()
         av_noise1_read = Signal()
@@ -134,140 +194,285 @@ The refill mark is configured at {} entries.
             self.xadc.config_noise.eq(av_config_noise),
             av_configured.eq(self.xadc.configured),
         ]
+        # This state machine assembles ADC values into a 32-bit noise word
+        # This can be done even when the XADC isn't configured for noise mode -- the "noise mode"
+        # reconfiguration is just to optimize sampling speed, it does not affect correctness.
+        # Note that correctness is affected by the power-on delay of the external generator, which is
+        # not related to the following state machine
+        av_noiseout = Signal(32)
+        av_noiseout_ready = Signal()
+        av_noiseout_read = Signal()
+        av_noisecnt = Signal(4)
+        avn = FSM(reset_state="IDLE")
+        self.submodules += avn
+        avn.act("IDLE",
+            If(av_powerstate,
+                NextState("ASSEMBLE"),
+            ),
+            av_noiseout_ready.eq(0),
+            NextValue(av_noisecnt, 7),
+            NextValue(av_noiseout, 0),
+        )
+        avn.act("ASSEMBLE",
+            av_noiseout_ready.eq(0),
+            If(av_noisecnt == 0,
+                NextState("READY")
+            ).Else(
+                If(av_noise0_fresh & av_noise1_fresh,
+                    NextValue(av_noisecnt, av_noisecnt - 1),
+                    NextValue(av_noiseout, Cat(av_noise0_data[:4] ^ av_noise1_data[:4],av_noiseout[4:])),
+                    av_noise0_read.eq(1),
+                    av_noise1_read.eq(1),
+                )
+            )
+        )
+        avn.act("READY",
+            If(av_noiseout_read,
+                NextState("IDLE")
+            ).Else(
+                av_noiseout_ready.eq(1)
+            )
+        )
 
+        # instantiate the on-chip ring oscillator TRNG. This one has no power-on delay, but the first
+        # reading should be discarded after enabling (this is handled by the high level sequencer)
         self.submodules.ringosc = TrngRingOscV2Managed(platform)
         # pass-through config and mangamement signals to the RO
         ro_rand = Signal(32)
         ro_fresh = Signal()
         ro_rand_read = Signal()
         self.comb += [
-            self.ringosc.ena.eq( (~priv.control.fields.ro_dis & priv.control.fields.enable) & (refill_needed | ~priv.control.fields.powersave) ),
-            self.ringosc.gang.eq(priv.ro_config.fields.gang),
-            self.ringosc.dwell.eq(priv.ro_config.fields.dwell),
-            self.ringosc.delay.eq(priv.ro_config.fields.delay),
+            self.ringosc.ena.eq( (~server.control.fields.ro_dis & server.control.fields.enable)
+                                 & (powerup | ~server.control.fields.powersave) ),
+            self.ringosc.gang.eq(server.ro_config.fields.gang),
+            self.ringosc.dwell.eq(server.ro_config.fields.dwell),
+            self.ringosc.delay.eq(server.ro_config.fields.delay),
             ro_rand.eq(self.ringosc.rand_out),
             ro_fresh.eq(self.ringosc.fresh),
             self.ringosc.rand_read.eq(ro_rand_read),
         ]
 
-        #### now build two fifos, one for user, one for priv
+        ## Add the health checkers and interrupts
+        self.submodules.ro_health = TrngOnlineCheck()
+        self.submodules.av_health = TrngOnlineCheck()
+        self.comb += [
+            self.av_health.enable.eq(~server.control.fields.no_check & av_powerstate),
+            self.av_health.rand.eq(av_noiseout),
+            self.av_health.update.eq(av_noiseout_read),
+            self.ro_health.enable.eq(~server.control.fields.no_check & self.ringosc.ena),
+            self.ro_health.rand.eq(ro_rand),
+            self.ro_health.update.eq(ro_rand_read),
+        ]
+        health_issue = Signal()
+        self.sync += [
+            If(server.errors.re,
+                server.errors.fields.ro_health.eq(0),
+                server.errors.fields.av_health.eq(0),
+            ).Else(
+                If(~self.ro_health.healthy,
+                    server.errors.fields.ro_health.eq(1),
+                ).Else(
+                    server.errors.fields.ro_health.eq(server.errors.fields.ro_health)
+                ),
+                If(~self.av_health.healthy,
+                    server.errors.fields.av_health.eq(1),
+                ).Else(
+                    server.errors.fields.av_health.eq(server.errors.fields.av_health)
+                )
+            ),
+            health_issue.eq(server.errors.fields.av_health | server.errors.fields.ro_health),
+            server.ev.health.trigger.eq(~health_issue & (server.errors.fields.av_health | server.errors.fields.ro_health))
+        ]
+
+        #### now build two fifos, one for kernel, one for server
         # At a width of 32 bits, an 36kiB fifo is 1024 entries deep
-
-        ## priv fifo
-        priv_fifo_full = Signal()
-        priv_fifo_empty = Signal()
-        priv_fifo_wren = Signal()
-        priv_fifo_din = Signal(32)
-        priv_fifo_rden = Signal()
-        priv_fifo_dout = Signal(32)
-        priv_fifo_rdcount = Signal(10)
-        priv_fifo_rderr = Signal()
-        priv_fifo_wrcount = Signal(10)
-        priv_fifo_almostempty = Signal()
+        ## server fifo
+        server_fifo_full = Signal()
+        server_fifo_empty = Signal()
+        server_fifo_wren = Signal()
+        server_fifo_din = Signal(32)
+        server_fifo_rden = Signal()
+        server_fifo_dout = Signal(32)
+        server_fifo_rdcount = Signal(10)
+        server_fifo_rderr = Signal()
+        server_fifo_wrcount = Signal(10)
+        server_fifo_almostempty = Signal()
         self.specials += Instance("FIFO_SYNC_MACRO",
             p_DEVICE="7SERIES",
             p_FIFO_SIZE="36Kb",
             p_DATA_WIDTH=32,
-            p_ALMOST_EMPTY_OFFSET=priv.refill_mark,
+            p_ALMOST_EMPTY_OFFSET=server.refill_mark,
             p_ALMOST_FULL_OFFSET=1024-8,
             p_DO_REG=0,
             i_CLK=ClockSignal(),
             i_RST=ResetSignal(),
-            o_FULL=priv_fifo_full,
-            o_EMPTY=priv_fifo_empty,
-            i_WREN=priv_fifo_wren,
-            i_DI=priv_fifo_din,
-            i_RDEN=priv_fifo_rden,
-            o_DO=priv_fifo_dout,
-            o_RDCOUNT=priv_fifo_rdcount,
-            o_RDERR=priv_fifo_rderr,
-            o_WRCOUNT=priv_fifo_wrcount,
-            o_ALMOSTEMPTY=priv_fifo_almostempty,
+            o_FULL=server_fifo_full,
+            o_EMPTY=server_fifo_empty,
+            i_WREN=server_fifo_wren,
+            i_DI=server_fifo_din,
+            i_RDEN=server_fifo_rden,
+            o_DO=server_fifo_dout,
+            o_RDCOUNT=server_fifo_rdcount,
+            o_RDERR=server_fifo_rderr,
+            o_WRCOUNT=server_fifo_wrcount,
+            o_ALMOSTEMPTY=server_fifo_almostempty,
         )
         self.comb += [
-            priv.ev.avail.trigger.eq(~priv_fifo_empty),
-            priv.ev.error.trigger.eq(priv_fifo_rderr), # this should only pulse when RE is triggered; it should not be stuck at a level
-            If(~priv_fifo_empty,
-                priv_fifo_rden.eq(priv.data.re),
-                priv.data.fields.data.eq(priv_fifo_dout),
+            server.ev.avail.trigger.eq(~server_fifo_empty),
+            server.ev.error.trigger.eq(server_fifo_rderr), # this should only pulse when RE is triggered; it should not be stuck at a level
+            If(~server_fifo_empty,
+                server_fifo_rden.eq(server.data.re),
+                server.data.fields.data.eq(server_fifo_dout),
             ).Else(
-                priv.data.fields.data.eq(0xDEADBEEF),
+                server.data.fields.data.eq(0xDEADBEEF),
             ),
-            priv.status.fields.rdcount.eq(priv_fifo_rdcount),
-            priv.status.fields.wrcount.eq(priv_fifo_wrcount),
-            priv.status.fields.avail.eq(~priv_fifo_empty),
+            server.status.fields.rdcount.eq(server_fifo_rdcount),
+            server.status.fields.wrcount.eq(server_fifo_wrcount),
+            server.status.fields.avail.eq(~server_fifo_empty),
         ]
         self.sync += [
-            If(priv.control.fields.clr_err,
-                priv.errors.fields.priv_underrun.eq(0)
+            If(server.control.fields.clr_err,
+                server.errors.fields.server_underrun.eq(0)
             ).Else(
-                If(priv_fifo_rden & priv_fifo_empty,
-                    If(priv.errors.fields.priv_underrun < 0x3FF,
-                        priv.errors.fields.priv_underrun.eq(priv.errors.fields.priv_underrun + 1)
+                If(server_fifo_rden & server_fifo_empty,
+                    If(server.errors.fields.server_underrun < 0x3FF,
+                        server.errors.fields.server_underrun.eq(server.errors.fields.server_underrun + 1)
                     )
                 )
             )
         ]
 
-        ## user fifo
-        user_fifo_full = Signal()
-        user_fifo_empty = Signal()
-        user_fifo_wren = Signal()
-        user_fifo_din = Signal(32)
-        user_fifo_rden = Signal()
-        user_fifo_dout = Signal(32)
-        user_fifo_rdcount = Signal(10)
-        user_fifo_rderr = Signal()
-        user_fifo_wrcount = Signal(10)
-        user_fifo_almostempty = Signal()
+        ## kernel fifo
+        kernel_fifo_full = Signal()
+        kernel_fifo_empty = Signal()
+        kernel_fifo_wren = Signal()
+        kernel_fifo_din = Signal(32)
+        kernel_fifo_rden = Signal()
+        kernel_fifo_dout = Signal(32)
+        kernel_fifo_rdcount = Signal(10)
+        kernel_fifo_rderr = Signal()
+        kernel_fifo_wrcount = Signal(10)
+        kernel_fifo_almostempty = Signal()
         self.specials += Instance("FIFO_SYNC_MACRO",
             p_DEVICE="7SERIES",
             p_FIFO_SIZE="36Kb",
             p_DATA_WIDTH=32,
-            p_ALMOST_EMPTY_OFFSET=priv.refill_mark,
+            p_ALMOST_EMPTY_OFFSET=server.refill_mark,
             p_ALMOST_FULL_OFFSET=1024-8,
             p_DO_REG=0,
             i_CLK=ClockSignal(),
             i_RST=ResetSignal(),
-            o_FULL=user_fifo_full,
-            o_EMPTY=user_fifo_empty,
-            i_WREN=user_fifo_wren,
-            i_DI=user_fifo_din,
-            i_RDEN=user_fifo_rden,
-            o_DO=user_fifo_dout,
-            o_RDCOUNT=user_fifo_rdcount,
-            o_RDERR=user_fifo_rderr,
-            o_WRCOUNT=user_fifo_wrcount,
-            o_ALMOSTEMPTY=user_fifo_almostempty,
+            o_FULL=kernel_fifo_full,
+            o_EMPTY=kernel_fifo_empty,
+            i_WREN=kernel_fifo_wren,
+            i_DI=kernel_fifo_din,
+            i_RDEN=kernel_fifo_rden,
+            o_DO=kernel_fifo_dout,
+            o_RDCOUNT=kernel_fifo_rdcount,
+            o_RDERR=kernel_fifo_rderr,
+            o_WRCOUNT=kernel_fifo_wrcount,
+            o_ALMOSTEMPTY=kernel_fifo_almostempty,
         )
         self.comb += [
-            user.ev.avail.trigger.eq(~user_fifo_empty),
-            user.ev.error.trigger.eq(user_fifo_rderr), # this should only pulse when RE is triggered; it should not be stuck at a level
-            If(~user_fifo_empty,
-                user_fifo_rden.eq(user.data.re),
-                user.data.fields.data.eq(user_fifo_dout),
+            kernel.ev.avail.trigger.eq(~kernel_fifo_empty),
+            kernel.ev.error.trigger.eq(kernel_fifo_rderr), # this should only pulse when RE is triggered; it should not be stuck at a level
+            If(~kernel_fifo_empty,
+                kernel_fifo_rden.eq(kernel.data.re),
+                kernel.data.fields.data.eq(kernel_fifo_dout),
             ).Else(
-                user.data.fields.data.eq(0xDEADBEEF),
+                kernel.data.fields.data.eq(0xDEADBEEF),
             ),
-            user.status.fields.rdcount.eq(user_fifo_rdcount),
-            user.status.fields.wrcount.eq(user_fifo_wrcount),
-            user.status.fields.avail.eq(~user_fifo_empty),
+            kernel.status.fields.rdcount.eq(kernel_fifo_rdcount),
+            kernel.status.fields.wrcount.eq(kernel_fifo_wrcount),
+            kernel.status.fields.avail.eq(~kernel_fifo_empty),
         ]
         self.sync += [
-            If(priv.control.fields.clr_err,
-                priv.errors.fields.user_underrun.eq(0)
+            If(server.control.fields.clr_err,
+                server.errors.fields.kernel_underrun.eq(0)
             ).Else(
-                If(user_fifo_rden & user_fifo_empty,
-                    If(priv.errors.fields.user_underrun < 0x3FF,
-                        priv.errors.fields.user_underrun.eq(priv.errors.fields.user_underrun + 1)
+                If(kernel_fifo_rden & kernel_fifo_empty,
+                    If(server.errors.fields.kernel_underrun < 0x3FF,
+                        server.errors.fields.kernel_underrun.eq(server.errors.fields.kernel_underrun + 1)
                     )
                 )
             )
         ]
 
+        # static datapath to merge the TRNG results into the FIFOs. Actual gating of writes is handled by the
+        # high level control state machine. The main reason we don't just always XOR the two machines together
+        # is to give visibility for debug and individual TRNG quality checking
+        merged_trng = Signal(32)
         self.comb += [
-            refill_needed.eq(user_fifo_almostempty | priv_fifo_almostempty)
+            refill_needed.eq(kernel_fifo_almostempty | server_fifo_almostempty), # either fifo going almost empty will trigger a top-up, but note that both will be topped up anytime one FIFO needs a top-up
+            If(~server.control.fields.av_dis & ~server.control.fields.ro_dis,
+                merged_trng.eq(av_noiseout ^ ro_rand)
+            ).Elif(~server.control.fields.av_dis & server.control.fields.ro_dis,
+                merged_trng.eq(av_noiseout)
+            ).Elif(server.control.fields.av_dis & ~server.control.fields.ro_dis,
+                merged_trng.eq(ro_rand)
+            ).Else(
+                merged_trng.eq(0xDEADBEEF)
+            ),
+            kernel_fifo_din.eq(merged_trng),
+            server_fifo_din.eq(merged_trng),
         ]
+
+        # This is the "high-level control" refill FSM.
+        refill = FSM(reset_state="IDLE")
+        self.submodules += refill
+        refill.act("IDLE",
+            If(refill_needed,
+                NextState("CONFIG"),
+                NextValue(powerup, 1),
+                NextValue(av_config_noise, 1),  # switch to noise-only sampling for the XADC
+            ).Else(
+                NextValue(powerup, 0),
+            )
+        )
+        refill.act("CONFIG",
+            av_reconfigure.eq(1),  # edge-triggered signal to initiate XADC config
+            NextState("WAIT_ON"),
+        )
+        refill.act("WAIT_ON",
+            If(av_powerstate & av_configured,  # ring oscillator is "instant-on", so we just need to check avalanche generator's power state
+                NextState("PUMP"),
+                NextValue(av_config_noise, 0),  # prep for next av_reconfigure pulse
+            )
+        )
+        refill.act("PUMP", # discard the first value out of the TRNG, as it's potentially biased by power-on effects
+            # do pump here
+            If(av_noiseout_ready & ro_fresh,
+                av_noiseout_read.eq(1),
+                ro_rand_read.eq(1),
+                NextState("REFILL_KERNEL")
+            )
+        )
+        refill.act("REFILL_KERNEL",
+            If(kernel_fifo_full,
+                NextState("REFILL_SERVER")
+            ).Else(
+                If(av_noiseout_ready & ro_fresh,
+                    kernel_fifo_wren.eq(1),
+                    av_noiseout_read.eq(1),
+                    ro_rand_read.eq(1),
+                ),
+            )
+        )
+        refill.act("REFILL_SERVER",
+            If(server_fifo_full,
+                NextState("GO_IDLE"),
+            ).Else(
+                If(av_noiseout_ready & ro_fresh,
+                    server_fifo_wren.eq(1),
+                    av_noiseout_read.eq(1),
+                    ro_rand_read.eq(1),
+                )
+            )
+        )
+        refill.act("GO_IDLE",
+            NextValue(av_config_noise, 0), # should already be 0, as this was set leaving "WAIT_ON" state
+            av_reconfigure.eq(1), # pulse to set XADC back into the "system" sampling mode
+        )
 
 analog_layout = [("vauxp", 16), ("vauxn", 16), ("vp", 1), ("vn", 1)]
 
