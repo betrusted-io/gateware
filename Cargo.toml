@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "sim/trng_managed/testbench",
     "sim/curve_engine/testbench",
     "sim/sha512/testbench",
     "sim/sha2/testbench",
