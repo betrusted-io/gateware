@@ -80,6 +80,26 @@ local_clocks = {
     # add more clocks here, formatted as {"name" : [freq, phase]}
 }
 
+adc_values = """
+// This analog stimulus file is used to inject analog signals (e.g., volts, temperature) for a simulation.
+// Units are as follows:
+//          Time:                           nanoseconds [ns]
+//          Voltage (All rails):     volts [V]
+//          Temperature:             degrees C [C]. Please note that the temperature transfer function is in terms of Kelvin
+//
+// In this example the VCCAUX supply moves outside the 1.89V upper alarm limit at 67 us
+// An alarm is generate when the VCCAUX channel is sampled and converted by the ADC
+
+//      noise1            vbus              noise0              usb_p               usb_n
+TIME    VAUXP[4] VAUXN[4] VAUXP[6] VAUXN[6] VAUXP[12] VAUXN[12] VAUXP[14] VAUXN[14] VAUXP[15] VAUXN[15] TEMP VCCINT VCCAUX VCCBRAM
+00000   0.005    0.0      0.2      0.0      0.5       0.0       0.1       0.0       0.0       0.0       25    0.94    1.8     0.95    
+67000   0.020    0.0      0.400    0.0      0.49      0.0       0.2       0.0       0.0       0.0       35    0.94    1.79    0.94
+100000  0.049    0.0      0.600    0.0      0.51      0.0       0.5       0.0       0.0       0.0       40    0.95    1.78    0.95 
+134000  0.034    0.0      0.900    0.0      0.53      0.0       0.5       0.0       0.0       0.0       41    0.96    1.81    0.96
+150000  0.500    0.0      2.500    0.0      0.40      0.0       0.5       0.0       0.0       0.0       41    0.96    1.81    0.96
+160000  0.450    0.0      2.500    0.0      0.56      0.0       0.5       0.0       0.0       0.0       41    0.96    1.81    0.96
+"""
+
 """
 add the submodules we're testing to the SoC, which is encapsulated in the Sim class
 """
@@ -126,7 +146,7 @@ class Dut(Sim):
         self.add_csr("trng_server")
         self.add_interrupt("trng_server")
         self.submodules.trng = TrngManaged(platform, analog_pads, platform.request("noise"), server=self.trng_server,
-            kernel=self.trng_kernel)
+            kernel=self.trng_kernel, sim=True)
         self.add_csr("trng")
 
 
@@ -171,7 +191,7 @@ before calling SimRunner
 """
 def run_sim(ci=False):
     # add third-party modules via extra_cmds, eg. "cd run && xvlog ../MX66UM1G45G/MX66UM1G45G.v"
-    extra_cmds = ['echo "extra commands!"', 'echo "more extra commands!"']
+    extra_cmds = ['cd run && xvlog ../XADC.v']
     SimRunner(ci, extra_cmds)
 
 
@@ -184,6 +204,12 @@ def main():
     args = parser.parse_args()
 
     generate_top()
+
+    # copy the ADC simulation values to the right place
+    design_txt = open("run/design.txt", "w")
+    design_txt.write(adc_values)
+    design_txt.close()
+
     run_sim(ci=args.ci)
     if args.ci:
         if CheckSim() != 0:

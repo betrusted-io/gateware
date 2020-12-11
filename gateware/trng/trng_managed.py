@@ -30,8 +30,6 @@ the top-level SoC and passed to TrngManaged as an argument.
 
 class TrngManagedServer(Module, AutoCSR, AutoDoc):
     def __init__(self):
-        self.refill_mark = 512  # point at which manager automatically powers on the block and refills the FIFO
-
         self.intro = ModuleDoc("""
 server register interface for the TrngManaged core. Must be created as a submodule in
 the top-level SoC and passed to TrngManaged as an argument.
@@ -40,7 +38,7 @@ the top-level SoC and passed to TrngManaged as an argument.
             CSRField("enable", size=1, description="Power on the management interface and auto-fill random numbers", reset=1),
             CSRField("ro_dis", size=1, description="When set, disables the ring oscillator as an entropy source", reset=0),
             CSRField("av_dis", size=1, description="When set, disables the avalanche generator as an entropy source", reset=0),
-            CSRField("powersave", size=1, description="When set, TRNGs are automatically turned off until low water mark of {} entries is hit; when cleared, TRNGs are always on".format(self.refill_mark), reset=1),
+            CSRField("powersave", size=1, description="When set, TRNGs are automatically turned off until the low water mark is hit; when cleared, TRNGs are always on", reset=1),
             CSRField("no_check", size=1, description="When set, disables on-line health checking (for power saving)"),
             CSRField("clr_err", size=1, description="Write ``1`` to this bit to clear the ``errors`` register", pulse=True)
         ])
@@ -52,6 +50,7 @@ the top-level SoC and passed to TrngManaged as an argument.
             CSRField("avail", size=1, description="FIFO data is available"),
             CSRField("rdcount", size=10, description="Read fifo pointer"),
             CSRField("wrcount", size=10, description="Write fifo pointer"),
+            CSRField("full", size=1, description="Both kernel and server FIFOs have been topped off"),
         ])
 
         self.av_config = CSRStorage(fields=[
@@ -109,7 +108,15 @@ errors (stuck state). Do not rely on the output of this until it has been made m
         ]
 
 class TrngManaged(Module, AutoCSR, AutoDoc):
-    def __init__(self, platform, analog_pads, noise_pads, kernel, server):
+    def __init__(self, platform, analog_pads, noise_pads, kernel, server, sim=False):
+        if sim == True:
+            fifo_depth = 64
+            refill_mark = fifo_depth / 2
+            almost_full = 1024 - fifo_depth
+        else:
+            fifo_depth = 1024
+            refill_mark = fifo_depth / 2  # point at which manager automatically powers on the block and refills the FIFO
+            almost_full = 1024 - fifo_depth
         self.intro = ModuleDoc("""
 TrngManaged wraps a management interface around two TRNG sources for the Precursor platform.
 The management interface provides:
@@ -125,8 +132,8 @@ instantiated concurrently with the XADC in the Info block. It also is intended t
 the ring oscillator, so e.g. stand-alone TrngRingOscV2's are not recommended to be installed in
 the same design.
 
-The refill mark is configured at {} entries.
-        """.format(server.refill_mark))
+The refill mark is configured at {} entries, with a total depth of {} entries.
+        """.format(refill_mark, fifo_depth))
         refill_needed = Signal()
         powerup = Signal()
 
@@ -142,20 +149,27 @@ The refill mark is configured at {} entries.
         av_powerstate = Signal()
         av_delay_ctr = Signal(20)
         av_micros_ctr = Signal(7)
+
+        av_delay_setting = Signal(20)
+        if sim == True:
+            self.comb += av_delay_setting.eq(10)
+        else:
+            self.comb += av_delay_setting.eq(server.av_config.fields.powerdelay)
+
         avpwr = FSM(reset_state="DOWN")
         self.submodules += avpwr
         avpwr.act("DOWN",
             NextValue(av_powerstate, 0),
             If(av_ena,
-                NextValue(av_delay_ctr, server.av_config.fields.powerdelay),
-                NextValue(av_micros_ctr, 100),
+                NextValue(av_delay_ctr, av_delay_setting),
+                NextValue(av_micros_ctr, 99),
                 NextState("WAIT"),
             )
         )
         avpwr.act("WAIT",
             NextValue(av_powerstate, 0),
             If(av_micros_ctr == 0,
-                NextValue(av_micros_ctr, 100),
+                NextValue(av_micros_ctr, 99),
                 If(av_delay_ctr == 0,
                     NextState("UP")
                 ).Else(
@@ -173,7 +187,7 @@ The refill mark is configured at {} entries.
         )
 
         # This the XADC module -- it gives us raw noise values that we have to assemble into a 32-bit value
-        self.submodules.xadc = TrngXADC(analog_pads)
+        self.submodules.xadc = TrngXADC(analog_pads, sim)
         av_noise0_read = Signal()
         av_noise1_read = Signal()
         av_noise0_fresh = Signal()
@@ -237,7 +251,10 @@ The refill mark is configured at {} entries.
 
         # instantiate the on-chip ring oscillator TRNG. This one has no power-on delay, but the first
         # reading should be discarded after enabling (this is handled by the high level sequencer)
-        self.submodules.ringosc = TrngRingOscV2Managed(platform)
+        if sim == False:
+            self.submodules.ringosc = TrngRingOscV2Managed(platform)
+        else:
+            self.submodules.ringosc = TrngRingOscSim() # fake source for simulation purposes
         # pass-through config and mangamement signals to the RO
         ro_rand = Signal(32)
         ro_fresh = Signal()
@@ -266,7 +283,7 @@ The refill mark is configured at {} entries.
         ]
         health_issue = Signal()
         self.sync += [
-            If(server.errors.re,
+            If(server.errors.we,
                 server.errors.fields.ro_health.eq(0),
                 server.errors.fields.av_health.eq(0),
             ).Else(
@@ -302,12 +319,12 @@ The refill mark is configured at {} entries.
             p_DEVICE="7SERIES",
             p_FIFO_SIZE="36Kb",
             p_DATA_WIDTH=32,
-            p_ALMOST_EMPTY_OFFSET=server.refill_mark,
-            p_ALMOST_FULL_OFFSET=1024-8,
+            p_ALMOST_EMPTY_OFFSET=refill_mark,
+            p_ALMOST_FULL_OFFSET=almost_full,
             p_DO_REG=0,
             i_CLK=ClockSignal(),
             i_RST=ResetSignal(),
-            o_FULL=server_fifo_full,
+            o_ALMOSTFULL=server_fifo_full, # use ALMOSTFULL so simulations don't take forever to run :P
             o_EMPTY=server_fifo_empty,
             i_WREN=server_fifo_wren,
             i_DI=server_fifo_din,
@@ -322,7 +339,7 @@ The refill mark is configured at {} entries.
             server.ev.avail.trigger.eq(~server_fifo_empty),
             server.ev.error.trigger.eq(server_fifo_rderr), # this should only pulse when RE is triggered; it should not be stuck at a level
             If(~server_fifo_empty,
-                server_fifo_rden.eq(server.data.re),
+                server_fifo_rden.eq(server.data.we),
                 server.data.fields.data.eq(server_fifo_dout),
             ).Else(
                 server.data.fields.data.eq(0xDEADBEEF),
@@ -358,12 +375,12 @@ The refill mark is configured at {} entries.
             p_DEVICE="7SERIES",
             p_FIFO_SIZE="36Kb",
             p_DATA_WIDTH=32,
-            p_ALMOST_EMPTY_OFFSET=server.refill_mark,
-            p_ALMOST_FULL_OFFSET=1024-8,
+            p_ALMOST_EMPTY_OFFSET=refill_mark,
+            p_ALMOST_FULL_OFFSET=almost_full,
             p_DO_REG=0,
             i_CLK=ClockSignal(),
             i_RST=ResetSignal(),
-            o_FULL=kernel_fifo_full,
+            o_ALMOSTFULL=kernel_fifo_full, # use ALMOSTFULL so simulations don't take forever to run :P
             o_EMPTY=kernel_fifo_empty,
             i_WREN=kernel_fifo_wren,
             i_DI=kernel_fifo_din,
@@ -378,7 +395,7 @@ The refill mark is configured at {} entries.
             kernel.ev.avail.trigger.eq(~kernel_fifo_empty),
             kernel.ev.error.trigger.eq(kernel_fifo_rderr), # this should only pulse when RE is triggered; it should not be stuck at a level
             If(~kernel_fifo_empty,
-                kernel_fifo_rden.eq(kernel.data.re),
+                kernel_fifo_rden.eq(kernel.data.we),
                 kernel.data.fields.data.eq(kernel_fifo_dout),
             ).Else(
                 kernel.data.fields.data.eq(0xDEADBEEF),
@@ -398,6 +415,8 @@ The refill mark is configured at {} entries.
                 )
             )
         ]
+
+        self.comb += server.status.fields.full.eq(kernel_fifo_full & server_fifo_full)
 
         # static datapath to merge the TRNG results into the FIFOs. Actual gating of writes is handled by the
         # high level control state machine. The main reason we don't just always XOR the two machines together
@@ -428,7 +447,8 @@ The refill mark is configured at {} entries.
                 NextValue(av_config_noise, 1),  # switch to noise-only sampling for the XADC
             ).Else(
                 NextValue(powerup, 0),
-            )
+            ),
+            av_reconfigure.eq(0),
         )
         refill.act("CONFIG",
             av_reconfigure.eq(1),  # edge-triggered signal to initiate XADC config
@@ -473,12 +493,13 @@ The refill mark is configured at {} entries.
         refill.act("GO_IDLE",
             NextValue(av_config_noise, 0), # should already be 0, as this was set leaving "WAIT_ON" state
             av_reconfigure.eq(1), # pulse to set XADC back into the "system" sampling mode
+            NextState("IDLE")
         )
 
 analog_layout = [("vauxp", 16), ("vauxn", 16), ("vp", 1), ("vn", 1)]
 
 class TrngXADC(Module, AutoCSR):
-    def __init__(self, analog_pads=None):
+    def __init__(self, analog_pads=None, sim=False):
         # Temperature
         self.temperature = CSRStatus(12, description="""Raw Temperature value from XADC.\n
             Temperature (°C) = ``Value`` x 503.975 / 4096 - 273.15.""")
@@ -511,7 +532,7 @@ class TrngXADC(Module, AutoCSR):
         # # #
 
         busy    = Signal()
-        channel = Signal(7)
+        channel = Signal(5)
         eoc     = Signal()
         eos     = Signal()
 
@@ -523,7 +544,11 @@ class TrngXADC(Module, AutoCSR):
         di   = Signal(16)
         do   = Signal(16)
         drp_en = Signal()
-        self.specials += Instance("XADC",
+        if sim == True:
+            instancename = "XADCsim"
+        else:
+            instancename = "XADC"
+        self.specials += Instance(instancename,
             # From ug480
             p_INIT_40=0x9000, p_INIT_41=0x2ef0, p_INIT_42=0x0420,
             p_INIT_48=0x4701, p_INIT_49=0xd050,
@@ -562,12 +587,6 @@ class TrngXADC(Module, AutoCSR):
         local_di    = Signal(16)
 
         self.configured = Signal() # when high, ADC is configured and sampling
-        self.comb += [
-            If(~drp_en & self.configured,
-                den.eq(eoc),  # auto-read the output of the converter
-                dadr.eq(channel),
-            )
-        ]
 
         # Channels update --------------------------------------------------------------------------
         channels = {
@@ -591,19 +610,19 @@ class TrngXADC(Module, AutoCSR):
         self.noise0_fresh = Signal() # indicates a new value in noise 0
         self.noise1_fresh = Signal() # indicates a new value in noise 1
         self.sync += [
-            If(self.noise0.re | self.noise0_read,
+            If(self.noise0.we | self.noise0_read,
                 self.noise0_fresh.eq(0)
             ).Else(
-                If(channel == 28 & drdy & self.configured & ~drp_en,
+                If( (channel == 28) & drdy & self.configured & ~drp_en,
                     self.noise0_fresh.eq(1)
                 ).Else(
                     self.noise0_fresh.eq(self.noise0_fresh)
                 )
             ),
-            If(self.noise1.re | self.noise1_read,
+            If(self.noise1.we | self.noise1_read,
                 self.noise1_fresh.eq(0)
             ).Else(
-                If(channel == 20 & drdy & self.configured & ~drp_en,
+                If( (channel == 20) & drdy & self.configured & ~drp_en,
                     self.noise1_fresh.eq(1)
                 ).Else(
                     self.noise1_fresh.eq(self.noise1_fresh)
@@ -658,7 +677,11 @@ class TrngXADC(Module, AutoCSR):
         romval = Signal(16 + 7) # rom is formatted as {addr[6:0], data[15:0]}
         self.comb += [
             local_di.eq(romval[:16]),
-            local_dadr.eq(romval[16:]),
+            If(self.configured,
+                local_dadr.eq(channel),
+            ).Else(
+                local_dadr.eq(romval[16:]),
+            )
         ]
         romadr = Signal(3) # up to 8 entries in the sequence
         self.noise_mode = Signal()
@@ -668,10 +691,10 @@ class TrngXADC(Module, AutoCSR):
             1: 0x480000, # Seq 0: none
             2: 0x491010, # Seq 1: Vaux12 (noise0) and Vaux4 (noise1)
             3: 0x4A0000, # Avg 0: no averaging
-            4: 0x4B0000, # Avg 1: no averaging
-            5: 0x412EF0, # continuous mode, disable most alarms
+            4: 0x4B1010, # Avg 1: no averaging
+            5: 0x420420, # adc B off, divide DCLK by 4
             6: 0x408000, # don't use averaging
-            7: 0x420420, # adc B off, divide DCLK by 4
+            7: 0x412EF0,  # continuous mode, disable most alarms
         }
         # configure for round-robin sampling of all system parameters (this is default)
         sense_table = {
@@ -679,7 +702,7 @@ class TrngXADC(Module, AutoCSR):
             1: 0x484701, # Seq 0: Aux Int Bram Temp Cal
             2: 0x49D050, # Seq 1: Vaux15 (usbn) Vaux14 (usbp) Vaux12 (noise0) Vaux6 (vbus) Vaux4 (noise1)
             3: 0x4A4701, # Average aux int bram temp cal
-            4: 0x4BC040, # Average all but noise
+            4: 0x4BC040, # Average all but noise (c040)
             5: 0x412EF0,
             6: 0x409000, # Average by 16 samples
             7: 0x420420,
@@ -703,9 +726,11 @@ class TrngXADC(Module, AutoCSR):
         self.sync += [
             reconfigure_r.eq(self.reconfigure)
         ]
+
         fsm = FSM(reset_state="IDLE")
         self.submodules += fsm
         fsm.act("IDLE",
+            local_den.eq(eoc),  # auto-read the output of the converter in IDLE mode
             self.configured.eq(1),
             NextValue(romadr, 0),
             If(self.config_noise,
@@ -714,6 +739,11 @@ class TrngXADC(Module, AutoCSR):
                 NextValue(self.noise_mode, 0),  # select sense table
             ),
             If(self.reconfigure & ~reconfigure_r,
+                NextState("WAIT_UNBUSY")
+            )
+        )
+        fsm.act("WAIT_UNBUSY",
+            If(~busy,
                 NextState("LOAD_DRP")
             )
         )
@@ -735,12 +765,54 @@ class TrngXADC(Module, AutoCSR):
             If(romadr == 0,
                 NextState("IDLE")
             ).Else(
-                If(~drdy,
+                If(~drdy & ~busy,
                     NextState("LOAD_DRP")
                 )
             )
         )
 
+class TrngRingOscSim(Module, AutoDoc):
+    def __init__(self):
+        self.intro = ModuleDoc("""
+WARNING: if you see this paragraph in the documentation, something is very wrong with
+the SoC build. The TRNG has been replaced with a simulation model that is not at all
+random (it's a simple counter). 
+
+We do this because xsim cannot simulate ring oscillators. 
+        """)
+        ### to/from management interface
+        self.ena = Signal()
+        self.gang = Signal()
+        self.dwell = Signal(20)
+        self.delay = Signal(10)
+        self.rand_out = Signal(32, reset=0x5555_0000)
+        self.rand_read = Signal() # pulse one cycle to indicate rand_out has been read
+        self.fresh = Signal(reset=1)
+
+        delay = Signal(4, reset=15)
+        self.sync += [
+            If(self.ena,
+                If(self.rand_read,
+                    self.fresh.eq(0),
+                    delay.eq(15),
+                    self.rand_out.eq(self.rand_out),
+                ).Else(
+                    If(delay == 1,
+                        delay.eq(delay - 1),
+                        self.rand_out.eq(self.rand_out + 1),
+                        self.fresh.eq(1),
+                    ).Elif(delay != 0,
+                        delay.eq(delay - 1),
+                        self.fresh.eq(self.fresh),
+                        self.rand_out.eq(self.rand_out),
+                    ).Else(
+                        delay.eq(delay),
+                        self.fresh.eq(self.fresh),
+                        self.rand_out.eq(self.rand_out),
+                    )
+                )
+            )
+        ]
 
 
 class TrngRingOscV2Managed(Module, AutoCSR, AutoDoc):
