@@ -883,6 +883,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6af0edf5b4faacc31fc51159244d78d65ec580f021afcef7bd53c04aeabc7f29"
 
 [[package]]
+name = "wdt"
+version = "0.1.0"
+dependencies = [
+ "pac",
+ "sim-bios",
+ "volatile",
+ "xous-nommu",
+]
+
+[[package]]
 name = "winapi"
 version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
