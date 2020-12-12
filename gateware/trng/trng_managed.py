@@ -111,12 +111,14 @@ class TrngManaged(Module, AutoCSR, AutoDoc):
     def __init__(self, platform, analog_pads, noise_pads, kernel, server, sim=False):
         if sim == True:
             fifo_depth = 64
-            refill_mark = fifo_depth / 2
-            almost_full = 1024 - fifo_depth
+            refill_mark = int(fifo_depth // 2)
+            almost_full = int(1024 - fifo_depth)
         else:
             fifo_depth = 1024
-            refill_mark = fifo_depth / 2  # point at which manager automatically powers on the block and refills the FIFO
-            almost_full = 1024 - fifo_depth
+            refill_mark = int(fifo_depth // 2)  # point at which manager automatically powers on the block and refills the FIFO
+            almost_full = int(1024 - fifo_depth)
+            if almost_full == 0:
+                almost_full = 1 # meet DRC rule for 7-series
         self.intro = ModuleDoc("""
 TrngManaged wraps a management interface around two TRNG sources for the Precursor platform.
 The management interface provides:
