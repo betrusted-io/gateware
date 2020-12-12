@@ -27,7 +27,7 @@ fn run(p: &pac::Peripherals) {
     p.WDT.watchdog.write(|w| w.enable().set_bit());
 
     let mut wait = 0x3000_0000;
-    for i in 0..10_000 {
+    for i in 0..1_000 {
         p.WDT.watchdog.write(|w| unsafe{w.reset_code().bits(0x600d)});
         report(&p, wait + i); // should WDT reset sometime in here
         p.WDT.watchdog.write(|w| unsafe{w.reset_code().bits(0xc0de)});
