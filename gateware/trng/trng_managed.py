@@ -33,6 +33,21 @@ class TrngManagedServer(Module, AutoCSR, AutoDoc):
         self.intro = ModuleDoc("""
 server register interface for the TrngManaged core. Must be created as a submodule in
 the top-level SoC and passed to TrngManaged as an argument.
+
+Characterization data for the powerdelay parameter:
+
+.. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/trng/v_ava_poweron.png
+Above shows power-enable to full regulator stabilization in ~47ms
+
+.. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/trng/v_noise_stable.png
+Above shows power-enable to noise generation in much less than 20ms
+
+Note that regulator stability isn't a pre-requisite for noise generation -- the avalanche noise
+breakdown process proceeds over a wide voltage range. 
+ 
+50ms seems quite safe; we have sufficient voltage to cause noise generation after about 10ms, but
+voltage is fully regulated by 50ms. If a faster power-on is desired, one could program the delay
+to as little as 15-20ms and still probably be quite safe.
         """)
         self.control = CSRStorage(fields=[
             CSRField("enable", size=1, description="Power on the management interface and auto-fill random numbers", reset=1),
@@ -53,8 +68,11 @@ the top-level SoC and passed to TrngManaged as an argument.
             CSRField("full", size=1, description="Both kernel and server FIFOs have been topped off"),
         ])
 
+        # raw data:
+        # https://github.com/betrusted-io/gateware/blob/master/gateware/trng/v_noise_stable.png
+        # https://github.com/betrusted-io/gateware/blob/master/gateware/trng/v_ava_poweron.png
         self.av_config = CSRStorage(fields=[
-            CSRField("powerdelay", size=20, description="Delay in microseconds for avalanche generator to stabilize", reset=200000)
+            CSRField("powerdelay", size=20, description="Delay in microseconds for avalanche generator to stabilize", reset=50000)
         ])
 
         self.ro_config = CSRStorage(fields=[
@@ -236,7 +254,11 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             ).Else(
                 If(av_noise0_fresh & av_noise1_fresh,
                     NextValue(av_noisecnt, av_noisecnt - 1),
-                    NextValue(av_noiseout, Cat(av_noise0_data[:4] ^ av_noise1_data[:4], av_noiseout[:28])),
+                    # why do we take from uneven bit quanta on the two ADC values?
+                    # the idea is to null out systemic biases in the ADC itself, e.g. ADC steps are not exactly evenly distributed
+                    # by XOR'ing from two different ranges, this helps to null out system biases in the ADC comparators
+                    # Syndrome: Dieharder OQSO, OPSO tests are weak/failed
+                    NextValue(av_noiseout, Cat(av_noise0_data[1:5] ^ av_noise1_data[:4], av_noiseout[:28])),
                     av_noise0_read.eq(1),
                     av_noise1_read.eq(1),
                 )
@@ -464,7 +486,7 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
         )
         refill.act("PUMP", # discard the first value out of the TRNG, as it's potentially biased by power-on effects
             # do pump here
-            If(av_noiseout_ready & ro_fresh,
+            If((av_noiseout_ready | server.control.fields.av_dis) & (ro_fresh | server.control.fields.ro_dis),
                 av_noiseout_read.eq(1),
                 ro_rand_read.eq(1),
                 NextState("REFILL_KERNEL")
@@ -474,9 +496,9 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             If(kernel_fifo_full,
                 NextState("REFILL_SERVER")
             ).Else(
-                If(av_noiseout_ready & ro_fresh,
+                If((av_noiseout_ready | server.control.fields.av_dis) & (ro_fresh | server.control.fields.ro_dis),
                     kernel_fifo_wren.eq(1),
-                    av_noiseout_read.eq(1),
+                    av_noiseout_read.eq(1),  # note that trng stream selection considers the _dis field state, so it's safe to always pump both even if one is disabled
                     ro_rand_read.eq(1),
                 ),
             )
@@ -485,7 +507,7 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             If(server_fifo_full,
                 NextState("GO_IDLE"),
             ).Else(
-                If(av_noiseout_ready & ro_fresh,
+                If((av_noiseout_ready | server.control.fields.av_dis) & (ro_fresh | server.control.fields.ro_dis),
                     server_fifo_wren.eq(1),
                     av_noiseout_read.eq(1),
                     ro_rand_read.eq(1),
