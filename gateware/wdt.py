@@ -38,6 +38,19 @@ The register cannot be updated once the WDT is running.
                 description="Number of 'approximately 65MHz' CFGMCLK cycles before each reset_code must be entered. Defaults to a range of {:0.2f}-{:0.2f} seconds".format((default_period * 10.256e-9)*0.5, (default_period * 10.256e-9)*1.5), reset=default_period
             )
         ])
+        self.state = CSRStatus(4, fields=[
+            CSRField("enabled", size=1, description="WDT has been enabled"),
+            CSRField("armed1", size=1, description="WDT in the armed1 state"),
+            CSRField("armed2", size=1, description="WDT in the armed2 state"),
+            CSRField("disarmed", size=1, description="WDT in the disarmed state"),
+        ])
+        armed1 = Signal()
+        armed2 = Signal()
+        disarmed = Signal()
+        self.specials += MultiReg(armed1, self.state.fields.armed1)
+        self.specials += MultiReg(armed2, self.state.fields.armed2)
+        self.specials += MultiReg(disarmed, self.state.fields.disarmed)
+
         wdog_enable_wdt = Signal()
         self.specials += MultiReg(self.watchdog.fields.enable, wdog_enable_wdt, odomain="wdt")
         wdog_enabled = Signal(reset=0)
@@ -50,6 +63,7 @@ The register cannot be updated once the WDT is running.
             ),
             wdog_enabled_r.eq(wdog_enabled)
         ]
+        self.specials += MultiReg(wdog_enabled, self.state.fields.enabled)
         self.submodules.code_sync = BusSynchronizer(16, "sys", "wdt")
         reset_code_wdt = Signal(16)
         self.comb += [
@@ -104,6 +118,7 @@ The register cannot be updated once the WDT is running.
             )
         )
         wdog.act("ARMED",
+            armed1.eq(1),
             If(wdog_cycle,
                 do_reset.eq(1),
             ),
@@ -112,6 +127,7 @@ The register cannot be updated once the WDT is running.
             )
         )
         wdog.act("DISARM1",
+            armed2.eq(1),
             If(wdog_cycle,
                 do_reset.eq(1),
             ),
@@ -122,6 +138,7 @@ The register cannot be updated once the WDT is running.
             )
         )
         wdog.act("DISARMED",
+            disarmed.eq(1),
             If(wdog_cycle,
                 NextState("ARMED")
             )
