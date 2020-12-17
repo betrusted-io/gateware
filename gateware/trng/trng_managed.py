@@ -71,8 +71,10 @@ to as little as 15-20ms and still probably be quite safe.
         # raw data:
         # https://github.com/betrusted-io/gateware/blob/master/gateware/trng/v_noise_stable.png
         # https://github.com/betrusted-io/gateware/blob/master/gateware/trng/v_ava_poweron.png
+        default_samples = 20
         self.av_config = CSRStorage(fields=[
-            CSRField("powerdelay", size=20, description="Delay in microseconds for avalanche generator to stabilize", reset=50000)
+            CSRField("powerdelay", size=20, description="Delay in microseconds for avalanche generator to stabilize", reset=50000),
+            CSRField("samples", size=8, description="Number of samples to fold into a single result. Smaller values increase rate but decrease quality. Default is {}.".format(default_samples), reset=default_samples),
         ])
 
         self.ro_config = CSRStorage(fields=[
@@ -125,8 +127,144 @@ errors (stuck state). Do not rely on the output of this until it has been made m
             )
         ]
 
+
+# ModNoise ------------------------------------------------------------------------------------------
+
+class ModNoise(Module, AutoCSR, AutoDoc):
+    def __init__(self, pads):
+        self.intro = ModuleDoc("""Modular Noise generator
+
+        Modular noise generator driver. Generates non-overlapping clocks, and aggregates
+        incoming noise.
+
+        Op-amp bandwidth is 1MHz, slew rate of 2V/us. Cap settling time is probably around
+        3-4us per phase. Target 4.95us/phase, with a dead time of 50ns between phases. This 
+        should yield around 200kbps raw noise generation rate, which roughly matches the
+        maximum rate at which 256-bit DH key exchanges can be done using the Curve25519 engine.
+        """)
+        self.phase0 = Signal()
+        self.phase1 = Signal()
+        self.noiseon = Signal()
+        self.noisein = Signal()
+        self.noise_read = Signal()
+        self.ena = Signal()
+        self.comb += [
+            pads.phase0.eq(self.phase0),
+            pads.phase1.eq(self.phase1),
+            pads.noise_on.eq(self.noiseon),
+            self.noisein.eq(pads.noise_in),
+        ]
+        noisesync = Signal()
+        self.specials += MultiReg(self.noisein, noisesync)
+
+        self.ctl = CSRStorage(fields=[
+            CSRField("ena", size=1, description="Power on and enable TRNG.", reset=0),
+            CSRField("period", size=20, description="Duration of one phase in sysclk periods", reset=495),
+            CSRField("deadtime", size=10, description="Duration of deadtime between nonoverlaps in sysclk periods",
+                reset=5),
+        ])
+        self.comb += self.noiseon.eq(self.ctl.fields.ena | self.ena)
+        self.rand = CSRStatus(fields=[
+            CSRField("rand", size=32, description="Random data shifted into a register for easier collection",
+                reset=0xDEADBEEF),
+        ])
+        self.status = CSRStatus(fields=[
+            CSRField("fresh", size=1,
+                description="When set, the rand register contains a fresh set of bits to read; cleared by reading the `rand` register")
+        ])
+
+        shift_rand = Signal()
+        rand_cnt = Signal(max=self.rand.size + 1)
+        rand = Signal(32)
+        # keep track of how many bits have been shifted in since the last read-out
+        self.sync += [
+            If(self.rand.we | ~(self.ctl.fields.ena | self.ena) | self.noise_read,
+                self.status.fields.fresh.eq(0),
+                self.rand.fields.rand.eq(0xDEADBEEF),
+            ).Else(
+                If(shift_rand,
+                    If(rand_cnt < self.rand.size + 1,
+                        rand_cnt.eq(rand_cnt + 1),
+                        rand.eq(Cat(noisesync, rand[:-1])),
+                    ).Else(
+                        self.rand.fields.rand.eq(rand),
+                        self.status.fields.fresh.eq(1),
+                        rand_cnt.eq(0),
+                    )
+                ).Else(
+                    self.status.fields.fresh.eq(self.status.fields.fresh),
+                    self.rand.fields.rand.eq(self.rand.fields.rand),
+                ),
+            )
+        ]
+
+        counter = Signal(self.ctl.fields.period.nbits)
+        fsm = FSM(reset_state="RESET")
+        self.submodules += fsm
+        fsm.act("RESET",
+            NextValue(self.phase0, 0),
+            NextValue(self.phase1, 0),
+            If(self.ctl.fields.ena | self.ena,
+                NextValue(counter, self.ctl.fields.deadtime),
+                NextState("DEADTIME0"),
+            ).Else(
+                NextState("RESET")
+            )
+        )
+        fsm.act("DEADTIME0",
+            NextValue(self.phase0, 0),
+            NextValue(self.phase1, 0),
+            If(counter > 0,
+                NextValue(counter, counter - 1),
+                NextState("DEADTIME0"),
+            ).Else(
+                NextValue(counter, self.ctl.fields.period),
+                NextState("PHASE0"),
+            )
+        )
+        fsm.act("PHASE0",
+            NextValue(self.phase0, 1),
+            NextValue(self.phase1, 0),
+            If(counter > 0,
+                NextValue(counter, counter - 1),
+                NextState("PHASE0"),
+            ).Else(
+                NextValue(counter, self.ctl.fields.deadtime),
+                NextState("DEADTIME1"),
+                shift_rand.eq(1),
+            )
+        )
+        fsm.act("DEADTIME1",
+            NextValue(self.phase0, 0),
+            NextValue(self.phase1, 0),
+            If(counter > 0,
+                NextValue(counter, counter - 1),
+                NextState("DEADTIME1"),
+            ).Else(
+                NextValue(counter, self.ctl.fields.period),
+                NextState("PHASE1"),
+            )
+        )
+        fsm.act("PHASE1",
+            NextValue(self.phase0, 0),
+            NextValue(self.phase1, 1),
+            If(counter > 0,
+                NextValue(counter, counter - 1),
+                NextState("PHASE1"),
+            ).Else(
+                If(self.ctl.fields.ena | self.ena,
+                    NextValue(counter, self.ctl.fields.deadtime),
+                    NextState("DEADTIME0"),
+                    shift_rand.eq(1),
+                ).Else(
+                    NextState("RESET")
+                )
+            )
+        )
+
+
 class TrngManaged(Module, AutoCSR, AutoDoc):
-    def __init__(self, platform, analog_pads, noise_pads, kernel, server, sim=False):
+    def __init__(self, platform, analog_pads, noise_pads, kernel, server, sim=False, revision='pvt'):
         if sim == True:
             fifo_depth = 64
             refill_mark = int(fifo_depth // 2)
@@ -157,121 +295,151 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
         refill_needed = Signal()
         powerup = Signal()
 
-        # this state machine manages the avalanche generator's power-on delay. It ensures that
-        # the generator always gets at least the minimum specified time to turn on and stabilize
-        av_ena = Signal()
-        self.comb += [
-            av_ena.eq( (~server.control.fields.av_dis & server.control.fields.enable)
-                                & (powerup | ~server.control.fields.powersave)),
-            noise_pads.noisebias_on.eq(av_ena),
-            noise_pads.noise_on.eq(Cat(av_ena, av_ena)),
-        ]
-        av_powerstate = Signal()
-        av_delay_ctr = Signal(20)
-        av_micros_ctr = Signal(7)
+        if revision == 'pvt':
+            # this state machine manages the avalanche generator's power-on delay. It ensures that
+            # the generator always gets at least the minimum specified time to turn on and stabilize
+            av_ena = Signal()
+            self.comb += [
+                av_ena.eq( (~server.control.fields.av_dis & server.control.fields.enable)
+                                    & (powerup | ~server.control.fields.powersave)),
+                noise_pads.noisebias_on.eq(av_ena),
+                noise_pads.noise_on.eq(Cat(av_ena, av_ena)),
+            ]
+            av_powerstate = Signal()
+            av_delay_ctr = Signal(20)
+            av_micros_ctr = Signal(7)
 
-        av_delay_setting = Signal(20)
-        if sim == True:
-            self.comb += av_delay_setting.eq(10)
-        else:
-            self.comb += av_delay_setting.eq(server.av_config.fields.powerdelay)
+            av_delay_setting = Signal(20)
+            if sim == True:
+                self.comb += av_delay_setting.eq(10)
+            else:
+                self.comb += av_delay_setting.eq(server.av_config.fields.powerdelay)
 
-        avpwr = FSM(reset_state="DOWN")
-        self.submodules += avpwr
-        avpwr.act("DOWN",
-            NextValue(av_powerstate, 0),
-            If(av_ena,
-                NextValue(av_delay_ctr, av_delay_setting),
-                NextValue(av_micros_ctr, 99),
-                NextState("WAIT"),
+            avpwr = FSM(reset_state="DOWN")
+            self.submodules += avpwr
+            avpwr.act("DOWN",
+                NextValue(av_powerstate, 0),
+                If(av_ena,
+                    NextValue(av_delay_ctr, av_delay_setting),
+                    NextValue(av_micros_ctr, 99),
+                    NextState("WAIT"),
+                )
             )
-        )
-        avpwr.act("WAIT",
-            NextValue(av_powerstate, 0),
-            If(av_micros_ctr == 0,
-                NextValue(av_micros_ctr, 99),
-                If(av_delay_ctr == 0,
-                    NextState("UP")
+            avpwr.act("WAIT",
+                NextValue(av_powerstate, 0),
+                If(av_micros_ctr == 0,
+                    NextValue(av_micros_ctr, 99),
+                    If(av_delay_ctr == 0,
+                        NextState("UP")
+                    ).Else(
+                        NextValue(av_delay_ctr, av_delay_ctr - 1)
+                    )
                 ).Else(
-                    NextValue(av_delay_ctr, av_delay_ctr - 1)
+                    NextValue(av_micros_ctr, av_micros_ctr - 1),
                 )
-            ).Else(
-                NextValue(av_micros_ctr, av_micros_ctr - 1),
             )
-        )
-        avpwr.act("UP",
-            NextValue(av_powerstate, 1),
-            If(~av_ena,
-                NextState("DOWN")
+            avpwr.act("UP",
+                NextValue(av_powerstate, 1),
+                If(~av_ena,
+                    NextState("DOWN")
+                )
             )
-        )
 
-        # This the XADC module -- it gives us raw noise values that we have to assemble into a 32-bit value
-        self.submodules.xadc = TrngXADC(analog_pads, sim)
-        av_noise0_read = Signal()
-        av_noise1_read = Signal()
-        av_noise0_fresh = Signal()
-        av_noise1_fresh = Signal()
-        av_noise0_data = Signal(12)
-        av_noise1_data = Signal(12)
-        av_reconfigure = Signal()
-        av_config_noise = Signal()
-        av_configured = Signal()
-        self.comb += [
-            av_noise0_fresh.eq(self.xadc.noise0_fresh),
-            av_noise1_fresh.eq(self.xadc.noise1_fresh),
-            av_noise0_data.eq(self.xadc.noise0.status),
-            av_noise1_data.eq(self.xadc.noise1.status),
-            self.xadc.noise0_read.eq(av_noise0_read),
-            self.xadc.noise1_read.eq(av_noise1_read),
-            self.xadc.reconfigure.eq(av_reconfigure),
-            self.xadc.config_noise.eq(av_config_noise),
-            av_configured.eq(self.xadc.configured),
-        ]
-        # This state machine assembles ADC values into a 32-bit noise word
-        # This can be done even when the XADC isn't configured for noise mode -- the "noise mode"
-        # reconfiguration is just to optimize sampling speed, it does not affect correctness.
-        # Note that correctness is affected by the power-on delay of the external generator, which is
-        # not related to the following state machine
-        av_noiseout = Signal(32)
-        av_noiseout_ready = Signal()
-        av_noiseout_read = Signal()
-        av_noisecnt = Signal(4)
-        avn = FSM(reset_state="IDLE")
-        self.submodules += avn
-        avn.act("IDLE",
-            If(av_powerstate,
-                NextState("ASSEMBLE"),
-            ),
-            NextValue(av_noiseout_ready, 0),
-            NextValue(av_noisecnt, 8),
-            NextValue(av_noiseout, 0),
-        )
-        avn.act("ASSEMBLE",
-            NextValue(av_noiseout_ready, 0),
-            If(av_noisecnt == 0,
-                NextState("READY")
-            ).Else(
-                If(av_noise0_fresh & av_noise1_fresh,
-                    NextValue(av_noisecnt, av_noisecnt - 1),
-                    # why do we take from uneven bit quanta on the two ADC values?
-                    # the idea is to null out systemic biases in the ADC itself, e.g. ADC steps are not exactly evenly distributed
-                    # by XOR'ing from two different ranges, this helps to null out system biases in the ADC comparators
-                    # Syndrome: Dieharder OQSO, OPSO tests are weak/failed
-                    NextValue(av_noiseout, Cat(av_noise0_data[1:5] ^ av_noise1_data[:4], av_noiseout[:28])),
-                    av_noise0_read.eq(1),
-                    av_noise1_read.eq(1),
+            # This the XADC module -- it gives us raw noise values that we have to assemble into a 32-bit value
+            self.submodules.xadc = TrngXADC(analog_pads, sim)
+            av_noise0_read = Signal()
+            av_noise1_read = Signal()
+            av_noise0_fresh = Signal()
+            av_noise1_fresh = Signal()
+            av_noise0_data = Signal(12)
+            av_noise1_data = Signal(12)
+            av_reconfigure = Signal()
+            av_config_noise = Signal()
+            av_configured = Signal()
+            self.comb += [
+                av_noise0_fresh.eq(self.xadc.noise0_fresh),
+                av_noise1_fresh.eq(self.xadc.noise1_fresh),
+                av_noise0_data.eq(self.xadc.noise0.status),
+                av_noise1_data.eq(self.xadc.noise1.status),
+                self.xadc.noise0_read.eq(av_noise0_read),
+                self.xadc.noise1_read.eq(av_noise1_read),
+                self.xadc.reconfigure.eq(av_reconfigure),
+                self.xadc.config_noise.eq(av_config_noise),
+                av_configured.eq(self.xadc.configured),
+            ]
+            # This state machine assembles ADC values into a 32-bit noise word
+            # This can be done even when the XADC isn't configured for noise mode -- the "noise mode"
+            # reconfiguration is just to optimize sampling speed, it does not affect correctness.
+            # Note that correctness is affected by the power-on delay of the external generator, which is
+            # not related to the following state machine
+            av_noiseout = Signal(32)
+            av_noiseout_ready = Signal()
+            av_noiseout_read = Signal()
+            av_noisecnt = Signal(server.av_config.fields.samples.nbits)
+            avn = FSM(reset_state="IDLE")
+            self.submodules += avn
+            avn.act("IDLE",
+                If(av_powerstate,
+                    NextState("ASSEMBLE"),
+                ),
+                NextValue(av_noiseout_ready, 0),
+                NextValue(av_noisecnt, server.av_config.fields.samples),
+                NextValue(av_noiseout, 0),
+            )
+            avn.act("ASSEMBLE",
+                NextValue(av_noiseout_ready, 0),
+                If(av_noisecnt == 0,
+                    NextState("READY")
+                ).Else(
+                    If(av_noise0_fresh & av_noise1_fresh,
+                        NextValue(av_noisecnt, av_noisecnt - 1),
+                        # Syndrome: Dieharder OQSO, OPSO tests are weak/failed
+                        # Hypothesis: sampling rate is too high
+                        # Solution: reduce effective sampling rate by oversampling noise (av_noisecount > 8)
+                        # Side note: entropy is concentrated in the LSBs of the ADC, so we rotate the result by 5
+                        #            which stripes the LSB over the final resulting 32-bit number:
+                        # iters   00 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32->0
+                        # bit pos 00 05 10 15 20 25 30 03 08 13 18 23 28 01 06 11 16 21 26 31 04 09 14 19 24 29 02 07 12 17 22 27   00
+                        # iters is set by the initial value in `av_noisecnt`, loaded in the "IDLE" state above
+                        NextValue(av_noiseout, av_noise0_data ^ av_noise1_data ^ Cat(av_noiseout[27:], av_noiseout[:27])),
+                        av_noise0_read.eq(1),
+                        av_noise1_read.eq(1),
+                    )
                 )
             )
-        )
-        avn.act("READY",
-            If(av_noiseout_read,
-                NextValue(av_noiseout_ready, 0),
-                NextState("IDLE")
-            ).Else(
-                NextValue(av_noiseout_ready, 1)
+            avn.act("READY",
+                If(av_noiseout_read,
+                    NextValue(av_noiseout_ready, 0),
+                    NextState("IDLE")
+                ).Else(
+                    NextValue(av_noiseout_ready, 1)
+                )
             )
-        )
+        elif revision == 'modnoise':
+            self.submodules.xadc = TrngXADC(analog_pads, sim)
+            self.submodules.modnoise = ModNoise(noise_pads)
+
+            av_noiseout = Signal(32)
+            av_powerstate = Signal()
+            av_noiseout_read = Signal()
+
+            av_config_noise = Signal()
+            av_reconfigure = Signal()
+            av_configured = Signal()
+            av_noiseout_ready = Signal()
+
+            self.comb += [
+                av_noiseout.eq(self.modnoise.rand.fields.rand),
+                self.modnoise.noise_read.eq(av_noiseout_read),
+                av_configured.eq(1),
+                self.modnoise.ena.eq((~server.control.fields.av_dis & server.control.fields.enable)
+                                    & (powerup | ~server.control.fields.powersave)),
+                av_powerstate.eq(self.modnoise.ena),
+                av_noiseout_ready.eq(self.modnoise.status.fields.fresh),
+            ]
+
+        else:
+            print("Error! unsuppored revision")
 
         # instantiate the on-chip ring oscillator TRNG. This one has no power-on delay, but the first
         # reading should be discarded after enabling (this is handled by the high level sequencer)
