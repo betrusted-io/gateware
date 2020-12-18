@@ -75,6 +75,7 @@ to as little as 15-20ms and still probably be quite safe.
         self.av_config = CSRStorage(fields=[
             CSRField("powerdelay", size=20, description="Delay in microseconds for avalanche generator to stabilize", reset=50000),
             CSRField("samples", size=8, description="Number of samples to fold into a single result. Smaller values increase rate but decrease quality. Default is {}.".format(default_samples), reset=default_samples),
+            CSRField("test", size=1, description="When set, puts the generator into test mode -- full-size, raw ADC samples are directly placed into the FIFO at full rate, creating a 'virtual oscilloscope' snapshot of the avalanche generator waveform.")
         ])
 
         self.ro_config = CSRStorage(fields=[
@@ -107,6 +108,24 @@ class TrngOnlineCheck(Module, AutoDoc):
         self.intro = ModuleDoc("""
 This is a placeholder for online health checks on the TRNG. Right now we just check for very gross
 errors (stuck state). Do not rely on the output of this until it has been made more robust!
+
+The "TrngOnlineCheck" module should be customized into a module for the ring oscillator, and for
+the avalanche generator, as they have very different mechanisms for generating numbers, and therefore
+very different failure modes.
+
+- For the ring oscillator, it should check for runs of bits both over a single 32-bit word, but also
+individual bits over time. "Long runs" in either direction (probably best to define the threshold as a CSR
+that can be set) will trigger a health alert. A run is minimally defined as a 1-bit pattern, but probably
+should include at least 2-3 bit patterns if feasible. This basically checks if a ring oscillator "slows down" to
+a rate that is not commensurate with the expected entropy rate, or if it stabilizes too much to be generating
+entropy. 
+
+- For the avalanche geneartor, it should extract the raw noise values from the avalanche output, and use those
+to update a min/max window over time. If the min/max window is not exceeded over a period of time, we can
+conclude that the avalanche process has ceased. The size of the min/max window, again, should be user-configurable.
+This will catch the failure case that the avalanche diode 'wears out', and will also catch the failure case that
+the bias generator's voltage is not high enough for some reason. It will not catch the case of e.g. periodic
+noise deliberately injected into the TRNG in an attempt to override the TRNG's natural behavior. 
         """)
         self.enable = Signal()
         self.healthy = Signal() # if currently healthy or not
@@ -353,6 +372,7 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             av_noise1_fresh = Signal()
             av_noise0_data = Signal(12)
             av_noise1_data = Signal(12)
+            pad4 = Signal(4)  # pad by 4 bits
             av_reconfigure = Signal()
             av_config_noise = Signal()
             av_configured = Signal()
@@ -378,9 +398,14 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             av_noisecnt = Signal(server.av_config.fields.samples.nbits)
             avn = FSM(reset_state="IDLE")
             self.submodules += avn
+
             avn.act("IDLE",
                 If(av_powerstate,
-                    NextState("ASSEMBLE"),
+                    If(~server.av_config.fields.test,
+                        NextState("ASSEMBLE"),
+                    ).Else(
+                        NextState("TEST"),
+                    )
                 ),
                 NextValue(av_noiseout_ready, 0),
                 NextValue(av_noisecnt, server.av_config.fields.samples),
@@ -405,6 +430,13 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
                         av_noise0_read.eq(1),
                         av_noise1_read.eq(1),
                     )
+                )
+            )
+            avn.act("TEST",
+                NextValue(av_noiseout_ready, 0),
+                If(av_noise0_fresh & av_noise1_fresh,
+                    NextValue(av_noiseout, Cat(av_noise0_data, pad4, av_noise1_data, pad4)),
+                    NextState("READY"),
                 )
             )
             avn.act("READY",
