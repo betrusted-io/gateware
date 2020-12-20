@@ -86,11 +86,11 @@ to as little as 15-20ms and still probably be quite safe.
             CSRField("delay", size=10, description="""Sampler delay time. Sets the delay between when the small rings
             are merged together, and when the final entropy result is sampled. Value encodes number of sysclk edges
             to pass during the delay period. Delay should be long enough for the signal to propagate around the merged ring,
-            but longer times also means more coupling of the deterministic sysclk noise into the rings.""", reset=8),
+            but longer times also means more coupling of the deterministic sysclk noise into the rings.""", reset=4),
             CSRField("fuzz", size=1, description="""Modulate the `delay`/`dwell` parameter slightly from run-to-run, 
             based on previous run's random values. May help to break ring oscillator resonances trained by the delay/dwell periodicity.""", reset=1),
             CSRField("oversampling", size=8, description="""Number of stages to oversample entropy. Normally, each bit is just
-            sampled and shifted once (so 32 times for 32-bit word). Each increment of oversampling will add another stage.""", reset=0)
+            sampled and shifted once (so 32 times for 32-bit word). Each increment of oversampling will add another stage.""", reset=3)
         ])
 
         self.errors = CSRStatus(fields=[
@@ -131,14 +131,18 @@ This will catch the failure case that the avalanche diode 'wears out', and will 
 the bias generator's voltage is not high enough for some reason. It will not catch the case of e.g. periodic
 noise deliberately injected into the TRNG in an attempt to override the TRNG's natural behavior.
 
-- The OPSO/OQSO tests seem to be the hardest for both TRNGs to pass, probably due to systemic, fixed biases
-in e.g. ADC bits and/or ring oscillator rates causing certain code-pairs to be less frequent. A truncated 
+- The OPSO/OQSO tests are good at catching systemic, large-scale biases, e.g. large sets of repeating
+data and/or systemic biases that would cause code-pairs to be less frequent. A truncated 
 version of OPSO/OQSO could be pretty useful for measuring the health of the TRNG. 4xRAMB36 blocks could 
 store a portion of the OPSO sampling matrix, giving a total of 16 x 1024 "lines" of the 1024x1024 total 
 OPSO matrix. Summing results over hundreds of runs into even this sub-portion of the matrix should 
 eventually lead to a normal distribution of values, and shifts in the mean and spread can give 
 hints into the amount of systemic bias a given ring oscillator could be showing. As of the writing 
 of this comment, there are 24x RAMB36's available in the FPGA still.
+
+- A "monobit" test is pretty easy to implement, and it will catch biased ring oscillators. This test
+just consists of a running count of 1's seen over all the bits up to a defined sampling level, and then 
+storing the results in a memory that can be later on read out and compared to an expected distribution table.
         """)
         self.enable = Signal()
         self.healthy = Signal() # if currently healthy or not
@@ -1062,9 +1066,89 @@ We do this because xsim cannot simulate ring oscillators.
             )
         ]
 
+class TrngRingOscCore(Module, AutoDoc, AutoCSR):
+    def __init__(self, platform, stage_id, ro_elements, ro_stages):
+        self.sample_now = Signal()
+        self.dwell_now = Signal()
+        self.rand = Signal(ro_elements-1)
+        self.gang = Signal()
+        self.ena = Signal()
+
+        # build a set of `element` rings, with `stage` stages
+        self.trng_slow = Signal()
+        for element in range(ro_elements):
+            setattr(self, "ro_elem" + str(element), Signal(ro_stages+1))
+            setattr(self, "ro_samp" + str(element), Signal())
+            for stage in range(ro_stages):
+                stagename = 'RINGOSC_E' + str(element) + stage_id + '_S' + str(stage)
+                self.specials += Instance("LUT1", name=stagename, p_INIT=1,
+                    i_I0=getattr(self, "ro_elem" + str(element))[stage],
+                    o_O=getattr(self, "ro_elem" + str(element))[stage+1],
+                    attr=("KEEP", "DONT_TOUCH"),
+                )
+                # add platform command to disable timing closure on ring oscillator paths
+                platform.add_platform_command("set_disable_timing -from I0 -to O [get_cells " + stagename + "]")
+                platform.add_platform_command("set_false_path -through [get_pins " + stagename + "/O]")
+            # add "gang" sampler to pull out extra entropy during dwell mode
+            if element != 32: # element 32 is a special case, handled at end of loop
+                self.specials += Instance("FDCE", name='FDCE_E' + str(element) + stage_id,
+                    i_D=getattr(self, "ro_elem" + str(element))[0],
+                    i_C=ClockSignal(),
+                    i_CE=self.gang,
+                    i_CLR=0,
+                    o_Q=getattr(self, "ro_samp" + str(element))
+                )
+            if (element != 0) & (element != 32): # element 0 is a special case, handled at end of loop
+                self.sync += [
+                    If(self.sample_now,
+                       self.rand[element].eq(self.rand[element-1]),
+                    ).Else(
+                        self.rand[element].eq(self.rand[element] ^ (getattr(self, "ro_samp" + str(element)) & self.gang)),
+                    )
+                ]
+            # close feedback loop with enable gate
+            setattr(self, "ro_fbk" + str(element), Signal())
+            self.comb += [
+                getattr(self, "ro_fbk" + str(element)).eq(getattr(self, "ro_elem" + str(element))[ro_stages]
+                                                          & self.ena),
+            ]
+
+        # build the input tap
+        self.specials += Instance("FDCE", name='FDCE_E32' + stage_id,
+            i_D=getattr(self, "ro_elem32")[0],
+            i_C=ClockSignal(),
+            i_CE=1, # element 32 is not part of the gang, it's the output element of the "big loop"
+            i_CLR=0,
+            o_Q=getattr(self, "ro_samp32")
+        )
+        self.sync += [
+            If(self.sample_now,
+                # shift in sample entropy from a tap on the one stage that's not already wired to a gang mixer
+                # but still rotate back bits from the top, why throw away good entropy?
+                self.rand[0].eq(getattr(self, "ro_samp32") ^ self.rand[31]),
+            ).Else(
+                self.rand[0].eq(self.rand[0] ^ (getattr(self, "ro_samp0") & self.gang)),
+            )
+        ]
+
+        # create the switchable meta-ring by muxing on dwell_now
+        for element in range(ro_elements):
+            if element < ro_elements-1:
+                self.comb += getattr(self, "ro_elem" + str(element))[0]\
+                                 .eq(  getattr(self, "ro_fbk" + str(element)) & self.dwell_now
+                                     | getattr(self, "ro_fbk" + str(element + 1)) & ~self.dwell_now),
+            else:
+                self.comb += getattr(self, "ro_elem" + str(element))[0]\
+                                 .eq(  getattr(self, "ro_fbk" + str(element)) & self.dwell_now
+                                     | getattr(self, "ro_fbk" + str(0)) & ~self.dwell_now),
+
+        self.trng_slow = Signal()
+        self.trng_fast = Signal()
+        self.sync += [self.trng_fast.eq(self.ro_fbk0), self.trng_slow.eq(self.rand[0])]
+
 
 class TrngRingOscV2Managed(Module, AutoCSR, AutoDoc):
-    def __init__(self, platform):
+    def __init__(self, platform, cores=4):
         self.intro = ModuleDoc("""
 TrngRingOscV2 builds a set of fast oscillators that are allowed to run independently to
 gather entropy, and then are merged into a single large oscillator to create a bit of
@@ -1073,8 +1157,11 @@ Metastable Ring Oscillator", with modifications. I actually suspect the ring osc
 is not quite metastable during the small-ring phase, but it is accumulating phase noise
 as an independent variable, so I think the paper's core idea still works.
 
+The system as described above is referred to as a "core". This version is built with {} 
+parallel cores that are XOR'd simultaneously to generate the final output.
+
 * `self.trng_slow` and `self.trng_fast` are debug hooks for sampled TRNG data and the fast ring oscillator, respectively. 
-        """)
+        """.format(cores))
         ### to/from management interface
         self.ena = Signal()
         self.gang = Signal()
@@ -1125,78 +1212,6 @@ as an independent variable, so I think the paper's core idea still works.
             )
         ]
 
-        # build a set of `element` rings, with `stage` stages
-        self.trng_slow = Signal()
-        for element in range(ro_elements):
-            setattr(self, "ro_elem" + str(element), Signal(ro_stages+1))
-            setattr(self, "ro_samp" + str(element), Signal())
-            for stage in range(ro_stages):
-                stagename = 'RINGOSC_E' + str(element) + '_S' + str(stage)
-                self.specials += Instance("LUT1", name=stagename, p_INIT=1,
-                    i_I0=getattr(self, "ro_elem" + str(element))[stage],
-                    o_O=getattr(self, "ro_elem" + str(element))[stage+1],
-                    attr=("KEEP", "DONT_TOUCH"),
-                )
-                # add platform command to disable timing closure on ring oscillator paths
-                platform.add_platform_command("set_disable_timing -from I0 -to O [get_cells " + stagename + "]")
-                platform.add_platform_command("set_false_path -through [get_pins " + stagename + "/O]")
-            # add "gang" sampler to pull out extra entropy during dwell mode
-            if element != 32: # element 32 is a special case, handled at end of loop
-                self.specials += Instance("FDCE", name='FDCE_E' + str(element),
-                    i_D=getattr(self, "ro_elem" + str(element))[0],
-                    i_C=ClockSignal(),
-                    i_CE=self.gang,
-                    i_CLR=0,
-                    o_Q=getattr(self, "ro_samp" + str(element))
-                )
-            if (element != 0) & (element != 32): # element 0 is a special case, handled at end of loop
-                self.sync += [
-                    If(sample_now,
-                       rand[element].eq(rand[element-1]),
-                    ).Else(
-                        rand[element].eq(rand[element] ^ (getattr(self, "ro_samp" + str(element)) & self.gang)),
-                    )
-                ]
-            # close feedback loop with enable gate
-            setattr(self, "ro_fbk" + str(element), Signal())
-            self.comb += [
-                getattr(self, "ro_fbk" + str(element)).eq(getattr(self, "ro_elem" + str(element))[ro_stages]
-                                                          & self.ena),
-            ]
-
-        # build the input tap
-        self.specials += Instance("FDCE", name='FDCE_E32',
-            i_D=getattr(self, "ro_elem32")[0],
-            i_C=ClockSignal(),
-            i_CE=1, # element 32 is not part of the gang, it's the output element of the "big loop"
-            i_CLR=0,
-            o_Q=getattr(self, "ro_samp32")
-        )
-        self.sync += [
-            If(sample_now,
-                # shift in sample entropy from a tap on the one stage that's not already wired to a gang mixer
-                # but still rotate back bits from the top, why throw away good entropy?
-                rand[0].eq(getattr(self, "ro_samp32") ^ rand[31]),
-            ).Else(
-                rand[0].eq(rand[0] ^ (getattr(self, "ro_samp0") & self.gang)),
-            )
-        ]
-
-        # create the switchable meta-ring by muxing on dwell_now
-        for element in range(ro_elements):
-            if element < ro_elements-1:
-                self.comb += getattr(self, "ro_elem" + str(element))[0]\
-                                 .eq(  getattr(self, "ro_fbk" + str(element)) & dwell_now
-                                     | getattr(self, "ro_fbk" + str(element + 1)) & ~dwell_now),
-            else:
-                self.comb += getattr(self, "ro_elem" + str(element))[0]\
-                                 .eq(  getattr(self, "ro_fbk" + str(element)) & dwell_now
-                                     | getattr(self, "ro_fbk" + str(0)) & ~dwell_now),
-
-        self.trng_slow = Signal()
-        self.trng_fast = Signal()
-        self.sync += [self.trng_fast.eq(self.ro_fbk0), self.trng_slow.eq(rand[0])]
-
         dwell_cnt = Signal(self.dwell.nbits)
         delay_cnt = Signal(self.delay.nbits)
         fsm = FSM(reset_state="IDLE")
@@ -1238,4 +1253,20 @@ as an independent variable, so I think the paper's core idea still works.
                 )
             )
         )
+
+        r = Signal(rand.nbits, reset=0) # base case is 0
+        for core in range(cores):
+            setattr(self.submodules, 'rocore' + str(core), TrngRingOscCore(platform, '_c{}_'.format(core), ro_elements, ro_stages))
+            setattr(self, 'rocore' + str(core) + '_rand', Signal(rand.nbits))
+            self.comb += [
+                getattr(self, 'rocore' + str(core)).sample_now.eq(sample_now),
+                getattr(self, 'rocore' + str(core)).dwell_now.eq(dwell_now),
+                getattr(self, 'rocore' + str(core)).gang.eq(self.gang),
+                getattr(self, 'rocore' + str(core)).ena.eq(self.ena),
+            ]
+            # fold the results across each core by doing a progressive XOR
+            next_r = Signal(rand.nbits)
+            self.comb += next_r.eq(r ^ getattr(self, 'rocore' + str(core)).rand)
+            r = next_r
+        self.comb += rand.eq(r)
 
