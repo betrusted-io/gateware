@@ -71,7 +71,7 @@ to as little as 15-20ms and still probably be quite safe.
         # raw data:
         # https://github.com/betrusted-io/gateware/blob/master/gateware/trng/v_noise_stable.png
         # https://github.com/betrusted-io/gateware/blob/master/gateware/trng/v_ava_poweron.png
-        default_samples = 20
+        default_samples = 32
         self.av_config = CSRStorage(fields=[
             CSRField("powerdelay", size=20, description="Delay in microseconds for avalanche generator to stabilize", reset=50000),
             CSRField("samples", size=8, description="Number of samples to fold into a single result. Smaller values increase rate but decrease quality. Default is {}.".format(default_samples), reset=default_samples),
@@ -80,13 +80,17 @@ to as little as 15-20ms and still probably be quite safe.
 
         self.ro_config = CSRStorage(fields=[
             CSRField("gang", size=1, description="Fold in collective gang entropy during dwell time", reset=1),
-            CSRField("dwell", size=20, description="""Prescaler to set dwell-time of entropy collection. 
+            CSRField("dwell", size=12, description="""Prescaler to set dwell-time of entropy collection. 
             Controls the period of how long the oscillators are in a metastable state to collect entropy 
             before sampling. Value encodes the number of sysclk edges to pass during the dwell period.""", reset=100),
             CSRField("delay", size=10, description="""Sampler delay time. Sets the delay between when the small rings
             are merged together, and when the final entropy result is sampled. Value encodes number of sysclk edges
             to pass during the delay period. Delay should be long enough for the signal to propagate around the merged ring,
-            but longer times also means more coupling of the deterministic sysclk noise into the rings.""", reset=8)
+            but longer times also means more coupling of the deterministic sysclk noise into the rings.""", reset=8),
+            CSRField("fuzz", size=1, description="""Modulate the `delay`/`dwell` parameter slightly from run-to-run, 
+            based on previous run's random values. May help to break ring oscillator resonances trained by the delay/dwell periodicity.""", reset=1),
+            CSRField("oversampling", size=8, description="""Number of stages to oversample entropy. Normally, each bit is just
+            sampled and shifted once (so 32 times for 32-bit word). Each increment of oversampling will add another stage.""", reset=0)
         ])
 
         self.errors = CSRStatus(fields=[
@@ -120,12 +124,21 @@ should include at least 2-3 bit patterns if feasible. This basically checks if a
 a rate that is not commensurate with the expected entropy rate, or if it stabilizes too much to be generating
 entropy. 
 
-- For the avalanche geneartor, it should extract the raw noise values from the avalanche output, and use those
+- For the avalanche generator, it should extract the raw noise values from the avalanche output in test mode, and use those
 to update a min/max window over time. If the min/max window is not exceeded over a period of time, we can
 conclude that the avalanche process has ceased. The size of the min/max window, again, should be user-configurable.
 This will catch the failure case that the avalanche diode 'wears out', and will also catch the failure case that
 the bias generator's voltage is not high enough for some reason. It will not catch the case of e.g. periodic
-noise deliberately injected into the TRNG in an attempt to override the TRNG's natural behavior. 
+noise deliberately injected into the TRNG in an attempt to override the TRNG's natural behavior.
+
+- The OPSO/OQSO tests seem to be the hardest for both TRNGs to pass, probably due to systemic, fixed biases
+in e.g. ADC bits and/or ring oscillator rates causing certain code-pairs to be less frequent. A truncated 
+version of OPSO/OQSO could be pretty useful for measuring the health of the TRNG. 4xRAMB36 blocks could 
+store a portion of the OPSO sampling matrix, giving a total of 16 x 1024 "lines" of the 1024x1024 total 
+OPSO matrix. Summing results over hundreds of runs into even this sub-portion of the matrix should 
+eventually lead to a normal distribution of values, and shifts in the mean and spread can give 
+hints into the amount of systemic bias a given ring oscillator could be showing. As of the writing 
+of this comment, there are 24x RAMB36's available in the FPGA still.
         """)
         self.enable = Signal()
         self.healthy = Signal() # if currently healthy or not
@@ -176,6 +189,7 @@ class ModNoise(Module, AutoCSR, AutoDoc):
         noisesync = Signal()
         self.specials += MultiReg(self.noisein, noisesync)
 
+        ##### NOTE: for testing purposes, the CSR config is put in the module, but should be refactored into the Server address space if used for production
         self.ctl = CSRStorage(fields=[
             CSRField("ena", size=1, description="Power on and enable TRNG.", reset=0),
             CSRField("period", size=20, description="Duration of one phase in sysclk periods", reset=495),
@@ -418,15 +432,17 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
                 ).Else(
                     If(av_noise0_fresh & av_noise1_fresh,
                         NextValue(av_noisecnt, av_noisecnt - 1),
-                        # Syndrome: Dieharder OQSO, OPSO tests are weak/failed
-                        # Hypothesis: sampling rate is too high
-                        # Solution: reduce effective sampling rate by oversampling noise (av_noisecount > 8)
+                        # Reduce effective sampling rate by oversampling noise (av_noisecount > 8) to improve entropy quality
                         # Side note: entropy is concentrated in the LSBs of the ADC, so we rotate the result by 5
                         #            which stripes the LSB over the final resulting 32-bit number:
+                        # mod 5
                         # iters   00 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32->0
                         # bit pos 00 05 10 15 20 25 30 03 08 13 18 23 28 01 06 11 16 21 26 31 04 09 14 19 24 29 02 07 12 17 22 27   00
                         # iters is set by the initial value in `av_noisecnt`, loaded in the "IDLE" state above
-                        NextValue(av_noiseout, av_noise0_data ^ av_noise1_data ^ Cat(av_noiseout[27:], av_noiseout[:27])),
+                        # mod 3
+                        # iters   00 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32->0
+                        # bit pos 00 03 06 09 12 15 18 21 24 27 30 01 04 07 10 13 16 19 22 25 28 31 02 05 08 11 14 17 20 23 26 29   00
+                        NextValue(av_noiseout, av_noise0_data ^ av_noise1_data ^ Cat(av_noiseout[27:], av_noiseout[:27])), # 27 for 5 shift, 29 for 3 shift
                         av_noise0_read.eq(1),
                         av_noise1_read.eq(1),
                     )
@@ -489,6 +505,8 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             self.ringosc.gang.eq(server.ro_config.fields.gang),
             self.ringosc.dwell.eq(server.ro_config.fields.dwell),
             self.ringosc.delay.eq(server.ro_config.fields.delay),
+            self.ringosc.fuzz.eq(server.ro_config.fields.fuzz),
+            self.ringosc.oversampling.eq(server.ro_config.fields.oversampling),
             ro_fresh.eq(self.ringosc.fresh),
             ro_rand.eq(self.ringosc.rand_out),
             self.ringosc.rand_read.eq(ro_rand_read),
@@ -666,9 +684,13 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
         self.submodules += refill
         refill.act("IDLE",
             If(refill_needed,
-                NextState("CONFIG"),
                 NextValue(powerup, 1),
-                NextValue(av_config_noise, 1),  # switch to noise-only sampling for the XADC
+                If(~server.control.fields.av_dis,
+                    NextState("CONFIG"),
+                    NextValue(av_config_noise, 1),  # switch to noise-only sampling for the XADC
+                ).Else(
+                    NextState("PUMP")
+                )
             ).Else(
                 NextValue(powerup, 0),
             ),
@@ -1054,11 +1076,13 @@ as an independent variable, so I think the paper's core idea still works.
         ### to/from management interface
         self.ena = Signal()
         self.gang = Signal()
-        self.dwell = Signal(20)
+        self.dwell = Signal(12)
         self.delay = Signal(10)
         self.rand_out = Signal(32)
         self.rand_read = Signal() # pulse one cycle to indicate rand_out has been read
         self.fresh = Signal()
+        self.fuzz = Signal()
+        self.oversampling = Signal(8)  # stages to oversample entropy
 
         devstr = platform.device.split('-')
         device_root = devstr[0]
@@ -1077,7 +1101,7 @@ as an independent variable, so I think the paper's core idea still works.
 
         dwell_now = Signal()   # level-signal to indicate dwell or measure
         sample_now = Signal()  # single-sysclk wide pulse to indicate sampling time (after leaving dwell)
-        rand_cnt = Signal(max=self.rand_out.nbits+1)
+        rand_cnt = Signal(max=self.rand_out.nbits+1+8)
         # keep track of how many bits have been shifted in since the last read-out
         self.sync += [
             If(self.rand_read,
@@ -1085,7 +1109,7 @@ as an independent variable, so I think the paper's core idea still works.
                self.rand_out.eq(0xDEADBEEF),
             ).Else(
                 If(shift_rand,
-                    If(rand_cnt < self.rand_out.nbits+1, # +1 because the very first bit never got sample entropy, just dwell, so we throw it away
+                    If(rand_cnt < self.rand_out.nbits + self.oversampling +1, # +1 because the very first bit never got sample entropy, just dwell, so we throw it away
                        rand_cnt.eq(rand_cnt + 1),
                     ).Else(
                        self.rand_out.eq(rand),
@@ -1148,7 +1172,9 @@ as an independent variable, so I think the paper's core idea still works.
         )
         self.sync += [
             If(sample_now,
-                rand[0].eq(getattr(self, "ro_samp32")), # shift in sample entropy from a tap on the one stage that's not already wired to a gang mixer
+                # shift in sample entropy from a tap on the one stage that's not already wired to a gang mixer
+                # but still rotate back bits from the top, why throw away good entropy?
+                rand[0].eq(getattr(self, "ro_samp32") ^ rand[31]),
             ).Else(
                 rand[0].eq(rand[0] ^ (getattr(self, "ro_samp0") & self.gang)),
             )
@@ -1196,8 +1222,13 @@ as an independent variable, so I think the paper's core idea still works.
                 NextValue(delay_cnt, delay_cnt - 1),
             ).Else(
                 sample_now.eq(1),
-                NextValue(dwell_cnt, self.dwell),
-                NextValue(delay_cnt, self.delay),
+                If(self.fuzz,
+                    NextValue(dwell_cnt, self.dwell + self.rand_out[:5]),
+                    NextValue(delay_cnt, self.delay + self.rand_out[:2]),
+                ).Else(
+                    NextValue(dwell_cnt, self.dwell),
+                    NextValue(delay_cnt, self.delay),
+                ),
                 If(self.ena,
                     NextState("DWELL"),
                 ).Else(
