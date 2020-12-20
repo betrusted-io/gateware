@@ -1034,6 +1034,8 @@ We do this because xsim cannot simulate ring oscillators.
         self.rand_out = Signal(32, reset=0x5555_0000)
         self.rand_read = Signal() # pulse one cycle to indicate rand_out has been read
         self.fresh = Signal(reset=1)
+        self.fuzz = Signal()
+        self.oversampling = Signal(8)  # stages to oversample entropy
 
         delay = Signal(4, reset=15)
         self.sync += [
@@ -1101,7 +1103,7 @@ as an independent variable, so I think the paper's core idea still works.
 
         dwell_now = Signal()   # level-signal to indicate dwell or measure
         sample_now = Signal()  # single-sysclk wide pulse to indicate sampling time (after leaving dwell)
-        rand_cnt = Signal(max=self.rand_out.nbits+1+8)
+        rand_cnt = Signal(9)
         # keep track of how many bits have been shifted in since the last read-out
         self.sync += [
             If(self.rand_read,
