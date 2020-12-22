@@ -332,7 +332,7 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
         refill_needed = Signal()
         powerup = Signal()
 
-        if revision == 'pvt':
+        if (revision == 'pvt') or (revision == 'pvt2'):
             # this state machine manages the avalanche generator's power-on delay. It ensures that
             # the generator always gets at least the minimum specified time to turn on and stabilize
             av_ena = Signal()
@@ -383,7 +383,7 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             )
 
             # This the XADC module -- it gives us raw noise values that we have to assemble into a 32-bit value
-            self.submodules.xadc = TrngXADC(analog_pads, sim)
+            self.submodules.xadc = TrngXADC(analog_pads, sim, revision)
             av_noise0_read = Signal()
             av_noise1_read = Signal()
             av_noise0_fresh = Signal()
@@ -749,7 +749,7 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
 analog_layout = [("vauxp", 16), ("vauxn", 16), ("vp", 1), ("vn", 1)]
 
 class TrngXADC(Module, AutoCSR):
-    def __init__(self, analog_pads=None, sim=False):
+    def __init__(self, analog_pads=None, sim=False, revision='pvt'):
         # Temperature
         self.temperature = CSRStatus(12, description="""Raw Temperature value from XADC.\n
             Temperature (°C) = ``Value`` x 503.975 / 4096 - 273.15.""")
@@ -801,7 +801,7 @@ class TrngXADC(Module, AutoCSR):
         self.specials += Instance(instancename,
             # From ug480
             p_INIT_40=0x9000, p_INIT_41=0x2ef0, p_INIT_42=0x0420,
-            p_INIT_48=0x4701, p_INIT_49=0xd050,
+            p_INIT_48=0x4701, p_INIT_49=0xd050, # note the initial values don't map the GPIOx pins, but this is adjusted in the "sense_table" later based on HW rev
             p_INIT_4A=0x4701, p_INIT_4B=0xc040,
             p_INIT_4C=0x0000, p_INIT_4D=0x0000,
             p_INIT_4E=0x0000, p_INIT_4F=0x0000,
@@ -839,17 +839,34 @@ class TrngXADC(Module, AutoCSR):
         self.configured = Signal() # when high, ADC is configured and sampling
 
         # Channels update --------------------------------------------------------------------------
-        channels = {
-            0: self.temperature,
-            1: self.vccint,
-            2: self.vccaux,
-            6: self.vccbram,
-            20: self.noise1,
-            22: self.vbus,
-            28: self.noise0,
-            30: self.usb_p,
-            31: self.usb_n,
-        }
+        if revision == 'pvt':
+            channels = {
+                0 : self.temperature,
+                1 : self.vccint,
+                2 : self.vccaux,
+                6 : self.vccbram,
+                20: self.noise1,
+                22: self.vbus,
+                28: self.noise0,
+                30: self.usb_p,
+                31: self.usb_n,
+            }
+        elif revision == 'pvt2':
+            self.gpio5 = CSRStatus(12, description="GPIO5 value")
+            self.gpio2 = CSRStatus(12, description="GPIO2 value")
+            channels = {
+                0: self.temperature,
+                1: self.vccint,
+                2: self.vccaux,
+                6: self.vccbram,
+                20: self.noise1,
+                21: self.gpio5,
+                22: self.vbus,
+                27: self.gpio2,
+                28: self.noise0,
+                30: self.usb_p,
+                31: self.usb_n,
+            }
         self.sync += [
                 If(drdy,
                     Case(channel, dict(
@@ -946,17 +963,33 @@ class TrngXADC(Module, AutoCSR):
             6: 0x408000, # don't use averaging
             7: 0x412EF0,  # continuous mode, disable most alarms
         }
-        # configure for round-robin sampling of all system parameters (this is default)
-        sense_table = {
-            0: 0x410EF0, # set sequencer default mode -- allows updating of Sequencer
-            1: 0x484701, # Seq 0: Aux Int Bram Temp Cal
-            2: 0x49D050, # Seq 1: Vaux15 (usbn) Vaux14 (usbp) Vaux12 (noise0) Vaux6 (vbus) Vaux4 (noise1)
-            3: 0x4A4701, # Average aux int bram temp cal
-            4: 0x4BC040, # Average all but noise (c040)
-            5: 0x412EF0,
-            6: 0x409000, # Average by 16 samples
-            7: 0x420420,
-        }
+        if revision == 'pvt':
+            # configure for round-robin sampling of all system parameters (this is default)
+            sense_table = {
+                0: 0x410EF0,  # set sequencer default mode -- allows updating of Sequencer
+                1: 0x484701,  # Seq 0: Aux Int Bram Temp Cal
+                2: 0x49D050,  # Seq 1: Vaux15 (usbn) Vaux14 (usbp) Vaux12 (noise0) Vaux6 (vbus) Vaux4 (noise1)
+                3: 0x4A4701,  # Average aux int bram temp cal
+                4: 0x4BC040,  # Average all but noise (c040)
+                5: 0x412EF0,
+                6: 0x409000,  # Average by 16 samples
+                7: 0x420420,
+            }
+        elif revision == 'pvt2':
+            # configure for round-robin sampling of all system parameters (this is default)
+            sense_table = {
+                0: 0x410EF0,  # set sequencer default mode -- allows updating of Sequencer
+                1: 0x484701,  # Seq 0: Aux Int Bram Temp Cal
+                2: 0x49D870,  # Seq 1: Vaux15 (usbn) Vaux14 (usbp) Vaux12 (noise0) Vaux11 (gpio2) Vaux6 (vbus) Vaux5 (gpio5) Vaux4 (noise1)
+                3: 0x4A4701,  # Average aux int bram temp cal
+                4: 0x4BC860,  # Average all but noise (c040)
+                5: 0x412EF0,
+                6: 0x409000,  # Average by 16 samples
+                7: 0x420420,
+            }
+        else:
+            print("XADC: unsupported revision!")
+
         # Add table for power down? maybe this is better handled in driver software with DRP?
         self.sync += [
             If(~self.noise_mode,
