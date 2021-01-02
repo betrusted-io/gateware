@@ -46,11 +46,11 @@ class GitInfo(Module, AutoCSR, AutoDoc):
                 return (major, minor, rev, gitrev, gitextra, dirty)
             raw_git_rev = git_stdout.decode().strip()
 
-            parts = raw_git_rev.split("-")
-
             if raw_git_rev[-1] == "+":
                 raw_git_rev = raw_git_rev[:-1]
                 dirty = 1
+
+            parts = raw_git_rev.split("-")
 
             if len(parts) >= 3:
                 if parts[0].startswith("v"):
