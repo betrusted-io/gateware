@@ -164,6 +164,171 @@ storing the results in a memory that can be later on read out and compared to an
         ]
 
 
+class TrngOnlineCheckRo(Module, AutoDoc, AutoCSR):
+    def __init__(self, laggedsums=None, lagbits=20):
+        if laggedsums is None:
+            laggedsums = [0, 1, 2, 3, 4, 8, 16, 32]
+        self.intro = ModuleDoc("""
+On-line health checker for the Ring Oscillator.
+
+- monobit test: difference of 1's and 0's counted. Stops at `samplecount`, compares difference against
+  `sigma`, which is a pre-computed value that should equal to the square root of samplecount. Works by
+  counting a "disparity", which is incremented every time a 1 is seen, and decremented every time a 0 is seen.
+- runs test: difference between runs of 1's and 0's seen. Again, works by counting a "disparity", which increments
+  every time a run of 1's starts, and decrements every time a run of 0's start. 
+
+TODO:
+- lagged sums test: a set of accumulators that sum every nth random number. The sum total should approach 
+  the number of sums taken, divided by 2. This simple test should be fairly effective at teasing out periodicity
+  issues that could be common failure modes given the implementations of both the RO and AV.
+- lagged difference test: a set of accumulators that subtract every other nth random number. The sum total should
+  approach 0. This test compensates for he defect of the lagged sums test in that it over-emphasizes the
+  contribution of the MSBs, at the trade-off that it can be fooled by non-random sequences that have a uniform
+  distribution.
+ 
+  
+Avalanche-specific:
+- Min/max range test on av_noise0_data, av_noise1_data (raw avalanche data)
+- Symbol distribution of bits 25-30: specific to the bit-aggregation algorithm used; we rotate
+  the incoming samples by 5 and XOR them to stripe the entropy; if something is broken, we would see
+  artifacts/patterns modulo 5-bit fields, so check for this problem specifically. Create 2^5 counters,
+  and count the number of times each of 2^5 symbols occur. The distribution should be uniform. We pick
+  bits 25-30 specifically, because these would be the "weakest" bits if a sample count was selected that
+  wasn't divisible by 32, as we start by XORing data aligned with bit 0 and shift up. For example, in a
+  limiting case that we didn't do any oversampling at all, the top bits would always be 0, because the
+  A/D convert values would never have been shift-propagated to the higher bits even once.
+        """)
+
+        self.enable = Signal()
+        self.healthy = Signal() # if currently healthy or not
+        self.rand = Signal(32)  # the current random number generated
+        self.update = Signal()  # should be a single-cycle pulse to latch the value of self.rand
+
+        # monobit test -- count # of 1's and zeros
+        self.monobit = CSRStatus(fields=[
+            CSRField("stat_error", size=1, description="When set, indicates a problem was found in the monobit test"),
+            CSRField("missed_sample", size=1, description="When set, indicates that we missed a sample because we were busy doing statistics collection"),
+        ])
+        self.disparity = CSRStatus(fields=[
+            CSRField("disparity", size=32, description="Disparity of ones and zeros seen since the last update. Positive means more ones than zeros. This field is a signed, 32-bit integer.")
+        ])
+        self.disparity_runs = CSRStatus(fields=[
+            CSRField("disparity_runs", size=32, description="Disparity of runs of 1's versus 0's. Positive means more runs of 1's seen. A signed 32-bit integer.")
+        ])
+        self.samplecount = CSRStorage(fields=[
+            CSRField("samplecount", size=32,
+                description="Total number of bits sampled",
+                reset=0x4_0000),
+        ])
+
+        self.sigma = CSRStorage(fields=[
+            CSRField("sigma", size=32, description="Threshold for test failure of monobit, equal to sqrt(samplecount) for one sigma. This value is interpreted as a signed value.", reset=512),
+        ])
+        sigma_signed = Signal(bits_sign=(32, True))
+        self.comb += sigma_signed.eq(self.sigma.fields.sigma)
+
+        self.sigma_runs = CSRStorage(fields=[
+            CSRField("sigma_runs", size=32, description="Threshold for test failure of runs. Not sure what it should be yet, so the current value is a spitball.", reset=512)
+        ])
+        sigma_runs_signed = Signal(bits_sign=(32, True))
+        self.comb += sigma_runs_signed.eq(self.sigma_runs.fields.sigma_runs)
+
+        ## LEFT OFF -- questioning the validity of summing to a large number. Basically throwing away LSBs? what's the
+        ## value of even keeping them around...the rgb_lagged_sums test does an int coerced to double in the test, which
+        ## helps to spread out the bits a bit...
+
+        for i in laggedsums:
+            setattr(self, "laggedsum" + str(i), CSRStatus(fields=[
+                CSRField("sum", size=(32+lagbits), description="Result of the lagged sum at {} intervals".format(i))
+            ]))
+
+        sample = Signal(32)
+        disparity = Signal(bits_sign=(32, True))
+        disparity_runs = Signal(bits_sign=(32, True))
+        total = Signal(32)
+        bitpos = Signal(6) # we can afford the time to shift through all bits because `update` pulses should be infrequent
+        update_r = Signal()
+        update_pulse = Signal()
+        missed_update = Signal()
+        stat_error = Signal()
+        self.sync += update_r.eq(self.update)
+        self.comb += update_pulse.eq(self.update & ~update_r)
+        previous_bit = Signal()
+        monofsm = FSM(reset_state="RESET")
+        self.submodules += monofsm
+        monofsm.act("RESET",
+            NextValue(missed_update, 0),
+            NextValue(disparity, 0),
+            NextValue(disparity_runs, 0),
+            NextValue(total, 0),
+            NextValue(bitpos, 32),
+            NextValue(stat_error, 0),
+            NextValue(previous_bit, 0),
+            If(self.enable & update_pulse,
+                NextValue(sample, self.rand),
+                NextState("COUNT"),
+            )
+        )
+        monofsm.act("COUNT",
+            If(self.enable,
+                If(self.update,
+                    NextValue(missed_update, 1)
+                ),
+                NextValue(bitpos, bitpos - 1),
+                If(bitpos > 0,
+                    # disparity
+                    If(sample[0] == 1,
+                        NextValue(disparity, disparity + 1),
+                    ).Else(
+                        NextValue(disparity, disparity - 1),
+                    ),
+                    NextValue(total, total + 1),
+                    NextValue(sample, Cat(sample[1:], 0)), # shift right, Cat goes LSB-to-MSB
+
+                    # disparity_runs
+                    NextValue(previous_bit, sample[0]),
+                    If( ~previous_bit & sample[0],  # we're entering a run of 1's
+                        NextValue(disparity_runs, disparity_runs + 1)
+                    ).Elif( previous_bit & ~sample[0], # we're entering a run of 0's
+                        NextValue(disparity_runs, disparity_runs - 1)
+                    )
+                ).Else(
+                    NextState("REPORT?")
+                )
+            ).Else(
+                NextState("RESET")
+            )
+        )
+        monofsm.act("REPORT?",
+            If(self.enable,
+                If(total > self.samplecount.fields.samplecount,
+                    If( (disparity > sigma_signed) |
+                        (disparity < -sigma_signed) |
+                        (disparity_runs > sigma_runs_signed) |
+                        (disparity_runs < -sigma_runs_signed),
+                        NextValue(stat_error, 1)
+                    ),
+                    NextValue(disparity, 0),
+                    NextValue(total, 0),
+                ),
+                If(update_pulse,
+                    NextState("COUNT"),
+                    NextValue(sample, self.rand),
+                    NextValue(bitpos, 32),
+                )
+            ).Else(
+                NextState("RESET")
+            )
+        )
+        self.comb += self.healthy.eq(~stat_error & ~missed_update)
+        self.comb += [
+            self.monobit.fields.stat_error.eq(stat_error),
+            self.monobit.fields.missed_sample.eq(missed_update),
+            self.disparity.fields.disparity.eq(disparity),
+            self.disparity_runs.fields.disparity_runs.eq(disparity_runs),
+        ]
+
+
 # ModNoise ------------------------------------------------------------------------------------------
 
 class ModNoise(Module, AutoCSR, AutoDoc):
@@ -517,12 +682,13 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
         ]
 
         ## Add the health checkers and interrupts
-        self.submodules.ro_health = TrngOnlineCheck()
+        self.submodules.ro_health = TrngOnlineCheck() # TrngOnlineCheckRo()
         self.submodules.av_health = TrngOnlineCheck()
         self.comb += [
             self.av_health.enable.eq(~server.control.fields.no_check & av_powerstate),
             self.av_health.rand.eq(av_noiseout),
             self.av_health.update.eq(av_noiseout_read),
+
             self.ro_health.enable.eq(~server.control.fields.no_check & self.ringosc.ena),
             self.ro_health.rand.eq(ro_rand),
             self.ro_health.update.eq(ro_rand_read),
