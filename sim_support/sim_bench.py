@@ -194,6 +194,8 @@ class SimRunner():
         os.system("cd run && xvlog ../../../sim_support/glbl.v")
         os.system("cd run && xvlog sim_bench.v -sv")
         os.system("cd run && xvlog top_tb.v -sv ")
+        vex_dir = os.path.dirname(VEX_CPU_PATH)
+        os.system("cp {} run/".format(vex_dir + "/*.bin")) # copy any relevant .bin files into the run directory as well
         os.system("cd run && xvlog {}".format("../" + vex_verilog_path))
 
         # run user dependencies
