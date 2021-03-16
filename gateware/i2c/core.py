@@ -54,7 +54,8 @@ class RTLI2C(Module, AutoCSR, AutoDoc):
         ])
 
         self.submodules.ev = EventManager()
-        self.ev.i2c_int    = EventSourcePulse()  # rising edge triggered
+        self.ev.i2c_int    = EventSourcePulse(description="Triggered when arbitration is lost")  # rising edge triggered
+        self.ev.txrx_done  = EventSourceProcess(description="Triggered on the falling edge of TIP") # falling edge triggered
         self.ev.finalize()
 
         # control register
@@ -154,4 +155,5 @@ class RTLI2C(Module, AutoCSR, AutoDoc):
         ]
 
         self.comb += self.ev.i2c_int.trigger.eq(intflag & int_ena)
+        self.comb += self.ev.txrx_done.trigger.eq(tip)
 
