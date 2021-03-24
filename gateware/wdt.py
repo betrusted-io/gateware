@@ -2,6 +2,7 @@ from migen import *
 from migen.genlib.cdc import MultiReg, BlindTransfer, BusSynchronizer
 from litex.soc.integration.doc import AutoDoc, ModuleDoc
 from litex.soc.interconnect.csr import *
+from litex.soc.interconnect.csr_eventmanager import *
 
 # WDT --------------------------------------------------------------------------------------------
 class WDT(Module, AutoDoc, AutoCSR):
@@ -38,6 +39,16 @@ The register cannot be updated once the WDT is running.
                 description="Number of 'approximately 65MHz' CFGMCLK cycles before each reset_code must be entered. Defaults to a range of {:0.2f}-{:0.2f} seconds".format((default_period * 10.256e-9)*0.5, (default_period * 10.256e-9)*1.5), reset=default_period
             )
         ])
+
+        self.interrupt = CSRStorage(1, fields=[
+            CSRField("interrupt", size = 1, pulse=True,
+                description="Writing this causes an interrupt to fire. Used by the kernel to initiate a routine to reset the WDT in an interrupt context."
+            )
+        ])
+        self.submodules.ev = EventManager()
+        self.ev.soft_int = EventSourceProcess()
+        self.comb += self.ev.soft_int.trigger.eq(self.interrupt.fields.interrupt)
+
         self.state = CSRStatus(4, fields=[
             CSRField("enabled", size=1, description="WDT has been enabled"),
             CSRField("armed1", size=1, description="WDT in the armed1 state"),
