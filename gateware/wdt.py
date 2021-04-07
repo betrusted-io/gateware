@@ -79,6 +79,8 @@ The register cannot be updated once the WDT is running.
         reset_code_wdt = Signal(16)
         self.comb += [
             self.code_sync.i.eq(self.watchdog.fields.reset_code),
+        ]
+        self.sync.wdt += [
             reset_code_wdt.eq(self.code_sync.o)
         ]
         self.submodules.period_sync = BusSynchronizer(32, "sys", "wdt")
@@ -144,9 +146,13 @@ The register cannot be updated once the WDT is running.
             ),
             If(reset_code_wdt == 0xc0de,
                 NextState("DISARMED")
-            ).Else(
-                NextState("ARMED")
             )
+            # the arrival of the next write isn't strictly guaranteed: it can take longer than one cycle for 0x600d to go to 0xc0de
+            # due to CDC delays, interrupts, etc.
+            # so we make this a bit more permissive and allow any junk to be written until we see 0xc0de
+            #.Else(
+            #    NextState("ARMED")
+            #)
         )
         wdog.act("DISARMED",
             disarmed.eq(1),
