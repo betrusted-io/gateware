@@ -36,7 +36,7 @@ class RTLI2C(Module, AutoCSR, AutoDoc):
         self.rxr = CSRStatus(8, name="rxr", description="""
         Data being read from slaved devices""")
         self.command = CSRStorage(write_from_dev=True, fields=[
-            CSRField("IACK",  size=1, description="Interrupt acknowledge; when set, clears a pending interrupt"),
+            CSRField("IACK",  size=1, description="Interrupt acknowledge; when set, clears a pending interrupt", pulse=True),
             CSRField("Resvd", size=2, description="reserved for cross-compatibility with OpenCores drivers"),
             CSRField("ACK",   size=1, description="when a receiver, sent ack (`ACK=0`) or nack (`ACK=1`)"),
             CSRField("WR",    size=1, description="write to slave"),
@@ -54,7 +54,7 @@ class RTLI2C(Module, AutoCSR, AutoDoc):
         ])
 
         self.submodules.ev = EventManager()
-        self.ev.i2c_int    = EventSourcePulse(description="Triggered when arbitration is lost")  # rising edge triggered
+        self.ev.i2c_int    = EventSourcePulse(description="Triggered when arbitration is lost or transaction done. Requires IACK write to clear or else it will re-trigger.")  # rising edge triggered
         self.ev.txrx_done  = EventSourceProcess(description="Triggered on the falling edge of TIP") # falling edge triggered
         self.ev.finalize()
 
