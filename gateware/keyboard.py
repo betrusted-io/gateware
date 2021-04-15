@@ -89,6 +89,17 @@ an interrupt.
         rows_unsync = pads.row
         cols        = Signal(pads.col.nbits)
 
+        self.uart_inject = Signal(8) # character to inject from the UART
+        self.inject_strobe = Signal() # on rising edge, latch uart_inject and raise an interrupt
+        self.uart_char = CSRStatus(9, fields = [
+            CSRField("char", size=8, description="character value being injected"),
+            CSRField("stb", size=1, description="current strobe value (for debugging)"),
+        ])
+        self.comb += [
+            self.uart_char.fields.char.eq(self.uart_inject),
+            self.uart_char.fields.stb.eq(self.inject_strobe),
+        ]
+
         for c in range(0, cols.nbits):
             cols_ts = TSTriple(1)
             self.specials += cols_ts.get_tristate(pads.col[c])
@@ -196,7 +207,13 @@ an interrupt.
 
         self.submodules.ev = EventManager()
         self.ev.keypressed = EventSourcePulse(description="Triggered every time there is a difference in the row state") # Rising edge triggered
+        self.ev.inject = EventSourcePulse(description="Key injection request received")
         self.ev.finalize()
+        inject_r = Signal()
+        self.sync += [
+            inject_r.eq(self.inject_strobe),
+            self.ev.inject.trigger.eq(self.inject_strobe & ~inject_r) # make sure it's just one edge
+        ]
         # debounce timers and clocks
         debounce_clocks = int((debounce_ms * 0.001) * 32768.0)
         debounce_timer  = Signal(max=(debounce_clocks + 1))
