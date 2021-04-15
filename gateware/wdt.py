@@ -127,32 +127,47 @@ The register cannot be updated once the WDT is running.
         wdog.act("WAIT_ARM",
             # sync up to the watchdog cycle so we give ourselves a full cycle to disarm the watchdog
             If(wdog_cycle,
-                NextState("ARMED")
+                NextState("ARMED_HOT")
             )
         )
-        wdog.act("ARMED",
+        wdog.act("ARMED_HOT",
             armed1.eq(1),
             If(wdog_cycle,
                 do_reset.eq(1),
             ),
             If(reset_code_wdt == 0x600d,
+                NextState("DISARM1_HOT")
+            )
+        )
+        wdog.act("DISARM1_HOT",
+            armed2.eq(1),
+            If(wdog_cycle,
+                do_reset.eq(1),
+            ),
+            If(reset_code_wdt == 0xc0de,
+                NextState("ARMED")
+            )
+        )
+        # double-interlock: not having responded to the watchdog code immediately
+        # is not cause for a reset: this could just be the wdog_cycle hitting at an
+        # inopportune time relative to the watchdog reset routine.
+        # instead, escalate to the ARMED_HOT state so that
+        # the watchdog next period, if no action was taken, we do a reset
+        wdog.act("ARMED",
+            armed1.eq(1),
+            If(wdog_cycle,
+                NextState("ARMED_HOT")
+            ).Elif(reset_code_wdt == 0x600d,
                 NextState("DISARM1")
             )
         )
         wdog.act("DISARM1",
             armed2.eq(1),
             If(wdog_cycle,
-                do_reset.eq(1),
-            ),
-            If(reset_code_wdt == 0xc0de,
+                NextState("DISARM1_HOT")
+            ).Elif(reset_code_wdt == 0xc0de,
                 NextState("DISARMED")
             )
-            # the arrival of the next write isn't strictly guaranteed: it can take longer than one cycle for 0x600d to go to 0xc0de
-            # due to CDC delays, interrupts, etc.
-            # so we make this a bit more permissive and allow any junk to be written until we see 0xc0de
-            #.Else(
-            #    NextState("ARMED")
-            #)
         )
         wdog.act("DISARMED",
             disarmed.eq(1),
