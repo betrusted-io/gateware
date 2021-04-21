@@ -31,21 +31,34 @@ class TickTimer(Module, AutoCSR, AutoDoc):
         timer = Signal(bits)
 
         self.control = CSRStorage(2, fields=[
-            CSRField("reset", description="Write a `1` to this bit to reset the count to 0", pulse=True),
-            CSRField("pause", description="Write a `1` to this field to pause counting, 0 for free-run")
+            CSRField("reset", description="Write a `1` to this bit to reset the count to 0. This bit has priority over all other requests.", pulse=True),
+            CSRField("pause", description="Write a `1` to this field to request a pause to counting, 0 for free-run. Count pauses on the next tick quanta."),
+            CSRField("load", description="If paused, write a `1` to this bit to load a resume value to the timer. If not paused, this bit is ignored.", pulse=True),
         ])
         self.time = CSRStatus(bits, name="time", description="""Elapsed time in systicks""")
+        self.resume_time = CSRStorage(bits, name="resume_time", description="Elapsed time to load. Loaded upon writing `1` to the load bit in the control regsiter. This will immediately affect the msleep extension.")
+        self.status = CSRStatus(1, fields=[
+            CSRField("paused", description="When set, indicates that the counter has been paused")
+        ])
 
         self.sync += [
             If(self.control.fields.reset,
-               timer.eq(0),
-               prescaler.eq(self.clkspertick),
+                timer.eq(0),
+                prescaler.eq(self.clkspertick),
+            ).Elif(self.control.fields.load & self.status.fields.paused,
+                prescaler.eq(self.clkspertick),
+                timer.eq(self.resume_time.storage),
             ).Else(
                 If(prescaler == 0,
                    prescaler.eq(self.clkspertick),
+
                    If(self.control.fields.pause == 0,
-                      timer.eq(timer + 1),
-                    )
+                       timer.eq(timer + 1),
+                       self.status.fields.paused.eq(0)
+                   ).Else(
+                       timer.eq(timer),
+                       self.status.fields.paused.eq(1)
+                   )
                 ).Else(
                    prescaler.eq(prescaler - 1),
                 )
