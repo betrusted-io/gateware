@@ -121,13 +121,7 @@ The register cannot be updated once the WDT is running.
         self.submodules += wdog
         wdog.act("IDLE",
             If(wdog_enabled,
-                NextState("WAIT_ARM")
-            )
-        )
-        wdog.act("WAIT_ARM",
-            # sync up to the watchdog cycle so we give ourselves a full cycle to disarm the watchdog
-            If(wdog_cycle,
-                NextState("ARMED_HOT")
+                NextState("DISARMED")
             )
         )
         wdog.act("ARMED_HOT",
