@@ -34,7 +34,6 @@ class TickTimer(Module, AutoCSR, AutoDoc):
         self.pause = Signal()
         self.load = Signal()
         self.paused = Signal()
-        self.reset = Signal()
         self.timer = Signal(bits)
         self.resume_time = Signal(bits)
 
@@ -46,10 +45,10 @@ class TickTimer(Module, AutoCSR, AutoDoc):
             self.timer.eq(timer),
         ]
         self.sync += [
-            If(self.control.fields.reset | self.reset,
+            If(self.control.fields.reset,
                 timer.eq(0),
                 prescaler.eq(self.clkspertick),
-            ).Elif(self.load & self.paused,
+            ).Elif(self.load,
                 prescaler.eq(self.clkspertick),
                 timer.eq(self.resume_time),
             ).Else(
