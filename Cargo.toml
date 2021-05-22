@@ -6,7 +6,7 @@ members = [
     "sim/sha512/testbench",
     "sim/sha2/testbench",
     "sim/aes/testbench",
-    "sim/jtag_phy/testbench",
+    "sim_noci/jtag_phy/testbench",
     "sim/spi_basic/testbench",
     "sim/spififo/testbench",
     "sim/sram32/testbench",
