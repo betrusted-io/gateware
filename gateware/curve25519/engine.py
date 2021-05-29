@@ -1505,6 +1505,10 @@ Here are the currently implemented opcodes for The Engine:
         self.control = CSRStorage(fields=[
             CSRField("go", size=1, pulse=True, description="Writing to this puts the engine in `run` mode, and it will execute mplen microcode instructions starting at mpstart"),
         ])
+        self.power = CSRStorage(fields=[
+            CSRField("on", size=1, reset=0,
+                description="Writing `1` turns on the clocks to this block, `0` stops the clocks (for power savings)")
+        ])
         self.status = CSRStorage(fields=[
             CSRField("running", size=1, description="When set, the microcode engine is running. All wishbone access to RF and microcode memory areas will stall until this bit is clear"),
             CSRField("mpc", size=log2_int(microcode_depth), description="Current location of the microcode program counter. Mostly for debug."),

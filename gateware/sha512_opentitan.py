@@ -50,6 +50,10 @@ class Hmac(Module, AutoDoc, AutoCSR):
             bus.ack.eq( ~ack_lsb_r & ack_lsb | ~ack_msb_r & ack_msb )  # single-cycle acks only!
         ]
 
+        self.power = CSRStorage(fields=[
+            CSRField("on", size=1, reset=0,
+                description="Writing `1` turns on the clocks to this block, `0` stops the clocks (for power savings)")
+        ])
         self.config = CSRStorage(description="Configuration register for the HMAC block", fields=[
             CSRField("sha_en", size=1, description="Enable the SHA512 core"),
             CSRField("endian_swap", size=1, description="Swap the endianness on the input data"),
