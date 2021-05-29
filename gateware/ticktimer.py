@@ -1,5 +1,5 @@
 from migen import *
-from migen.genlib.cdc import MultiReg
+from migen.genlib.cdc import BlindTransfer, BusSynchronizer, MultiReg
 
 from litex.soc.interconnect.csr import *
 from litex.soc.interconnect.csr_eventmanager import *
@@ -32,43 +32,63 @@ class TickTimer(Module, AutoCSR, AutoDoc):
 
         # cross-process domain signals. Broken out to a different CSR so it can be on a different virtual memory page.
         self.pause = Signal()
-        self.load = Signal()
-        self.paused = Signal()
-        self.timer = Signal(bits)
-        self.resume_time = Signal(bits)
+        pause = Signal()
+        self.specials += MultiReg(self.pause, pause, "always_on")
 
-        self.control = CSRStorage(2, fields=[
+        self.load = Signal()
+        self.submodules.load_xfer = BlindTransfer("sys", "always_on")
+        self.comb += self.load_xfer.i.eq(self.load)
+
+        self.paused = Signal()
+        paused = Signal()
+        self.specials += MultiReg(paused, self.paused)
+
+        self.timer = Signal(bits)
+        self.submodules.timer_sync = BusSynchronizer(bits, "always_on", "sys")
+        self.comb += [
+            self.timer_sync.i.eq(timer),
+            self.timer.eq(self.timer_sync.o)
+        ]
+        self.resume_time = Signal(bits)
+        self.submodules.resume_sync = BusSynchronizer(bits, "sys", "always_on")
+        self.comb += [
+            self.resume_sync.i.eq(self.resume_time)
+        ]
+
+        self.control = CSRStorage(fields=[
             CSRField("reset", description="Write a `1` to this bit to reset the count to 0. This bit has priority over all other requests.", pulse=True),
         ])
         self.time = CSRStatus(bits, name="time", description="""Elapsed time in systicks""")
+        self.comb += self.time.status.eq(self.timer_sync.o)
+
+        self.submodules.reset_xfer = BlindTransfer("sys", "always_on")
         self.comb += [
-            self.timer.eq(timer),
+            self.reset_xfer.i.eq(self.control.fields.reset),
         ]
-        self.sync += [
-            If(self.control.fields.reset,
+
+        self.sync.always_on += [
+            If(self.reset_xfer.o,
                 timer.eq(0),
                 prescaler.eq(self.clkspertick),
-            ).Elif(self.load,
+            ).Elif(self.load_xfer.o,
                 prescaler.eq(self.clkspertick),
-                timer.eq(self.resume_time),
+                timer.eq(self.resume_sync.o),
             ).Else(
                 If(prescaler == 0,
                    prescaler.eq(self.clkspertick),
 
-                   If(self.pause == 0,
+                   If(pause == 0,
                        timer.eq(timer + 1),
-                       self.paused.eq(0)
+                       paused.eq(0)
                    ).Else(
                        timer.eq(timer),
-                       self.paused.eq(1)
+                       paused.eq(1)
                    )
                 ).Else(
                    prescaler.eq(prescaler - 1),
                 )
             )
         ]
-
-        self.comb += self.time.status.eq(timer)
 
         self.msleep = ModuleDoc("""msleep extension
         
@@ -80,8 +100,14 @@ class TickTimer(Module, AutoCSR, AutoDoc):
         self.msleep_target = CSRStorage(size=bits, description="Target time in {}ms ticks".format(resolution_in_ms))
         self.submodules.ev = EventManager()
         alarm = Signal()
+        alarm_sys = Signal()
         self.ev.alarm = EventSourceLevel()
-        self.comb += self.ev.alarm.trigger.eq(alarm)
+        self.comb += self.ev.alarm.trigger.eq(alarm_sys)
 
-        self.comb += alarm.eq(self.msleep_target.storage <= timer)
+        self.specials += MultiReg(alarm, alarm_sys)
+        self.submodules.target_xfer = BusSynchronizer(bits, "sys", "always_on")
+        self.comb += self.target_xfer.i.eq(self.msleep_target.storage)
+        self.sync.always_on += alarm.eq(self.target_xfer.o <= timer)
 
+        self.alarm_always_on = Signal()
+        self.comb += self.alarm_always_on.eq(alarm)
