@@ -20,6 +20,14 @@ class TickTimer(Module, AutoCSR, AutoDoc):
         The hardware parameter to the block is the divisor of sysclk, and sysclk. So if
         the divisor is 1000, then the increment for a tick is 1ms. If the divisor is 2000,
         the increment for a tick is 0.5ms. 
+        
+        Note to self: substantial area savings could be hand by being smarter about the
+        synchronization between the always-on and the TickTimer domains. Right now about 1.8%
+        of the chip is eaten up by ~1100 synchronization registers to cross the 64-bit values
+        between the clock domains. Since the values move rarely, a slightly smarter method
+        would be to create a lock-out around a read pulse and then create some false_path
+        rules around the datapaths to keep the place/route from getting distracted by the
+        cross-domain clocks.
         """)
 
         resolution_in_ms = 1000 * (self.clkspertick / clkfreq)
