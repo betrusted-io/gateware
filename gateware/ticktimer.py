@@ -104,14 +104,18 @@ class TickTimer(Module, AutoCSR, AutoDoc):
         
         msleep fires an interrupt when the requested time is less than or equal to the current elapsed time in
         systicks. The interrupt remains active until a new target is set, or masked. 
+        
+        There is a slight slip in time (~200ns) from when the msleep timer is set before it can take effect.
+        This is because it takes many CPU clock cycles to transfer this data into the always-on clock
+        domain, which runs at a much slower rate than the CPU clock.
         """)
         self.msleep_target = CSRStorage(size=bits, description="Target time in {}ms ticks".format(resolution_in_ms))
         self.submodules.ev = EventManager()
-        alarm = Signal()
         self.ev.alarm = EventSourceLevel()
         # sys-domain alarm is computed using sys-domain time view, so that the trigger condition
         # corresponds tightly to the setting of the target time
-        self.comb += self.ev.alarm.trigger.eq(self.msleep_target.storage <= self.timer_sync.o)
+        alarm_trigger = Signal()
+        self.comb += self.ev.alarm.trigger.eq(alarm_trigger)
 
         # always_on domain gets a delayed copy of msleep_target
         # thus its output may not match that of the sys-domain alarm
@@ -119,17 +123,36 @@ class TickTimer(Module, AutoCSR, AutoDoc):
         # the bus synchronizers; however, the "trigger" enable for the system is handled
         # in the sys-domain, and can be set *before* the bus synchronizers have passed the
         # data through. This causes the alarm to glitch prematurely.
-        # It's thought tha for the purposes of waking the system up from sleep, this should be
-        # ok, because we only enter the wfi state "far enough" from the setting of the alarm
-        # that the race condition should be resolved.
 
-        # however, if we seem to be errantly aborting WFI's that are entered shortly after
+        # if we seem to be errantly aborting WFI's that are entered shortly after
         # setting an msleep target, this race condition is likely the culprit.
 
-        # "proper" resolutions to this problem (e.g. propagating the "enable" signal all the way
-        # to the always_on domain and masking the bit there) are complicated by the fact that
-        # migen does not know which bit is the enable bit until finalization, so there isn't
-        # a convenient static signal for us to access to do the masking...
+        # the circuit below locks out alarms for the duration of time that it takes for
+        # msleep_target to propagate to its target, and back again
+        self.submodules.ping = BlindTransfer("sys", "always_on")
+        self.comb += self.ping.i.eq(self.msleep_target.re)
+        self.submodules.pong = BlindTransfer("always_on", "sys")
+        self.comb += self.pong.i.eq(self.ping.o)
+        lockout_alarm = Signal()
+        self.comb += [
+            If(lockout_alarm,
+                alarm_trigger.eq(0)
+            ).Else (
+                alarm_trigger.eq(self.msleep_target.storage <= self.timer_sync.o)
+            )
+        ]
+        self.sync += [
+            If(self.msleep_target.re,
+                lockout_alarm.eq(1)
+            ).Elif(self.pong.o,
+                lockout_alarm.eq(0)
+            ).Else(
+                lockout_alarm.eq(lockout_alarm)
+            )
+        ]
+
+        # re-compute the alarm signal in the "always on" domain -- so that this can trigger even when the CPU clock is stopped
+        alarm = Signal()
         self.submodules.target_xfer = BusSynchronizer(bits, "sys", "always_on")
         self.comb += self.target_xfer.i.eq(self.msleep_target.storage)
         self.sync.always_on += alarm.eq(self.target_xfer.o <= timer)
