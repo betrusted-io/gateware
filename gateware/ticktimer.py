@@ -108,11 +108,28 @@ class TickTimer(Module, AutoCSR, AutoDoc):
         self.msleep_target = CSRStorage(size=bits, description="Target time in {}ms ticks".format(resolution_in_ms))
         self.submodules.ev = EventManager()
         alarm = Signal()
-        alarm_sys = Signal()
         self.ev.alarm = EventSourceLevel()
-        self.comb += self.ev.alarm.trigger.eq(alarm_sys)
+        # sys-domain alarm is computed using sys-domain time view, so that the trigger condition
+        # corresponds tightly to the setting of the target time
+        self.comb += self.ev.alarm.trigger.eq(self.msleep_target.storage <= self.timer_sync.o)
 
-        self.specials += MultiReg(alarm, alarm_sys)
+        # always_on domain gets a delayed copy of msleep_target
+        # thus its output may not match that of the sys-domain alarm
+        # in particular, it takes time for msleep_target update to propagate through
+        # the bus synchronizers; however, the "trigger" enable for the system is handled
+        # in the sys-domain, and can be set *before* the bus synchronizers have passed the
+        # data through. This causes the alarm to glitch prematurely.
+        # It's thought tha for the purposes of waking the system up from sleep, this should be
+        # ok, because we only enter the wfi state "far enough" from the setting of the alarm
+        # that the race condition should be resolved.
+
+        # however, if we seem to be errantly aborting WFI's that are entered shortly after
+        # setting an msleep target, this race condition is likely the culprit.
+
+        # "proper" resolutions to this problem (e.g. propagating the "enable" signal all the way
+        # to the always_on domain and masking the bit there) are complicated by the fact that
+        # migen does not know which bit is the enable bit until finalization, so there isn't
+        # a convenient static signal for us to access to do the masking...
         self.submodules.target_xfer = BusSynchronizer(bits, "sys", "always_on")
         self.comb += self.target_xfer.i.eq(self.msleep_target.storage)
         self.sync.always_on += alarm.eq(self.target_xfer.o <= timer)
