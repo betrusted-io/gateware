@@ -277,7 +277,7 @@ an interrupt.
         self.kbd_wakeup = Signal()
         self.sync.kbd += kp_d.eq(debounced & (rowdiff != 0))
         self.sync.kbd += kp_d2.eq(kp_d)
-        self.comb += self.kbd_wakeup.eq(kp_d2)
+        self.comb += self.kbd_wakeup.eq(kp_d2 | pending_kbd) # wakeup in advance of any potential keyboard change
         self.sync += kp_r.eq(kp_d2)
         self.sync += kp_r2.eq(kp_r)
         self.comb += self.ev.keypressed.trigger.eq(kp_r & ~kp_r2)
