@@ -188,34 +188,36 @@ class SimRunner():
             cpname = 'cp'
 
         try:
-            os.system("mkdir run")
-        except:
-            pass
-        try:
-            os.system("rm -r run/xsim.dir")
+            os.system("mkdir run") # was "mkdir -p run"
         except:
             pass
 
+        if os.name == 'nt':
+            os.system('rmdir /S /Q run\\xsim.dir')
+        else:
+            os.system("rm -rf run/xsim.dir")
+
         # copy over the top test bench and common code
-        os.system("{} top_tb.v run/top_tb.v".format(cpname))
-        os.system("{} ../../sim_support/common.v run/".format(cpname))
+        os.system("{} top_tb.v run".format(cpname) + os.path.sep + "top_tb.v") # "cp top_tb.v run/top_tb.v"
+        os.system("{} ..".format(cpname) + os.path.sep + ".." + os.path.sep + "sim_support" + os.path.sep + "common.v run" + os.path.sep) # "cp ../../sim_support/common.v run/"
 
         # initialize with a default waveform that contains the most basic execution tracing
         if os.path.isfile('run/top_tb_sim.wcfg') != True:
             if os.path.isfile('top_tb_sim.wcfg'):
-                os.system('{} top_tb_sim.wcfg run/'.format(cpname))
+                os.system('{} top_tb_sim.wcfg run'.format(cpname) + os.path.sep) # 'cp top_tb_sim.wcfg run/'
             else:
-                os.system('{} ../../sim_support/top_tb_sim.wcfg run/'.format(cpname))
+                os.system('{} ..'.format(cpname)+os.path.sep+'..'+os.path.sep+'sim_support'+os.path.sep+'top_tb_sim.wcfg run' + os.path.sep) # 'cp ../../sim_support/top_tb_sim.wcfg run/'
 
         # load up simulator dependencies
-        os.system("cd run && {} gateware/*.init .".format(cpname))
-        os.system("cd run && {} gateware/*.v .".format(cpname))
-        os.system("cd run && xvlog ../../../sim_support/glbl.v")
+        os.system("cd run && {} gateware".format(cpname)+os.path.sep+"*.init .") # "cd run && cp gateware/*.init ."
+        os.system("cd run && {} gateware".format(cpname)+os.path.sep+"*.v .") # "cd run && cp gateware/*.v ."
+        os.system("cd run && xvlog .."+os.path.sep+".."+os.path.sep+".."+os.path.sep+"sim_support"+os.path.sep+"glbl.v") # "cd run && xvlog ../../../sim_support/glbl.v"
         os.system("cd run && xvlog sim_bench.v -sv")
         os.system("cd run && xvlog top_tb.v -sv ")
         vex_dir = os.path.dirname(VEX_CPU_PATH)
-        os.system("{} {} run/".format(cpname, vex_dir + "/*.bin")) # copy any relevant .bin files into the run directory as well
-        os.system("cd run && xvlog {}".format("../" + vex_verilog_path))
+        # copy any relevant .bin files into the run directory as well
+        os.system("{} {} ".format(cpname, vex_dir + os.path.sep + "*.bin") + " run" + os.path.sep) # "{} {} run/".format(cpname, vex_dir + "/*.bin")
+        os.system("cd run && xvlog {}".format(".." + os.path.sep + vex_verilog_path)) # "cd run && xvlog {}".format("../" + vex_verilog_path)
 
         # run user dependencies
         for cmd in os_cmds:
