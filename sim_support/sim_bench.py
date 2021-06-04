@@ -177,40 +177,49 @@ class BiosHelper():
 
 class SimRunner():
     def __init__(self, ci, os_cmds, vex_verilog_path=VEX_CPU_PATH):
+        # we need to use wildcards, so shutil is rather hard to code around. Use this hack instead.
+        if os.name == 'nt':
+            cpname = 'copy'
+        else:
+            cpname = 'cp'
+
         os.system("mkdir -p run")
-        os.system("rm -rf run/xsim.dir")
+        try:
+            os.system("rm -r run/xsim.dir")
+        except Exception:
+            pass
 
         # copy over the top test bench and common code
-        os.system("cp top_tb.v run/top_tb.v")
-        os.system("cp ../../sim_support/common.v run/")
+        os.system("{} top_tb.v run/top_tb.v".format(cpname))
+        os.system("{} ../../sim_support/common.v run/".format(cpname))
 
         # initialize with a default waveform that contains the most basic execution tracing
         if os.path.isfile('run/top_tb_sim.wcfg') != True:
             if os.path.isfile('top_tb_sim.wcfg'):
-                os.system('cp top_tb_sim.wcfg run/')
+                os.system('{} top_tb_sim.wcfg run/'.format(cpname))
             else:
-                os.system('cp ../../sim_support/top_tb_sim.wcfg run/')
+                os.system('{} ../../sim_support/top_tb_sim.wcfg run/'.format(cpname))
 
         # load up simulator dependencies
-        os.system("cd run && cp gateware/*.init .")
-        os.system("cd run && cp gateware/*.v .")
-        os.system("cd run && xvlog ../../../sim_support/glbl.v")
-        os.system("cd run && xvlog sim_bench.v -sv")
-        os.system("cd run && xvlog top_tb.v -sv ")
+        os.system("cd run; {} gateware/*.init .".format(cpname))
+        os.system("cd run; {} gateware/*.v .".format(cpname))
+        os.system("cd run; xvlog ../../../sim_support/glbl.v")
+        os.system("cd run; xvlog sim_bench.v -sv")
+        os.system("cd run; xvlog top_tb.v -sv ")
         vex_dir = os.path.dirname(VEX_CPU_PATH)
-        os.system("cp {} run/".format(vex_dir + "/*.bin")) # copy any relevant .bin files into the run directory as well
-        os.system("cd run && xvlog {}".format("../" + vex_verilog_path))
+        os.system("{} {} run/".format(cpname, vex_dir + "/*.bin")) # copy any relevant .bin files into the run directory as well
+        os.system("cd run; xvlog {}".format("../" + vex_verilog_path))
 
         # run user dependencies
         for cmd in os_cmds:
             os.system(cmd)
 
         os.system(
-            "cd run && xelab -debug typical top_tb glbl -s top_tb_sim -L unisims_ver -L unimacro_ver -L SIMPRIM_VER -L secureip -L $xsimdir/xil_defaultlib -timescale 1ns/1ps")
+            "cd run; xelab -debug typical top_tb glbl -s top_tb_sim -L unisims_ver -L unimacro_ver -L SIMPRIM_VER -L secureip -L $xsimdir/xil_defaultlib -timescale 1ns/1ps")
         if ci:
-            os.system("cd run && xsim top_tb_sim -runall -wdb ci.wdb")
+            os.system("cd run; xsim top_tb_sim -runall -wdb ci.wdb")
         else:
-            os.system("cd run && xsim top_tb_sim -gui")
+            os.system("cd run; xsim top_tb_sim -gui")
 
 
 # for automated VCD checking after CI run
