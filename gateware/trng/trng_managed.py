@@ -918,7 +918,7 @@ class TrngXADC(Module, AutoCSR):
     def __init__(self, analog_pads=None, sim=False, revision='pvt'):
         # Temperature
         self.temperature = CSRStatus(12, description="""Raw Temperature value from XADC.\n
-            Temperature (°C) = ``Value`` x 503.975 / 4096 - 273.15.""")
+            Temperature (C) = ``Value`` x 503.975 / 4096 - 273.15.""")
 
         # Voltages
         self.vccint  = CSRStatus(12, description="""Raw VCCINT value from XADC.\n
