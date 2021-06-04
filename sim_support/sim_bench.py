@@ -2,6 +2,7 @@
 
 import sys
 import os
+import shutil
 import argparse
 
 # ASSUME: project structure is <project_root>/deps/gateware/sim/<sim_proj>/this_script
@@ -158,13 +159,16 @@ class BiosHelper():
 
         # setup the correct linker script for the BIOS build based on the SoC's boot vector settings
         if spiboot:
-            os.system("cp -f ../../sim_support/memory_spi.x ../../target/memory.x")
+            shutil.copyfile('../../sim_support/memory_spi.x', '../../target/memory.x')
         else:
-            os.system("cp -f ../../sim_support/memory_rom.x ../../target/memory.x")
+            shutil.copyfile('../../sim_support/memory_rom.x', '../../target/memory.x')
 
         # run the BIOS build
         ret = 0
-        os.system("mkdir -p run/software/bios") # make the directory if it doesn't exist
+        try:
+            os.system("mkdir run" + os.path.sep + "software" + os.path.sep + "bios") # make the directory if it doesn't exist
+        except:
+            pass
         if nightly:
             ret += os.system("cd testbench && cargo +nightly build --target {} --release".format(target))
         else:
@@ -183,10 +187,13 @@ class SimRunner():
         else:
             cpname = 'cp'
 
-        os.system("mkdir -p run")
+        try:
+            os.system("mkdir run")
+        except:
+            pass
         try:
             os.system("rm -r run/xsim.dir")
-        except Exception:
+        except:
             pass
 
         # copy over the top test bench and common code
@@ -201,25 +208,25 @@ class SimRunner():
                 os.system('{} ../../sim_support/top_tb_sim.wcfg run/'.format(cpname))
 
         # load up simulator dependencies
-        os.system("cd run; {} gateware/*.init .".format(cpname))
-        os.system("cd run; {} gateware/*.v .".format(cpname))
-        os.system("cd run; xvlog ../../../sim_support/glbl.v")
-        os.system("cd run; xvlog sim_bench.v -sv")
-        os.system("cd run; xvlog top_tb.v -sv ")
+        os.system("cd run && {} gateware/*.init .".format(cpname))
+        os.system("cd run && {} gateware/*.v .".format(cpname))
+        os.system("cd run && xvlog ../../../sim_support/glbl.v")
+        os.system("cd run && xvlog sim_bench.v -sv")
+        os.system("cd run && xvlog top_tb.v -sv ")
         vex_dir = os.path.dirname(VEX_CPU_PATH)
         os.system("{} {} run/".format(cpname, vex_dir + "/*.bin")) # copy any relevant .bin files into the run directory as well
-        os.system("cd run; xvlog {}".format("../" + vex_verilog_path))
+        os.system("cd run && xvlog {}".format("../" + vex_verilog_path))
 
         # run user dependencies
         for cmd in os_cmds:
             os.system(cmd)
 
         os.system(
-            "cd run; xelab -debug typical top_tb glbl -s top_tb_sim -L unisims_ver -L unimacro_ver -L SIMPRIM_VER -L secureip -L $xsimdir/xil_defaultlib -timescale 1ns/1ps")
+            "cd run && xelab -debug typical top_tb glbl -s top_tb_sim -L unisims_ver -L unimacro_ver -L SIMPRIM_VER -L secureip -L $xsimdir/xil_defaultlib -timescale 1ns/1ps")
         if ci:
-            os.system("cd run; xsim top_tb_sim -runall -wdb ci.wdb")
+            os.system("cd run && xsim top_tb_sim -runall -wdb ci.wdb")
         else:
-            os.system("cd run; xsim top_tb_sim -gui")
+            os.system("cd run && xsim top_tb_sim -gui")
 
 
 # for automated VCD checking after CI run
