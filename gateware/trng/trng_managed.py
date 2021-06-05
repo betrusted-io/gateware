@@ -163,171 +163,235 @@ storing the results in a memory that can be later on read out and compared to an
             )
         ]
 
+class RepCountTest(Module, AutoDoc):
+    def __init__(self, cutoff_max=32, nbits=1):
+        self.intro = ModuleDoc("""Repetition Count Test (per NIST SP 800-90B sec 4.4.1)
 
-class TrngOnlineCheckRo(Module, AutoDoc, AutoCSR):
-    def __init__(self, laggedsums=None, lagbits=20):
-        if laggedsums is None:
-            laggedsums = [0, 1, 2, 3, 4, 8, 16, 32]
-        self.intro = ModuleDoc("""
-On-line health checker for the Ring Oscillator.
+Let next() yield the next sample from the noise source.  Given a continuous sequence of noise
+source samples, and the cutoff value C, the repetition count test is performed as follows:
 
-- monobit test: difference of 1's and 0's counted. Stops at `samplecount`, compares difference against
-  `sigma`, which is a pre-computed value that should equal to the square root of samplecount. Works by
-  counting a "disparity", which is incremented every time a 1 is seen, and decremented every time a 0 is seen.
-- runs test: difference between runs of 1's and 0's seen. Again, works by counting a "disparity", which increments
-  every time a run of 1's starts, and decrements every time a run of 0's start. 
-
-TODO:
-- lagged sums test: a set of accumulators that sum every nth random number. The sum total should approach 
-  the number of sums taken, divided by 2. This simple test should be fairly effective at teasing out periodicity
-  issues that could be common failure modes given the implementations of both the RO and AV.
-- lagged difference test: a set of accumulators that subtract every other nth random number. The sum total should
-  approach 0. This test compensates for he defect of the lagged sums test in that it over-emphasizes the
-  contribution of the MSBs, at the trade-off that it can be fooled by non-random sequences that have a uniform
-  distribution.
+ 1.A=next()
+ 2.B=1
+ 3.X=next()
+ 4.If (X==A),
+      B=B+1
+      If (B ≥ C), signal a failure. 
+   Else:
+      A=X
+      B=1
+ 5. Repeat Step 3.
  
-  
-Avalanche-specific:
-- Min/max range test on av_noise0_data, av_noise1_data (raw avalanche data)
-- Symbol distribution of bits 25-30: specific to the bit-aggregation algorithm used; we rotate
-  the incoming samples by 5 and XOR them to stripe the entropy; if something is broken, we would see
-  artifacts/patterns modulo 5-bit fields, so check for this problem specifically. Create 2^5 counters,
-  and count the number of times each of 2^5 symbols occur. The distribution should be uniform. We pick
-  bits 25-30 specifically, because these would be the "weakest" bits if a sample count was selected that
-  wasn't divisible by 32, as we start by XORing data aligned with bit 0 and shift up. For example, in a
-  limiting case that we didn't do any oversampling at all, the top bits would always be 0, because the
-  A/D convert values would never have been shift-propagated to the higher bits even once.
+ * `cutoff_max` specifies the maximum C value that can be programmed.
+ * `nbits` specifies the width of the TRNG sample 
+ 
+ This implementation does not directly wire all bits to CSRs, as for the single-bit
+ generators we will need >100 such tests. A higher-level module will be responsible
+ for multiplexing all the values to a CSR interface. 
         """)
+        # inputs
+        self.cutoff = Signal(max=cutoff_max)
+        self.sample = Signal()  # strobe to sample a random value. One sample per cycle that this strobe is high.
+        self.rand = Signal(nbits) # a connection to the source of entropy to sample
+        self.reset = Signal()
+        # output
+        self.failure = Signal() # latches ON until reset. Also used in its inverse form to indicate a "ready" status (only valid after some run time, which is selected by the higher level logic).
 
-        self.enable = Signal()
-        self.healthy = Signal() # if currently healthy or not
-        self.rand = Signal(32)  # the current random number generated
-        self.update = Signal()  # should be a single-cycle pulse to latch the value of self.rand
+        a = Signal(nbits)
+        b = Signal(max=cutoff_max)
 
-        # monobit test -- count # of 1's and zeros
-        self.monobit = CSRStatus(fields=[
-            CSRField("stat_error", size=1, description="When set, indicates a problem was found in the monobit test"),
-            CSRField("missed_sample", size=1, description="When set, indicates that we missed a sample because we were busy doing statistics collection"),
-        ])
-        self.disparity = CSRStatus(fields=[
-            CSRField("disparity", size=32, description="Disparity of ones and zeros seen since the last update. Positive means more ones than zeros. This field is a signed, 32-bit integer.")
-        ])
-        self.disparity_runs = CSRStatus(fields=[
-            CSRField("disparity_runs", size=32, description="Disparity of runs of 1's versus 0's. Positive means more runs of 1's seen. A signed 32-bit integer.")
-        ])
-        self.samplecount = CSRStorage(fields=[
-            CSRField("samplecount", size=32,
-                description="Total number of bits sampled",
-                reset=0x4_0000),
-        ])
-
-        self.sigma = CSRStorage(fields=[
-            CSRField("sigma", size=32, description="Threshold for test failure of monobit, equal to sqrt(samplecount) for one sigma. This value is interpreted as a signed value.", reset=512),
-        ])
-        sigma_signed = Signal(bits_sign=(32, True))
-        self.comb += sigma_signed.eq(self.sigma.fields.sigma)
-
-        self.sigma_runs = CSRStorage(fields=[
-            CSRField("sigma_runs", size=32, description="Threshold for test failure of runs. Not sure what it should be yet, so the current value is a spitball.", reset=512)
-        ])
-        sigma_runs_signed = Signal(bits_sign=(32, True))
-        self.comb += sigma_runs_signed.eq(self.sigma_runs.fields.sigma_runs)
-
-        ## LEFT OFF -- questioning the validity of summing to a large number. Basically throwing away LSBs? what's the
-        ## value of even keeping them around...the rgb_lagged_sums test does an int coerced to double in the test, which
-        ## helps to spread out the bits a bit...
-
-        for i in laggedsums:
-            setattr(self, "laggedsum" + str(i), CSRStatus(fields=[
-                CSRField("sum", size=(32+lagbits), description="Result of the lagged sum at {} intervals".format(i))
-            ]))
-
-        sample = Signal(32)
-        disparity = Signal(bits_sign=(32, True))
-        disparity_runs = Signal(bits_sign=(32, True))
-        total = Signal(32)
-        bitpos = Signal(6) # we can afford the time to shift through all bits because `update` pulses should be infrequent
-        update_r = Signal()
-        update_pulse = Signal()
-        missed_update = Signal()
-        stat_error = Signal()
-        self.sync += update_r.eq(self.update)
-        self.comb += update_pulse.eq(self.update & ~update_r)
-        previous_bit = Signal()
-        monofsm = FSM(reset_state="RESET")
-        self.submodules += monofsm
-        monofsm.act("RESET",
-            NextValue(missed_update, 0),
-            NextValue(disparity, 0),
-            NextValue(disparity_runs, 0),
-            NextValue(total, 0),
-            NextValue(bitpos, 32),
-            NextValue(stat_error, 0),
-            NextValue(previous_bit, 0),
-            If(self.enable & update_pulse,
-                NextValue(sample, self.rand),
-                NextState("COUNT"),
+        fsm = FSM(reset_state="START")
+        self.submodules += fsm
+        fsm.act("START",
+            NextValue(self.failure, 0),
+            If(self.sample,
+                NextValue(a, self.rand),
+                NextValue(b, 0),
+                NextState("ITERATE"),
             )
         )
-        monofsm.act("COUNT",
-            If(self.enable,
-                If(self.update,
-                    NextValue(missed_update, 1)
+        fsm.act("ITERATE",
+            If(self.reset,
+                NextState("START")
+            ).Else(
+                If(b >= self.cutoff,
+                    NextValue(self.failure, 1)
                 ),
-                NextValue(bitpos, bitpos - 1),
-                If(bitpos > 0,
-                    # disparity
-                    If(sample[0] == 1,
-                        NextValue(disparity, disparity + 1),
+                If(self.sample,
+                    If(self.rand == a,
+                        If(b+1 <= cutoff_max,
+                            NextValue(b, b+1),
+                        )
                     ).Else(
-                        NextValue(disparity, disparity - 1),
-                    ),
-                    NextValue(total, total + 1),
-                    NextValue(sample, Cat(sample[1:], 0)), # shift right, Cat goes LSB-to-MSB
-
-                    # disparity_runs
-                    NextValue(previous_bit, sample[0]),
-                    If( ~previous_bit & sample[0],  # we're entering a run of 1's
-                        NextValue(disparity_runs, disparity_runs + 1)
-                    ).Elif( previous_bit & ~sample[0], # we're entering a run of 0's
-                        NextValue(disparity_runs, disparity_runs - 1)
+                        NextValue(a, self.rand),
+                        NextValue(b, 0),
                     )
-                ).Else(
-                    NextState("REPORT?")
                 )
-            ).Else(
-                NextState("RESET")
             )
         )
-        monofsm.act("REPORT?",
-            If(self.enable,
-                If(total > self.samplecount.fields.samplecount,
-                    If( (disparity > sigma_signed) |
-                        (disparity < -sigma_signed) |
-                        (disparity_runs > sigma_runs_signed) |
-                        (disparity_runs < -sigma_runs_signed),
-                        NextValue(stat_error, 1)
-                    ),
-                    NextValue(disparity, 0),
-                    NextValue(total, 0),
-                ),
-                If(update_pulse,
-                    NextState("COUNT"),
-                    NextValue(sample, self.rand),
-                    NextValue(bitpos, 32),
-                )
-            ).Else(
-                NextState("RESET")
-            )
-        )
-        self.comb += self.healthy.eq(~stat_error & ~missed_update)
-        self.comb += [
-            self.monobit.fields.stat_error.eq(stat_error),
-            self.monobit.fields.missed_sample.eq(missed_update),
-            self.disparity.fields.disparity.eq(disparity),
-            self.disparity_runs.fields.disparity_runs.eq(disparity_runs),
-        ]
 
+class AdaptivePropTest(Module, AutoDoc):
+    def __init__(self, cutoff_max=32, nbits=1):
+        self.intro = ModuleDoc("""Adaptive Proportion Test (per NIST SP 800-90B sec 4.4.2)
+
+Let next() yield the next sample from the noise source. Given a continuous sequence of noise samples,
+the cutoff value C and the window size W, the adaptive proportion test is performed as follows:
+
+1. A=next()
+2. B=1.
+3. For i=1 to W–1
+       If (A == next()) then B=B+1
+       If (B ≥ C) then signal a failure
+4.Go to Step 1.
+
+The cutoff value C is chosen such that the probability of observing C or more identical samples in a window size of W is at most α.
+
+ * `cutoff_max` specifies the maximum C value that can be programmed.
+ * `nbits` specifies the width of the TRNG sample
+ 
+ This implementation also does not infer CSRs, to allow for aggregation of multi-bank values.
+            """)
+        if nbits == 1: # per NIST spec
+            window_max = 1024
+        else:
+            window_max = 512
+
+        # inputs
+        self.cutoff = Signal(max=cutoff_max)
+        self.sample = Signal()  # strobe to sample a random value. One sample per cycle that this strobe is high.
+        self.rand = Signal(nbits) # a connection to the source of entropy to sample
+        self.reset = Signal()
+        self.enabled = Signal() # used to reset the "ready" signal
+        # output
+        self.failure = Signal() # latches ON until reset
+        self.ready = Signal() # indicates oscillator has passed at least one test iteration
+
+        a = Signal(nbits)
+        b = Signal(max=cutoff_max)
+        w = Signal(max=window_max)
+
+        fsm = FSM(reset_state="START")
+        self.submodules += fsm
+        fsm.act("START",
+            If(self.reset | ~self.enabled,
+                NextValue(self.ready, 0)
+            ),
+            If(self.reset,
+                NextValue(self.failure, 0),
+            ),
+            If(self.sample,
+                NextValue(a, self.rand),
+                NextValue(b, 0),
+                NextState("ITERATE"),
+                NextValue(w, 0),
+            )
+        )
+        fsm.act("ITERATE",
+            If(self.reset,
+                NextState("START"),
+                NextValue(self.failure, 0),
+                NextValue(self.ready, 0),
+            ).Elif(w == window_max-1,
+                NextState("START"),
+                If(~self.failure & self.enabled,
+                    NextValue(self.ready, 1)
+                ),
+            ).Else (
+                If(~self.enabled,
+                    NextValue(self.ready, 0)
+                ),
+                If(b >= self.cutoff,
+                    NextValue(self.failure, 1)
+                ),
+                If(self.sample,
+                    NextValue(w, w+1),
+                    If(a == self.rand,
+                        If(b+1 <= cutoff_max,
+                           NextValue(b, b+1)
+                        )
+                    ),
+                )
+            )
+        )
+
+class ExcursionTest(Module, AutoDoc, AutoCSR):
+    def __init__(self, nbits=12):
+        self.intro = ModuleDoc("""Excursion Test (supplemental tailored to avalanche noise source)
+
+For a given window w, ensure that the max-min excursion observed is greater than range r. 
+
+This block includes CSRs, as there are only two instance expected.
+""")
+        # inputs
+        self.sample = Signal()
+        self.rand = Signal(nbits)
+        self.power_on = Signal() # when de-asserted, resets the "self.ready" output
+        # outputs
+        self.ready = Signal()  # signal to other logic that we've passed test at least once
+
+        self.ctrl = CSRStorage(fields=[
+            CSRField("cutoff", size=nbits, description="Minimum excursion required to pass", reset=320), # 78mV amplitude cutoff; 10x min entropy window of 32; 6.4x margin on expected p-p amplitude of 0.5V
+            CSRField("reset", size=1, description="Write `1` to reset the system, including any error flags", pulse=True),
+            CSRField("window", size=(32 - (nbits + 1)), description="Number of samples over which to measure", reset=200), # we'd expect about 60 transitions in this period
+        ])
+        self.stat = CSRStatus(fields=[
+            CSRField("min", size=nbits, description="Minimum of last window"),
+            CSRField("max", size=nbits, description="Maximum of last window"),
+        ])
+        self.last_err = CSRStatus(fields=[
+            CSRField("min", size=nbits, description="Minimum of last error window"),
+            CSRField("max", size=nbits, description="Maximum of last error window"),
+        ])
+        self.submodules.ev = EventManager()
+        self.ev.failure = EventSourcePulse(description="An error has occurred")
+        self.ev.finalize()
+
+        w = Signal(self.ctrl.fields.window.n_bits)
+        min = Signal(nbits, reset=((2**nbits)-1))
+        max = Signal(12, reset=0)
+        fsm = FSM(reset_state="OFF")
+        self.submodules += fsm
+        fsm.act("OFF",
+            If(~self.power_on,
+                NextValue(self.ready, 0)
+            ).Else(
+                NextValue(w, self.ctrl.fields.window),
+                NextValue(min, (2**nbits)-1),
+                NextValue(max, 0),
+                NextState("RUN"),
+            )
+        )
+        fsm.act("RUN",
+            If(~self.power_on | self.ctrl.fields.reset,
+                NextValue(self.ready, 0),
+                NextState("OFF"),
+            ).Else(
+                If(w == 0,
+                    If(max - min < self.ctrl.fields.cutoff,
+                        self.ev.failure.trigger.eq(1),
+                        NextValue(self.last_err.fields.min, min),
+                        NextValue(self.last_err.fields.max, max),
+                        NextValue(self.ready, 0),
+                    ).Else(
+                        NextValue(self.ready, 1),
+                    ),
+                    NextValue(self.stat.fields.min, min),
+                    NextValue(self.stat.fields.max, max),
+                    NextValue(w, self.ctrl.fields.window),
+                    NextValue(min, (2**nbits)-1),
+                    NextValue(max, 0),
+                ).Else(
+                    If(self.sample,
+                        NextValue(w, w-1),
+                        If(self.rand < min,
+                            NextValue(min, self.rand)
+                        ),
+                        If(self.rand > max,
+                            NextValue(max, self.rand)
+                        )
+                    )
+                )
+            )
+        )
 
 # ModNoise ------------------------------------------------------------------------------------------
 
