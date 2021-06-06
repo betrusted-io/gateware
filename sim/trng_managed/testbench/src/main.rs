@@ -23,6 +23,9 @@ fn run(p: &pac::Peripherals) {
     let mut step = 0x1000_0000;
     report(&p, step);
 
+    // setup the TRNG to run "fast" so the simulation finishes in a reasonable amount of time
+    unsafe{p.TRNG_SERVER.av_config.write(|w| w.samples().bits(0x1));}
+
     // this turns off the ring oscillator
     // p.TRNG_SERVER.control.write(|w| w.ro_dis().set_bit());
 

@@ -79,14 +79,14 @@ to as little as 15-20ms and still probably be quite safe.
 
         self.ro_config = CSRStorage(fields=[
             CSRField("gang", size=1, description="Fold in collective gang entropy during dwell time", reset=1),
-            CSRField("dwell", size=12, description="""Prescaler to set dwell-time of entropy collection. 
-            Controls the period of how long the oscillators are in a metastable state to collect entropy 
+            CSRField("dwell", size=12, description="""Prescaler to set dwell-time of entropy collection.
+            Controls the period of how long the oscillators are in a metastable state to collect entropy
             before sampling. Value encodes the number of sysclk edges to pass during the dwell period.""", reset=100),
             CSRField("delay", size=10, description="""Sampler delay time. Sets the delay between when the small rings
             are merged together, and when the final entropy result is sampled. Value encodes number of sysclk edges
             to pass during the delay period. Delay should be long enough for the signal to propagate around the merged ring,
             but longer times also means more coupling of the deterministic sysclk noise into the rings.""", reset=4),
-            CSRField("fuzz", size=1, description="""Modulate the `delay`/`dwell` parameter slightly from run-to-run, 
+            CSRField("fuzz", size=1, description="""Modulate the `delay`/`dwell` parameter slightly from run-to-run,
             based on previous run's random values. May help to break ring oscillator resonances trained by the delay/dwell periodicity.""", reset=1),
             CSRField("oversampling", size=8, description="""Number of stages to oversample entropy. Normally, each bit is just
             sampled and shifted once (so 32 times for 32-bit word). Each increment of oversampling will add another stage.""", reset=3)
@@ -475,7 +475,7 @@ decisions about the health of the ring oscillators.
                 w.eq(0),
                 window_end.eq(0),
             ).Else(
-                If(shifter_ready,
+                If(shifter_ready & self.sample,
                     If(w < self.ctrl.fields.window,
                         w.eq(w+1),
                         window_end.eq(0)
@@ -490,8 +490,10 @@ decisions about the health of the ring oscillators.
             setattr(self, 'count'+str(run), CSRStatus(size=log2_int(maxwindow), name="count"+str(run), description="Count of sequence length {} runs seen in the past window".format(run)))
             setattr(self, 'runcount'+str(run), Signal(log2_int(maxwindow)))
             self.sync += [
-                If(shifter_ready,
-                    If(window_end,
+                If(~self.power_on,
+                    getattr(self, 'runcount'+str(run)).eq(0)
+                ).Elif(shifter_ready,
+                    If((w >= self.ctrl.fields.window) & self.sample,
                         # snapshot the runcount, and note the freshness
                         getattr(self, 'count'+str(run)).status.eq(getattr(self, 'runcount'+str(run))),
                         self.fresh.status[run-1].eq(1),
@@ -505,152 +507,18 @@ decisions about the health of the ring oscillators.
                         )
                     ),
                     # increment the runs count, based on the observed pattern as a sliding window across the bitstream
-                    If(window_end,
-                        getattr(self, 'runcount'+str(run)).eq(0)
-                    ).Elif( ((shifter[:run] == 0) & (shifter[run:run+1] == 1)) |   # case of 0's run
-                        ((shifter[:run] == ((2**run) -1)) & (shifter[run:run+1] == 0)),  # case of 1's run
-                        getattr(self, 'runcount'+str(run)).eq(getattr(self, 'runcount'+str(run)) + 1)
-                    ).Else(
-                        getattr(self, 'runcount'+str(run)).eq(getattr(self, 'runcount'+str(run)))
+                    If(self.sample,
+                        If(window_end,
+                            getattr(self, 'runcount'+str(run)).eq(0)
+                        ).Elif( ((shifter[:run] == 0) & (shifter[run:run+1] == 1)) |   # case of 0's run
+                            ((shifter[:run] == ((2**run) -1)) & (shifter[run:run+1] == 0)),  # case of 1's run
+                            getattr(self, 'runcount'+str(run)).eq(getattr(self, 'runcount'+str(run)) + 1)
+                        ).Else(
+                            getattr(self, 'runcount'+str(run)).eq(getattr(self, 'runcount'+str(run)))
+                        )
                     )
                 )
             ]
-
-
-# ModNoise ------------------------------------------------------------------------------------------
-
-class ModNoise(Module, AutoCSR, AutoDoc):
-    def __init__(self, pads):
-        self.intro = ModuleDoc("""Modular Noise generator
-
-        Modular noise generator driver. Generates non-overlapping clocks, and aggregates
-        incoming noise.
-
-        Op-amp bandwidth is 1MHz, slew rate of 2V/us. Cap settling time is probably around
-        3-4us per phase. Target 4.95us/phase, with a dead time of 50ns between phases. This 
-        should yield around 200kbps raw noise generation rate, which roughly matches the
-        maximum rate at which 256-bit DH key exchanges can be done using the Curve25519 engine.
-        """)
-        self.phase0 = Signal()
-        self.phase1 = Signal()
-        self.noiseon = Signal()
-        self.noisein = Signal()
-        self.noise_read = Signal()
-        self.ena = Signal()
-        self.comb += [
-            pads.phase0.eq(self.phase0),
-            pads.phase1.eq(self.phase1),
-            pads.noise_on.eq(self.noiseon),
-            self.noisein.eq(pads.noise_in),
-        ]
-        noisesync = Signal()
-        self.specials += MultiReg(self.noisein, noisesync)
-
-        ##### NOTE: for testing purposes, the CSR config is put in the module, but should be refactored into the Server address space if used for production
-        self.ctl = CSRStorage(fields=[
-            CSRField("ena", size=1, description="Power on and enable TRNG.", reset=0),
-            CSRField("period", size=20, description="Duration of one phase in sysclk periods", reset=495),
-            CSRField("deadtime", size=10, description="Duration of deadtime between nonoverlaps in sysclk periods",
-                reset=5),
-        ])
-        self.comb += self.noiseon.eq(self.ctl.fields.ena | self.ena)
-        self.rand = CSRStatus(fields=[
-            CSRField("rand", size=32, description="Random data shifted into a register for easier collection",
-                reset=0xDEADBEEF),
-        ])
-        self.status = CSRStatus(fields=[
-            CSRField("fresh", size=1,
-                description="When set, the rand register contains a fresh set of bits to read; cleared by reading the `rand` register")
-        ])
-
-        shift_rand = Signal()
-        rand_cnt = Signal(max=self.rand.size + 1)
-        rand = Signal(32)
-        # keep track of how many bits have been shifted in since the last read-out
-        self.sync += [
-            If(self.rand.we | ~(self.ctl.fields.ena | self.ena) | self.noise_read,
-                self.status.fields.fresh.eq(0),
-                self.rand.fields.rand.eq(0xDEADBEEF),
-            ).Else(
-                If(shift_rand,
-                    If(rand_cnt < self.rand.size + 1,
-                        rand_cnt.eq(rand_cnt + 1),
-                        rand.eq(Cat(noisesync, rand[:-1])),
-                    ).Else(
-                        self.rand.fields.rand.eq(rand),
-                        self.status.fields.fresh.eq(1),
-                        rand_cnt.eq(0),
-                    )
-                ).Else(
-                    self.status.fields.fresh.eq(self.status.fields.fresh),
-                    self.rand.fields.rand.eq(self.rand.fields.rand),
-                ),
-            )
-        ]
-
-        counter = Signal(self.ctl.fields.period.nbits)
-        fsm = FSM(reset_state="RESET")
-        self.submodules += fsm
-        fsm.act("RESET",
-            NextValue(self.phase0, 0),
-            NextValue(self.phase1, 0),
-            If(self.ctl.fields.ena | self.ena,
-                NextValue(counter, self.ctl.fields.deadtime),
-                NextState("DEADTIME0"),
-            ).Else(
-                NextState("RESET")
-            )
-        )
-        fsm.act("DEADTIME0",
-            NextValue(self.phase0, 0),
-            NextValue(self.phase1, 0),
-            If(counter > 0,
-                NextValue(counter, counter - 1),
-                NextState("DEADTIME0"),
-            ).Else(
-                NextValue(counter, self.ctl.fields.period),
-                NextState("PHASE0"),
-            )
-        )
-        fsm.act("PHASE0",
-            NextValue(self.phase0, 1),
-            NextValue(self.phase1, 0),
-            If(counter > 0,
-                NextValue(counter, counter - 1),
-                NextState("PHASE0"),
-            ).Else(
-                NextValue(counter, self.ctl.fields.deadtime),
-                NextState("DEADTIME1"),
-                shift_rand.eq(1),
-            )
-        )
-        fsm.act("DEADTIME1",
-            NextValue(self.phase0, 0),
-            NextValue(self.phase1, 0),
-            If(counter > 0,
-                NextValue(counter, counter - 1),
-                NextState("DEADTIME1"),
-            ).Else(
-                NextValue(counter, self.ctl.fields.period),
-                NextState("PHASE1"),
-            )
-        )
-        fsm.act("PHASE1",
-            NextValue(self.phase0, 0),
-            NextValue(self.phase1, 1),
-            If(counter > 0,
-                NextValue(counter, counter - 1),
-                NextState("PHASE1"),
-            ).Else(
-                If(self.ctl.fields.ena | self.ena,
-                    NextValue(counter, self.ctl.fields.deadtime),
-                    NextState("DEADTIME0"),
-                    shift_rand.eq(1),
-                ).Else(
-                    NextState("RESET")
-                )
-            )
-        )
 
 
 class TrngManaged(Module, AutoCSR, AutoDoc):
@@ -852,7 +720,7 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
         if sim == False:
             self.submodules.ringosc = TrngRingOscV2Managed(platform, cores=ro_cores)
         else:
-            self.submodules.ringosc = TrngRingOscSim() # fake source for simulation purposes
+            self.submodules.ringosc = TrngRingOscSim(cores=ro_cores) # fake source for simulation purposes
         # pass-through config and mangamement signals to the RO
         ro_rand = Signal(32)
         ro_fresh = Signal()
@@ -1138,7 +1006,7 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             NextState("WAIT_ON"),
         )
         refill.act("WAIT_ON",
-            If(av_powerstate & av_configured & (av_pass & ro_pass),  # ring oscillator is "instant-on", so we just need to check avalanche generator's power state and the self-check health states
+            If(av_powerstate & av_configured,
                 NextState("PUMP"),
                 NextValue(av_config_noise, 0),  # prep for next av_reconfigure pulse
             )
@@ -1148,6 +1016,18 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             If((av_noiseout_ready | server.control.fields.av_dis) & (ro_fresh | server.control.fields.ro_dis),
                 av_noiseout_read.eq(1),
                 ro_rand_read.eq(1),
+                NextState("SELFTEST")
+            )
+        )
+        refill.act("SELFTEST",
+            # pump each machine as fast as we can for the self-test
+            If(av_noiseout_ready | server.control.fields.av_dis,
+                av_noiseout_read.eq(1),
+            ),
+            If(ro_fresh | server.control.fields.ro_dis,
+                ro_rand_read.eq(1),
+            ),
+            If(av_pass & ro_pass,
                 NextState("REFILL_KERNEL")
             )
         )
@@ -1487,14 +1367,32 @@ class TrngXADC(Module, AutoCSR):
             )
         )
 
+class TrngRingOscCoreSim(Module):
+    def __init__(self, index=0):
+        self.rand_out = Signal(32, reset=(0x5555_00F0 + index + 3))
+        self.update = Signal()
+        self.ro_samp32 = Signal()
+        self.sample_now = Signal()
+        lfsr = Signal(16)
+        self.comb += lfsr.eq(self.rand_out[:16])
+        self.sync += [
+            If(self.sample_now,
+                self.rand_out.eq(Cat(Cat(lfsr[1:], lfsr[5] ^ lfsr[3] ^ lfsr[2] ^ lfsr[0]),self.rand_out[16:]))
+            ).Else(
+                self.rand_out.eq(self.rand_out)
+            )
+        ]
+        self.comb += self.ro_samp32.eq(self.rand_out[0])
+
+
 class TrngRingOscSim(Module, AutoDoc):
-    def __init__(self):
+    def __init__(self, cores=4):
         self.intro = ModuleDoc("""
 WARNING: if you see this paragraph in the documentation, something is very wrong with
 the SoC build. The TRNG has been replaced with a simulation model that is not at all
-random (it's a simple counter). 
+random (it's a simple counter).
 
-We do this because xsim cannot simulate ring oscillators. 
+We do this because xsim cannot simulate ring oscillators.
         """)
         ### to/from management interface
         self.ena = Signal()
@@ -1506,6 +1404,11 @@ We do this because xsim cannot simulate ring oscillators.
         self.fresh = Signal(reset=1)
         self.fuzz = Signal()
         self.oversampling = Signal(8)  # stages to oversample entropy
+        sample_now = Signal()
+
+        for core in range(cores):
+            setattr(self.submodules, 'rocore' + str(core), TrngRingOscCoreSim(core * 0x2000))
+            self.comb += getattr(self, 'rocore' + str(core)).sample_now.eq(sample_now)
 
         delay = Signal(4, reset=15)
         self.sync += [
@@ -1514,19 +1417,23 @@ We do this because xsim cannot simulate ring oscillators.
                     self.fresh.eq(0),
                     delay.eq(15),
                     self.rand_out.eq(self.rand_out),
+                    sample_now.eq(0),
                 ).Else(
                     If(delay == 1,
                         delay.eq(delay - 1),
                         self.rand_out.eq(self.rand_out + 1),
                         self.fresh.eq(1),
+                        sample_now.eq(1),
                     ).Elif(delay != 0,
                         delay.eq(delay - 1),
                         self.fresh.eq(self.fresh),
                         self.rand_out.eq(self.rand_out),
+                        sample_now.eq(0),
                     ).Else(
                         delay.eq(delay),
                         self.fresh.eq(self.fresh),
                         self.rand_out.eq(self.rand_out),
+                        sample_now.eq(0),
                     )
                 )
             )
@@ -1735,4 +1642,143 @@ parallel cores that are XOR'd simultaneously to generate the final output.
             self.comb += next_r.eq(r ^ getattr(self, 'rocore' + str(core)).rand)
             r = next_r
         self.comb += rand.eq(r)
+
+
+
+
+
+# ModNoise ------------------------------------------------------------------------------------------
+
+class ModNoise(Module, AutoCSR, AutoDoc):
+    def __init__(self, pads):
+        self.intro = ModuleDoc("""Modular Noise generator
+
+        Modular noise generator driver. Generates non-overlapping clocks, and aggregates
+        incoming noise.
+
+        Op-amp bandwidth is 1MHz, slew rate of 2V/us. Cap settling time is probably around
+        3-4us per phase. Target 4.95us/phase, with a dead time of 50ns between phases. This
+        should yield around 200kbps raw noise generation rate, which roughly matches the
+        maximum rate at which 256-bit DH key exchanges can be done using the Curve25519 engine.
+        """)
+        self.phase0 = Signal()
+        self.phase1 = Signal()
+        self.noiseon = Signal()
+        self.noisein = Signal()
+        self.noise_read = Signal()
+        self.ena = Signal()
+        self.comb += [
+            pads.phase0.eq(self.phase0),
+            pads.phase1.eq(self.phase1),
+            pads.noise_on.eq(self.noiseon),
+            self.noisein.eq(pads.noise_in),
+        ]
+        noisesync = Signal()
+        self.specials += MultiReg(self.noisein, noisesync)
+
+        ##### NOTE: for testing purposes, the CSR config is put in the module, but should be refactored into the Server address space if used for production
+        self.ctl = CSRStorage(fields=[
+            CSRField("ena", size=1, description="Power on and enable TRNG.", reset=0),
+            CSRField("period", size=20, description="Duration of one phase in sysclk periods", reset=495),
+            CSRField("deadtime", size=10, description="Duration of deadtime between nonoverlaps in sysclk periods",
+                reset=5),
+        ])
+        self.comb += self.noiseon.eq(self.ctl.fields.ena | self.ena)
+        self.rand = CSRStatus(fields=[
+            CSRField("rand", size=32, description="Random data shifted into a register for easier collection",
+                reset=0xDEADBEEF),
+        ])
+        self.status = CSRStatus(fields=[
+            CSRField("fresh", size=1,
+                description="When set, the rand register contains a fresh set of bits to read; cleared by reading the `rand` register")
+        ])
+
+        shift_rand = Signal()
+        rand_cnt = Signal(max=self.rand.size + 1)
+        rand = Signal(32)
+        # keep track of how many bits have been shifted in since the last read-out
+        self.sync += [
+            If(self.rand.we | ~(self.ctl.fields.ena | self.ena) | self.noise_read,
+                self.status.fields.fresh.eq(0),
+                self.rand.fields.rand.eq(0xDEADBEEF),
+            ).Else(
+                If(shift_rand,
+                    If(rand_cnt < self.rand.size + 1,
+                        rand_cnt.eq(rand_cnt + 1),
+                        rand.eq(Cat(noisesync, rand[:-1])),
+                    ).Else(
+                        self.rand.fields.rand.eq(rand),
+                        self.status.fields.fresh.eq(1),
+                        rand_cnt.eq(0),
+                    )
+                ).Else(
+                    self.status.fields.fresh.eq(self.status.fields.fresh),
+                    self.rand.fields.rand.eq(self.rand.fields.rand),
+                ),
+            )
+        ]
+
+        counter = Signal(self.ctl.fields.period.nbits)
+        fsm = FSM(reset_state="RESET")
+        self.submodules += fsm
+        fsm.act("RESET",
+            NextValue(self.phase0, 0),
+            NextValue(self.phase1, 0),
+            If(self.ctl.fields.ena | self.ena,
+                NextValue(counter, self.ctl.fields.deadtime),
+                NextState("DEADTIME0"),
+            ).Else(
+                NextState("RESET")
+            )
+        )
+        fsm.act("DEADTIME0",
+            NextValue(self.phase0, 0),
+            NextValue(self.phase1, 0),
+            If(counter > 0,
+                NextValue(counter, counter - 1),
+                NextState("DEADTIME0"),
+            ).Else(
+                NextValue(counter, self.ctl.fields.period),
+                NextState("PHASE0"),
+            )
+        )
+        fsm.act("PHASE0",
+            NextValue(self.phase0, 1),
+            NextValue(self.phase1, 0),
+            If(counter > 0,
+                NextValue(counter, counter - 1),
+                NextState("PHASE0"),
+            ).Else(
+                NextValue(counter, self.ctl.fields.deadtime),
+                NextState("DEADTIME1"),
+                shift_rand.eq(1),
+            )
+        )
+        fsm.act("DEADTIME1",
+            NextValue(self.phase0, 0),
+            NextValue(self.phase1, 0),
+            If(counter > 0,
+                NextValue(counter, counter - 1),
+                NextState("DEADTIME1"),
+            ).Else(
+                NextValue(counter, self.ctl.fields.period),
+                NextState("PHASE1"),
+            )
+        )
+        fsm.act("PHASE1",
+            NextValue(self.phase0, 0),
+            NextValue(self.phase1, 1),
+            If(counter > 0,
+                NextValue(counter, counter - 1),
+                NextState("PHASE1"),
+            ).Else(
+                If(self.ctl.fields.ena | self.ena,
+                    NextValue(counter, self.ctl.fields.deadtime),
+                    NextState("DEADTIME0"),
+                    shift_rand.eq(1),
+                ).Else(
+                    NextState("RESET")
+                )
+            )
+        )
 

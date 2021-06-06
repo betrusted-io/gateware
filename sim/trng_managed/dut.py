@@ -3,6 +3,7 @@
 import sys
 import os
 import argparse
+import random
 
 # ASSUME: project structure is <project_root>/deps/gateware/sim/<sim_proj>/this_script
 # where the "gateware" repository is cloned into <project_root>/deps/
@@ -92,9 +93,9 @@ adc_values = """
 
 //      noise1            vbus              noise0              usb_p               usb_n
 TIME    VAUXP[4] VAUXN[4] VAUXP[6] VAUXN[6] VAUXP[12] VAUXN[12] VAUXP[14] VAUXN[14] VAUXP[15] VAUXN[15] TEMP VCCINT VCCAUX VCCBRAM
-00000   0.005    0.0      0.2      0.0      0.5       0.0       0.1       0.0       0.0       0.0       25    0.94    1.8     0.95    
+00000   0.005    0.0      0.2      0.0      0.5       0.0       0.1       0.0       0.0       0.0       25    0.94    1.8     0.95
 67000   0.020    0.0      0.400    0.0      0.49      0.0       0.2       0.0       0.0       0.0       35    0.94    1.79    0.94
-100000  0.049    0.0      0.600    0.0      0.51      0.0       0.5       0.0       0.0       0.0       40    0.95    1.78    0.95 
+100000  0.049    0.0      0.600    0.0      0.51      0.0       0.5       0.0       0.0       0.0       40    0.95    1.78    0.95
 134000  0.034    0.0      0.900    0.0      0.53      0.0       0.5       0.0       0.0       0.0       41    0.96    1.81    0.96
 150000  0.500    0.0      2.500    0.0      0.40      0.0       0.5       0.0       0.0       0.0       41    0.96    1.81    0.96
 160000  0.450    0.0      2.500    0.0      0.56      0.0       0.5       0.0       0.0       0.0       41    0.96    1.81    0.96
@@ -207,8 +208,15 @@ def main():
 
     # copy the ADC simulation values to the right place
     design_txt = open("run/design.txt", "w")
+    global adc_values
     design_txt.write(adc_values)
+    init_time = 161000
+    print("generating random data for avalanche generator...")
+    for i in range(65536):
+        design_txt.write("{} {} 0.0 2.5 0.0 {} 0.0 0.5 0.0 0.0 0.0 41 0.95 1.80 0.95\n".format(str(init_time), (0.5 * random.randrange(4096)/4096) + 0.25, (0.25 * random.randrange(4096)/4096) + 0.5))
+        init_time += 1000
     design_txt.close()
+    print("done.")
 
     run_sim(ci=args.ci)
     if args.ci:
