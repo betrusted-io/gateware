@@ -43,8 +43,8 @@ Above shows power-enable to full regulator stabilization in ~47ms
 Above shows power-enable to noise generation in much less than 20ms
 
 Note that regulator stability isn't a pre-requisite for noise generation -- the avalanche noise
-breakdown process proceeds over a wide voltage range. 
- 
+breakdown process proceeds over a wide voltage range.
+
 50ms seems quite safe; we have sufficient voltage to cause noise generation after about 10ms, but
 voltage is fully regulated by 50ms. If a faster power-on is desired, one could program the delay
 to as little as 15-20ms and still probably be quite safe.
@@ -54,7 +54,6 @@ to as little as 15-20ms and still probably be quite safe.
             CSRField("ro_dis", size=1, description="When set, disables the ring oscillator as an entropy source", reset=0),
             CSRField("av_dis", size=1, description="When set, disables the avalanche generator as an entropy source", reset=0),
             CSRField("powersave", size=1, description="When set, TRNGs are automatically turned off until the low water mark is hit; when cleared, TRNGs are always on", reset=1),
-            CSRField("no_check", size=1, description="When set, disables on-line health checking (for power saving)"),
             CSRField("clr_err", size=1, description="Write ``1`` to this bit to clear the ``errors`` register", pulse=True)
         ])
 
@@ -93,12 +92,31 @@ to as little as 15-20ms and still probably be quite safe.
             sampled and shifted once (so 32 times for 32-bit word). Each increment of oversampling will add another stage.""", reset=3)
         ])
 
+        # Some defaults are needed to boot the system correctly.
+        # Avalanche:
+        #    The minimum amount of entropy per sample should be ~0.5 bits per sample, as 64 samples are mixed together for 32 bits of output.
+        #    For an α of 2^-20, eg, a one-in-a-million chance, the cutoff value for the reptest should be 1 + ceil(20/0.5) = 41.
+        #    For the adaptive test, should be 410.
+        # Ring oscillator:
+        #    To generate 32b its of entropy, we take 3 samples from 132 ring oscillators, so 396 total samples.
+        #    We need ~0.1 bits of entropy then from each oscillator, which makes for a run count of 201
+        # These can be tightened up after boot, but we prefer a looser bound initially to avoid the boot locking up unless we have a truly catastrophic TRNG failure.
+        self.av_nist = CSRStorage(fields=[
+            CSRField("repcount_cutoff", 7, description="Sets the `C` (cutoff) parameter in the NIST repetition count test for the avalanche generator", reset=41),
+            CSRField("adaptive_cutoff", 9, description="Sets the `C` (cutoff) parameter in the NIST adaptive proportion test for the avalanche generator", reset=410),
+        ])
+        self.ro_nist = CSRStorage(fields=[
+            CSRField("repcount_cutoff", 8, description="Sets the `C` (cutoff) parameter in the NIST repetition count test for the ringosc generator", reset=201),
+            CSRField("adaptive_cutoff", 10, description="Sets the `C` (cutoff) parameter in the NIST adaptive proportion test for the ringosg generator", reset=941),
+        ])
         self.errors = CSRStatus(fields=[
             CSRField("server_underrun", size=10, description="If non-zero, a server underrun has occurred. Will count number of underruns up to max field size"),
             CSRField("kernel_underrun", size=10, description="If non-zero, a kernel underrun has occurred. Will count number of underruns up to max field size"),
             CSRField("ro_health", size=1, description="When `1`, Ring oscillator has failed an on-line health test"),
-            CSRField("av_health", size=1, description="When `1`, Avalanche generator has failed an on-line health test"),
+            CSRField("av_repcount", size=2, description="Indicates a failure in a repcount test for one of two avalanche generators"),
+            CSRField("av_adaptive", size=2, description="Indicates a failure in a adaptive proportion test for one of two avalanche generators"),
         ])
+        self.ro_repcount_errors = CSRStatus(33*4, description="Error status signal from each of the repcount monitors on the ring oscillator cores")
 
         self.submodules.ev = EventManager()
         self.ev.avail = EventSourceLevel(description="Triggered anytime there is data available on the server interface")
@@ -175,18 +193,18 @@ source samples, and the cutoff value C, the repetition count test is performed a
  3.X=next()
  4.If (X==A),
       B=B+1
-      If (B ≥ C), signal a failure. 
+      If (B ≥ C), signal a failure.
    Else:
       A=X
       B=1
  5. Repeat Step 3.
- 
+
  * `cutoff_max` specifies the maximum C value that can be programmed.
- * `nbits` specifies the width of the TRNG sample 
- 
+ * `nbits` specifies the width of the TRNG sample
+
  This implementation does not directly wire all bits to CSRs, as for the single-bit
  generators we will need >100 such tests. A higher-level module will be responsible
- for multiplexing all the values to a CSR interface. 
+ for multiplexing all the values to a CSR interface.
         """)
         # inputs
         self.cutoff = Signal(max=cutoff_max)
@@ -247,7 +265,7 @@ The cutoff value C is chosen such that the probability of observing C or more id
 
  * `cutoff_max` specifies the maximum C value that can be programmed.
  * `nbits` specifies the width of the TRNG sample
- 
+
  This implementation also does not infer CSRs, to allow for aggregation of multi-bank values.
             """)
         if nbits == 1: # per NIST spec
@@ -317,7 +335,7 @@ class ExcursionTest(Module, AutoDoc, AutoCSR):
     def __init__(self, nbits=12):
         self.intro = ModuleDoc("""Excursion Test (supplemental tailored to avalanche noise source)
 
-For a given window w, ensure that the max-min excursion observed is greater than range r. 
+For a given window w, ensure that the max-min excursion observed is greater than range r.
 
 This block includes CSRs, as there are only two instance expected.
 """)
@@ -345,9 +363,19 @@ This block includes CSRs, as there are only two instance expected.
         self.ev.failure = EventSourcePulse(description="An error has occurred")
         self.ev.finalize()
 
-        w = Signal(self.ctrl.fields.window.n_bits)
+        w = Signal(self.ctrl.fields.window.size)
         min = Signal(nbits, reset=((2**nbits)-1))
-        max = Signal(12, reset=0)
+        max = Signal(nbits, reset=0)
+        cur_min = Signal(nbits)
+        cur_max = Signal(nbits)
+        err_min = Signal(nbits)
+        err_max = Signal(nbits)
+        self.comb += [
+            self.stat.fields.min.eq(cur_min),
+            self.stat.fields.max.eq(cur_max),
+            self.last_err.fields.min.eq(err_min),
+            self.last_err.fields.max.eq(err_max),
+        ]
         fsm = FSM(reset_state="OFF")
         self.submodules += fsm
         fsm.act("OFF",
@@ -368,14 +396,14 @@ This block includes CSRs, as there are only two instance expected.
                 If(w == 0,
                     If(max - min < self.ctrl.fields.cutoff,
                         self.ev.failure.trigger.eq(1),
-                        NextValue(self.last_err.fields.min, min),
-                        NextValue(self.last_err.fields.max, max),
+                        NextValue(err_min, min),
+                        NextValue(err_max, max),
                         NextValue(self.ready, 0),
                     ).Else(
                         NextValue(self.ready, 1),
                     ),
-                    NextValue(self.stat.fields.min, min),
-                    NextValue(self.stat.fields.max, max),
+                    NextValue(cur_min, min),
+                    NextValue(cur_max, max),
                     NextValue(w, self.ctrl.fields.window),
                     NextValue(min, (2**nbits)-1),
                     NextValue(max, 0),
@@ -724,8 +752,9 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
 
         # instantiate the on-chip ring oscillator TRNG. This one has no power-on delay, but the first
         # reading should be discarded after enabling (this is handled by the high level sequencer)
+        ro_cores=4
         if sim == False:
-            self.submodules.ringosc = TrngRingOscV2Managed(platform)
+            self.submodules.ringosc = TrngRingOscV2Managed(platform, cores=ro_cores)
         else:
             self.submodules.ringosc = TrngRingOscSim() # fake source for simulation purposes
         # pass-through config and mangamement signals to the RO
@@ -745,38 +774,98 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             self.ringosc.rand_read.eq(ro_rand_read),
         ]
 
-        ## Add the health checkers and interrupts
-        self.submodules.ro_health = TrngOnlineCheck() # TrngOnlineCheckRo()
-        self.submodules.av_health = TrngOnlineCheck()
-        self.comb += [
-            self.av_health.enable.eq(~server.control.fields.no_check & av_powerstate),
-            self.av_health.rand.eq(av_noiseout),
-            self.av_health.update.eq(av_noiseout_read),
-
-            self.ro_health.enable.eq(~server.control.fields.no_check & self.ringosc.ena),
-            self.ro_health.rand.eq(ro_rand),
-            self.ro_health.update.eq(ro_rand_read),
-        ]
-        health_issue = Signal()
+        ###### Avalanche generator on-line health checks
+        # "Excursion" health test for the Avalanche generator. A simple check to make sure there's enough wiggle on the noise source.
+        # note: this block has its own CSR interface, and will appear separately in the CSR list
+        self.submodules.av_excursion0 = ExcursionTest()
+        self.submodules.av_excursion1 = ExcursionTest()
+        av0_fresh_r = Signal()
+        av0_sample = Signal()
+        av1_fresh_r = Signal()
+        av1_sample = Signal()
         self.sync += [
-            If(server.errors.we,
-                server.errors.fields.ro_health.eq(0),
-                server.errors.fields.av_health.eq(0),
-            ).Else(
-                If(~self.ro_health.healthy,
-                    server.errors.fields.ro_health.eq(1),
-                ).Else(
-                    server.errors.fields.ro_health.eq(server.errors.fields.ro_health)
-                ),
-                If(~self.av_health.healthy,
-                    server.errors.fields.av_health.eq(1),
-                ).Else(
-                    server.errors.fields.av_health.eq(server.errors.fields.av_health)
-                )
-            ),
-            health_issue.eq(server.errors.fields.av_health | server.errors.fields.ro_health),
-            server.ev.health.trigger.eq(~health_issue & (server.errors.fields.av_health | server.errors.fields.ro_health))
+            av0_fresh_r.eq(av_noise0_fresh),
+            av1_fresh_r.eq(av_noise1_fresh)
         ]
+        self.comb += [
+            av0_sample.eq(~av0_fresh_r & av_noise0_fresh),
+            av1_sample.eq(~av1_fresh_r & av_noise1_fresh),
+            self.av_excursion0.sample.eq(av0_sample),
+            self.av_excursion1.sample.eq(av1_sample),
+            self.av_excursion0.rand.eq(av_noise0_data),
+            self.av_excursion1.rand.eq(av_noise1_data),
+            self.av_excursion0.power_on.eq(av_powerstate),
+            self.av_excursion1.power_on.eq(av_powerstate),
+        ]
+        # "Repetition Count" test as required by NIST SP 800-90B
+        # To generate 32 bits of entropy, we take 32 rounds of samples from 2 generators, so 64 total samples.
+        # select a cutoff_max of 127, to give _lots_ of margin for future-proofing options; in practice, I think
+        # we will arrive at a much smaller number than a larger number.
+        self.submodules.av_repcount0 = RepCountTest(cutoff_max=127, nbits=5)
+        self.submodules.av_repcount1 = RepCountTest(cutoff_max=127, nbits=5)
+        self.comb += [
+            self.av_repcount0.sample.eq(av0_sample),
+            self.av_repcount1.sample.eq(av1_sample),
+            self.av_repcount0.rand.eq(av_noise0_data[:5]), # we only assume the bottom 5 bits are usable entropy
+            self.av_repcount1.rand.eq(av_noise1_data[:5]),
+            self.av_repcount0.reset.eq(server.control.fields.clr_err),
+            self.av_repcount1.reset.eq(server.control.fields.clr_err),
+            self.av_repcount0.cutoff.eq(server.av_nist.fields.repcount_cutoff),
+            self.av_repcount1.cutoff.eq(server.av_nist.fields.repcount_cutoff),
+            server.errors.fields.av_repcount.eq(Cat(self.av_repcount0.failure, self.av_repcount1.failure)),
+        ]
+        # "Adaptive Proportion" test as required by NIST SP 800-90B
+        self.submodules.av_adaprop0 = AdaptivePropTest(cutoff_max=512, nbits=5)
+        self.submodules.av_adaprop1 = AdaptivePropTest(cutoff_max=512, nbits=5)
+        self.comb += [
+            self.av_adaprop0.sample.eq(av0_sample),
+            self.av_adaprop1.sample.eq(av1_sample),
+            self.av_adaprop0.rand.eq(av_noise0_data[:5]), # we only assume the bottom 5 bits are usable entropy
+            self.av_adaprop1.rand.eq(av_noise1_data[:5]),
+            self.av_adaprop0.enabled.eq(av_powerstate),
+            self.av_adaprop1.enabled.eq(av_powerstate),
+            self.av_adaprop0.reset.eq(server.control.fields.clr_err),
+            self.av_adaprop1.reset.eq(server.control.fields.clr_err),
+            self.av_adaprop0.cutoff.eq(server.av_nist.fields.adaptive_cutoff),
+            self.av_adaprop1.cutoff.eq(server.av_nist.fields.adaptive_cutoff),
+            server.errors.fields.av_adaptive.eq(Cat(self.av_adaprop0.failure, self.av_adaprop1.failure)),
+        ]
+
+        ## aggregate ready (e.g., passed power-on self-check) into one signal
+        av_pass = Signal()
+        self.comb += av_pass.eq(self.av_adaprop0.ready & self.av_adaprop1.ready & self.av_excursion0.ready & self.av_excursion1.ready)
+
+        ## aggregate failures and feed back into all-in-one interrupt
+        any_failure = Signal()
+        any_failure_r = Signal()
+        self.sync += any_failure_r.eq(any_failure)
+        self.comb += [
+            any_failure.eq(self.av_repcount0.failure | self.av_repcount1.failure | self.av_adaprop0.failure | self.av_adaprop1.failure),
+            server.ev.health.trigger.eq(any_failure & ~any_failure_r),
+        ]
+
+        ###### Ring oscillator on-line health checks
+        # "Repetition Count" test as required by NIST SP 800-90B
+        # To generate 32b its of entropy, we take 3 samples from 132 ring oscillators, so 396 total samples.
+        # We need ~0.1 bits of entropy then from each oscillator, which makes for a run count of 201
+        # Use 255 as the max threshold.
+        index = 0
+        for core in range(ro_cores):
+            for osc in range(33):
+                setattr(self.submodules, 'rorep' + str(core)+'_'+str(osc), RepCountTest(cutoff_max=255, nbits=1))
+                self.comb += [
+                    getattr(self, 'rorep'+str(core)+'_'+str(osc)).sample.eq(getattr(self.ringosc, 'rocore'+str(core)).sample_now),
+                    getattr(self, 'rorep'+str(core)+'_'+str(osc)).rand.eq(getattr(getattr(self.ringosc, 'rocore'+str(core)),'ro_samp'+str(core))),
+                    getattr(self, 'rorep'+str(core)+'_'+str(osc)).reset.eq(server.control.fields.clr_err),
+                    getattr(self, 'rorep'+str(core)+'_'+str(osc)).cutoff.eq(server.ro_nist.fields.repcount_cutoff),
+                    server.ro_repcount_errors.status[index].eq(getattr(self, 'rorep'+str(core)+'_'+str(osc)).failure),
+                    # need to figure out how to concatenate failure fields together to generate aggregate failure
+                    # ...and a bunch of other stuff, too. but let's see how bad the resource utilization is of this so far.
+                ]
+                index += 1
+
+        ro_pass=Signal()
+        self.comb += ro_pass.eq(1) # temp to just get a compilation to work
 
         #### now build two fifos, one for kernel, one for server
         # At a width of 32 bits, an 36kiB fifo is 1024 entries deep
@@ -935,7 +1024,7 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             NextState("WAIT_ON"),
         )
         refill.act("WAIT_ON",
-            If(av_powerstate & av_configured,  # ring oscillator is "instant-on", so we just need to check avalanche generator's power state
+            If(av_powerstate & av_configured & (av_pass & ro_pass),  # ring oscillator is "instant-on", so we just need to check avalanche generator's power state and the self-check health states
                 NextState("PUMP"),
                 NextValue(av_config_noise, 0),  # prep for next av_reconfigure pulse
             )
