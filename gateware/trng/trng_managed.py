@@ -93,30 +93,35 @@ to as little as 15-20ms and still probably be quite safe.
         ])
 
         # Some defaults are needed to boot the system correctly.
+        # These minimums need to be revisited -- entropy is not additive across XOR. it's much more complicated:
+        # https://crypto.stackexchange.com/questions/84399/formula-for-bits-of-entropy-per-bit-when-combining-bits-with-xor
         # Avalanche:
         #    The minimum amount of entropy per sample should be ~0.5 bits per sample, as 64 samples are mixed together for 32 bits of output.
         #    For an α of 2^-20, eg, a one-in-a-million chance, the cutoff value for the reptest should be 1 + ceil(20/0.5) = 41.
         #    For the adaptive test, should be 410.
         # Ring oscillator:
-        #    To generate 32b its of entropy, we take 3 samples from 132 ring oscillators, so 396 total samples.
-        #    We need ~0.1 bits of entropy then from each oscillator, which makes for a run count of 201
+        #    Let's shoot for an initial minimum entropy of 0.4 bits per core giving a max repcount of 51
+        #    Makes for a run count of 51; 7-bits used to hold the max value
+        #    For the adaptive test, let's start with 840 -- that's around 0.4 bits of entropy per core
         # These can be tightened up after boot, but we prefer a looser bound initially to avoid the boot locking up unless we have a truly catastrophic TRNG failure.
         self.av_nist = CSRStorage(fields=[
             CSRField("repcount_cutoff", 7, description="Sets the `C` (cutoff) parameter in the NIST repetition count test for the avalanche generator", reset=41),
             CSRField("adaptive_cutoff", 9, description="Sets the `C` (cutoff) parameter in the NIST adaptive proportion test for the avalanche generator", reset=410),
         ])
         self.ro_nist = CSRStorage(fields=[
-            CSRField("repcount_cutoff", 8, description="Sets the `C` (cutoff) parameter in the NIST repetition count test for the ringosc generator", reset=201),
-            CSRField("adaptive_cutoff", 10, description="Sets the `C` (cutoff) parameter in the NIST adaptive proportion test for the ringosg generator", reset=941),
+            CSRField("repcount_cutoff", 7, description="Sets the `C` (cutoff) parameter in the NIST repetition count test for the ringosc generator", reset=51),
+            CSRField("adaptive_cutoff", 10, description="Sets the `C` (cutoff) parameter in the NIST adaptive proportion test for the ringosg generator", reset=840),
         ])
-        self.errors = CSRStatus(fields=[
+        self.underruns = CSRStatus(fields=[
             CSRField("server_underrun", size=10, description="If non-zero, a server underrun has occurred. Will count number of underruns up to max field size"),
             CSRField("kernel_underrun", size=10, description="If non-zero, a kernel underrun has occurred. Will count number of underruns up to max field size"),
-            CSRField("ro_health", size=1, description="When `1`, Ring oscillator has failed an on-line health test"),
+        ])
+        self.nist_errors = CSRStatus(fields=[
             CSRField("av_repcount", size=2, description="Indicates a failure in a repcount test for one of two avalanche generators"),
             CSRField("av_adaptive", size=2, description="Indicates a failure in a adaptive proportion test for one of two avalanche generators"),
+            CSRField("ro_repcount", size=4, description="Inducates a failure in the repcount test for the ring oscillators"),
+            CSRField("ro_adaptive", size=4, description="Inducates a failure in the adaptive proportion test for the ring oscillators"),
         ])
-        self.ro_repcount_errors = CSRStatus(33*4, description="Error status signal from each of the repcount monitors on the ring oscillator cores")
 
         self.submodules.ev = EventManager()
         self.ev.avail = EventSourceLevel(description="Triggered anytime there is data available on the server interface")
@@ -420,6 +425,97 @@ This block includes CSRs, as there are only two instance expected.
                 )
             )
         )
+
+
+class MiniRuns(Module, AutoDoc, AutoCSR):
+    def __init__(self, maxrun=5, maxwindow=2048):
+        self.intro = ModuleDoc("""Miniature Runs Test (supplemental tailored to ring oscillator source)
+
+For a given window w, count the number of runs (e.g., 000/111 each count as a run of 3) of varying
+lengths that have occurred.
+
+Currently, no automatic alarms are triggered. This is more to help the upper-level software make
+decisions about the health of the ring oscillators.
+""")
+        # inputs
+        self.sample = Signal()
+        self.rand = Signal()
+        self.power_on = Signal() # when de-asserted, resets the counts
+
+        self.ctrl = CSRStorage(fields=[
+            CSRField("window", size=log2_int(maxwindow), description="Number of samples over which to measure. Must be less than {}, or else undefined behavior occurs".format(maxwindow), reset=(maxwindow//2)),
+        ])
+        self.fresh = CSRStatus(size=maxrun, description="The current data corresponding to a runlength of (bitposition +1) has been updated at least once since the last readout of any register")
+
+        # we need to grab one more than the max run count, in order to determine if an all-1's or all-0's register is exactly maxcount, or longer
+        shifter = Signal(maxrun+1)
+        shifter_ready = Signal()
+        shifter_initcount = Signal(max=maxrun+1)
+        w = Signal(max=maxwindow+1, reset=0)
+        window_end = Signal()
+        self.sync += [
+            If(self.sample,
+                shifter.eq(Cat(shifter[1:], self.rand)) # this shifts in from the MSB, discarding the LSB
+            ),
+            # don't start counting runs until we've shifted in at least maxcount bits
+            If(~self.power_on,
+                shifter_ready.eq(0),
+                shifter_initcount.eq(maxrun+1)
+            ).Else(
+                If(shifter_initcount > 0,
+                    shifter_initcount.eq(shifter_initcount - 1),
+                    shifter_ready.eq(0)
+                ).Else(
+                    shifter_ready.eq(1),
+                    shifter_initcount.eq(shifter_initcount),
+                )
+            ),
+            # build the window counter
+            If(~self.power_on,
+                w.eq(0),
+                window_end.eq(0),
+            ).Else(
+                If(shifter_ready,
+                    If(w < self.ctrl.fields.window,
+                        w.eq(w+1),
+                        window_end.eq(0)
+                    ).Else(
+                        w.eq(0),
+                        window_end.eq(1)
+                    )
+                )
+            )
+        ]
+        for run in range(1, maxrun+1):
+            setattr(self, 'count'+str(run), CSRStatus(size=log2_int(maxwindow), name="count"+str(run), description="Count of sequence length {} runs seen in the past window".format(run)))
+            setattr(self, 'runcount'+str(run), Signal(log2_int(maxwindow)))
+            self.sync += [
+                If(shifter_ready,
+                    If(window_end,
+                        # snapshot the runcount, and note the freshness
+                        getattr(self, 'count'+str(run)).status.eq(getattr(self, 'runcount'+str(run))),
+                        self.fresh.status[run-1].eq(1),
+                    ).Else(
+                        # save the current count, but retire the freshbit if any attempt to read acount has happened
+                        getattr(self, 'count'+str(run)).status.eq(getattr(self, 'count'+str(run)).status),
+                        If(getattr(self, 'count'+str(run)).we,
+                            self.fresh.status[run-1].eq(0),
+                        ).Else(
+                            self.fresh.status[run-1].eq(self.fresh.status[run-1])
+                        )
+                    ),
+                    # increment the runs count, based on the observed pattern as a sliding window across the bitstream
+                    If(window_end,
+                        getattr(self, 'runcount'+str(run)).eq(0)
+                    ).Elif( ((shifter[:run] == 0) & (shifter[run:run+1] == 1)) |   # case of 0's run
+                        ((shifter[:run] == ((2**run) -1)) & (shifter[run:run+1] == 0)),  # case of 1's run
+                        getattr(self, 'runcount'+str(run)).eq(getattr(self, 'runcount'+str(run)) + 1)
+                    ).Else(
+                        getattr(self, 'runcount'+str(run)).eq(getattr(self, 'runcount'+str(run)))
+                    )
+                )
+            ]
+
 
 # ModNoise ------------------------------------------------------------------------------------------
 
@@ -812,7 +908,7 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             self.av_repcount1.reset.eq(server.control.fields.clr_err),
             self.av_repcount0.cutoff.eq(server.av_nist.fields.repcount_cutoff),
             self.av_repcount1.cutoff.eq(server.av_nist.fields.repcount_cutoff),
-            server.errors.fields.av_repcount.eq(Cat(self.av_repcount0.failure, self.av_repcount1.failure)),
+            server.nist_errors.fields.av_repcount.eq(Cat(self.av_repcount0.failure, self.av_repcount1.failure)),
         ]
         # "Adaptive Proportion" test as required by NIST SP 800-90B
         self.submodules.av_adaprop0 = AdaptivePropTest(cutoff_max=512, nbits=5)
@@ -828,44 +924,62 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             self.av_adaprop1.reset.eq(server.control.fields.clr_err),
             self.av_adaprop0.cutoff.eq(server.av_nist.fields.adaptive_cutoff),
             self.av_adaprop1.cutoff.eq(server.av_nist.fields.adaptive_cutoff),
-            server.errors.fields.av_adaptive.eq(Cat(self.av_adaprop0.failure, self.av_adaprop1.failure)),
+            server.nist_errors.fields.av_adaptive.eq(Cat(self.av_adaprop0.failure, self.av_adaprop1.failure)),
         ]
 
         ## aggregate ready (e.g., passed power-on self-check) into one signal
         av_pass = Signal()
         self.comb += av_pass.eq(self.av_adaprop0.ready & self.av_adaprop1.ready & self.av_excursion0.ready & self.av_excursion1.ready)
 
+        ###### Ring oscillator on-line health checks
+        # "Repetition Count" test as required by NIST SP 800-90B
+        #    Use 127 as the max threshold. Should be way more than enough.
+        # "Adaptive proportion" test as required by NIST SP 800-90B
+        # "MiniRuns" as supplemental statistics gathering for the supervising software to make more informed decisions about
+        #    failure modes more specific to ring oscillators
+        index = 0
+        for core in range(ro_cores):
+            setattr(self.submodules, 'ro_rep' + str(core), RepCountTest(cutoff_max=127, nbits=1))
+            setattr(self.submodules, 'ro_adp' + str(core), AdaptivePropTest(cutoff_max=1024, nbits=1))
+            setattr(self.submodules, 'ro_run' + str(core), MiniRuns(maxrun=5, maxwindow=2048))
+            self.comb += [
+                getattr(self, 'ro_rep'+str(core)).sample.eq(getattr(self.ringosc, 'rocore'+str(core)).sample_now),
+                getattr(self, 'ro_adp'+str(core)).sample.eq(getattr(self.ringosc, 'rocore'+str(core)).sample_now),
+                getattr(self, 'ro_run'+str(core)).sample.eq(getattr(self.ringosc, 'rocore'+str(core)).sample_now),
+
+                getattr(self, 'ro_rep'+str(core)).rand.eq(getattr(getattr(self.ringosc, 'rocore'+str(core)),'ro_samp32')), # ro_samp32 is the "big ring" output
+                getattr(self, 'ro_adp'+str(core)).rand.eq(getattr(getattr(self.ringosc, 'rocore'+str(core)),'ro_samp32')),
+                getattr(self, 'ro_run'+str(core)).rand.eq(getattr(getattr(self.ringosc, 'rocore'+str(core)),'ro_samp32')),
+
+                getattr(self, 'ro_rep'+str(core)).reset.eq(server.control.fields.clr_err),
+                getattr(self, 'ro_adp'+str(core)).reset.eq(server.control.fields.clr_err),
+
+                getattr(self, 'ro_rep'+str(core)).cutoff.eq(server.ro_nist.fields.repcount_cutoff),
+                getattr(self, 'ro_adp'+str(core)).cutoff.eq(server.ro_nist.fields.adaptive_cutoff),
+
+                getattr(self, 'ro_adp'+str(core)).enabled.eq(self.ringosc.ena),
+                getattr(self, 'ro_run'+str(core)).power_on.eq(self.ringosc.ena),
+
+                server.nist_errors.fields.ro_repcount[index].eq(getattr(self, 'ro_rep'+str(core)).failure),
+                server.nist_errors.fields.ro_adaptive[index].eq(getattr(self, 'ro_adp'+str(core)).failure),
+            ]
+            index += 1
+
+
+        ro_pass=Signal()
+        self.comb += ro_pass.eq(self.ro_adp0.ready & self.ro_adp1.ready & self.ro_adp2.ready & self.ro_adp3.ready)
+
         ## aggregate failures and feed back into all-in-one interrupt
         any_failure = Signal()
         any_failure_r = Signal()
         self.sync += any_failure_r.eq(any_failure)
         self.comb += [
-            any_failure.eq(self.av_repcount0.failure | self.av_repcount1.failure | self.av_adaprop0.failure | self.av_adaprop1.failure),
+            any_failure.eq(self.av_repcount0.failure | self.av_repcount1.failure | self.av_adaprop0.failure | self.av_adaprop1.failure
+               | self.ro_rep0.failure | self.ro_rep1.failure | self.ro_rep2.failure | self.ro_rep3.failure
+               | self.ro_adp0.failure | self.ro_adp1.failure | self.ro_adp2.failure | self.ro_adp3.failure
+            ),
             server.ev.health.trigger.eq(any_failure & ~any_failure_r),
         ]
-
-        ###### Ring oscillator on-line health checks
-        # "Repetition Count" test as required by NIST SP 800-90B
-        # To generate 32b its of entropy, we take 3 samples from 132 ring oscillators, so 396 total samples.
-        # We need ~0.1 bits of entropy then from each oscillator, which makes for a run count of 201
-        # Use 255 as the max threshold.
-        index = 0
-        for core in range(ro_cores):
-            for osc in range(33):
-                setattr(self.submodules, 'rorep' + str(core)+'_'+str(osc), RepCountTest(cutoff_max=255, nbits=1))
-                self.comb += [
-                    getattr(self, 'rorep'+str(core)+'_'+str(osc)).sample.eq(getattr(self.ringosc, 'rocore'+str(core)).sample_now),
-                    getattr(self, 'rorep'+str(core)+'_'+str(osc)).rand.eq(getattr(getattr(self.ringosc, 'rocore'+str(core)),'ro_samp'+str(core))),
-                    getattr(self, 'rorep'+str(core)+'_'+str(osc)).reset.eq(server.control.fields.clr_err),
-                    getattr(self, 'rorep'+str(core)+'_'+str(osc)).cutoff.eq(server.ro_nist.fields.repcount_cutoff),
-                    server.ro_repcount_errors.status[index].eq(getattr(self, 'rorep'+str(core)+'_'+str(osc)).failure),
-                    # need to figure out how to concatenate failure fields together to generate aggregate failure
-                    # ...and a bunch of other stuff, too. but let's see how bad the resource utilization is of this so far.
-                ]
-                index += 1
-
-        ro_pass=Signal()
-        self.comb += ro_pass.eq(1) # temp to just get a compilation to work
 
         #### now build two fifos, one for kernel, one for server
         # At a width of 32 bits, an 36kiB fifo is 1024 entries deep
@@ -915,11 +1029,11 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
         ]
         self.sync += [
             If(server.control.fields.clr_err,
-                server.errors.fields.server_underrun.eq(0)
+                server.underruns.fields.server_underrun.eq(0)
             ).Else(
                 If(server_fifo_rden & server_fifo_empty,
-                    If(server.errors.fields.server_underrun < 0x3FF,
-                        server.errors.fields.server_underrun.eq(server.errors.fields.server_underrun + 1)
+                    If(server.underruns.fields.server_underrun < 0x3FF,
+                        server.underruns.fields.server_underrun.eq(server.underruns.fields.server_underrun + 1)
                     )
                 )
             )
@@ -971,11 +1085,11 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
         ]
         self.sync += [
             If(server.control.fields.clr_err,
-                server.errors.fields.kernel_underrun.eq(0)
+                server.underruns.fields.kernel_underrun.eq(0)
             ).Else(
                 If(kernel_fifo_rden & kernel_fifo_empty,
-                    If(server.errors.fields.kernel_underrun < 0x3FF,
-                        server.errors.fields.kernel_underrun.eq(server.errors.fields.kernel_underrun + 1)
+                    If(server.underruns.fields.kernel_underrun < 0x3FF,
+                        server.underruns.fields.kernel_underrun.eq(server.underruns.fields.kernel_underrun + 1)
                     )
                 )
             )
