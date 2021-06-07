@@ -1,3 +1,4 @@
+from re import S
 from migen import *
 from migen.genlib.cdc import MultiReg
 
@@ -29,7 +30,7 @@ the top-level SoC and passed to TrngManaged as an argument.
 
 
 class TrngManagedServer(Module, AutoCSR, AutoDoc):
-    def __init__(self):
+    def __init__(self, ro_cores=4):
         self.intro = ModuleDoc("""
 server register interface for the TrngManaged core. Must be created as a submodule in
 the top-level SoC and passed to TrngManaged as an argument.
@@ -122,69 +123,61 @@ to as little as 15-20ms and still probably be quite safe.
             CSRField("ro_repcount", size=4, description="Inducates a failure in the repcount test for the ring oscillators"),
             CSRField("ro_adaptive", size=4, description="Inducates a failure in the adaptive proportion test for the ring oscillators"),
         ])
+        self.nist_ro_stat0 = CSRStatus(fields=[
+            CSRField("adap_b", size=10, description="last window's `b` value for core 0 adaptive proportion test"),
+            CSRField("fresh", description="when `1`, adaptive proprotion b has been updated since last read"),
+            CSRField("rep_b", size=7, description="instantaneous `b` value for core 0 repetition count test"),
+        ])
+        self.nist_ro_stat1 = CSRStatus(fields=[
+            CSRField("adap_b", size=10, description="last window's `b` value for core 1 adaptive proportion test"),
+            CSRField("fresh", description="when `1`, adaptive proprotion b has been updated since last read"),
+            CSRField("rep_b", size=7, description="instantaneous `b` value for core 0 repetition count test"),
+        ])
+        self.nist_ro_stat2 = CSRStatus(fields=[
+            CSRField("adap_b", size=10, description="last window's `b` value for core 2 adaptive proportion test"),
+            CSRField("fresh", description="when `1`, adaptive proprotion b has been updated since last read"),
+            CSRField("rep_b", size=7, description="instantaneous `b` value for core 0 repetition count test"),
+        ])
+        self.nist_ro_stat3 = CSRStatus(fields=[
+            CSRField("adap_b", size=10, description="last window's `b` value for core 3 adaptive proportion test"),
+            CSRField("fresh", description="when `1`, adaptive proprotion b has been updated since last read"),
+            CSRField("rep_b", size=7, description="instantaneous `b` value for core 0 repetition count test"),
+        ])
+        self.nist_av_stat0 = CSRStatus(fields=[
+            CSRField("adap_b", size=10, description="last window's `b` value for core 0 adaptive proportion test"),
+            CSRField("fresh", description="when `1`, adaptive proprotion b has been updated since last read"),
+            CSRField("rep_b", size=7, description="instantaneous `b` value for core 0 repetition count test"),
+        ])
+        self.nist_av_stat1 = CSRStatus(fields=[
+            CSRField("adap_b", size=10, description="last window's `b` value for core 0 adaptive proportion test"),
+            CSRField("fresh", description="when `1`, adaptive proprotion b has been updated since last read"),
+            CSRField("rep_b", size=7, description="instantaneous `b` value for core 0 repetition count test"),
+        ])
 
         self.submodules.ev = EventManager()
         self.ev.avail = EventSourceLevel(description="Triggered anytime there is data available on the server interface")
         self.ev.error = EventSourcePulse(description="Triggered whenever an error condition first occurs on the server interface")
         self.ev.health = EventSourcePulse(description="Triggered whenever a health event first occurs")
-        self.ev.finalize()
+        self.ev.excursion0 = EventSourcePulse(description="Triggered by a failure in the avalanche generator core 0 on-line excursion test")
+        self.ev.excursion1 = EventSourcePulse(description="Triggered by a failure in the avalanche generator core 1 on-line excursion test")
 
-
-class TrngOnlineCheck(Module, AutoDoc):
-    def __init__(self):
-        self.intro = ModuleDoc("""
-This is a placeholder for online health checks on the TRNG. Right now we just check for very gross
-errors (stuck state). Do not rely on the output of this until it has been made more robust!
-
-The "TrngOnlineCheck" module should be customized into a module for the ring oscillator, and for
-the avalanche generator, as they have very different mechanisms for generating numbers, and therefore
-very different failure modes.
-
-- For the ring oscillator, it should check for runs of bits both over a single 32-bit word, but also
-individual bits over time. "Long runs" in either direction (probably best to define the threshold as a CSR
-that can be set) will trigger a health alert. A run is minimally defined as a 1-bit pattern, but probably
-should include at least 2-3 bit patterns if feasible. This basically checks if a ring oscillator "slows down" to
-a rate that is not commensurate with the expected entropy rate, or if it stabilizes too much to be generating
-entropy. 
-
-- For the avalanche generator, it should extract the raw noise values from the avalanche output in test mode, and use those
-to update a min/max window over time. If the min/max window is not exceeded over a period of time, we can
-conclude that the avalanche process has ceased. The size of the min/max window, again, should be user-configurable.
-This will catch the failure case that the avalanche diode 'wears out', and will also catch the failure case that
-the bias generator's voltage is not high enough for some reason. It will not catch the case of e.g. periodic
-noise deliberately injected into the TRNG in an attempt to override the TRNG's natural behavior.
-
-- The OPSO/OQSO tests are good at catching systemic, large-scale biases, e.g. large sets of repeating
-data and/or systemic biases that would cause code-pairs to be less frequent. A truncated 
-version of OPSO/OQSO could be pretty useful for measuring the health of the TRNG. 4xRAMB36 blocks could 
-store a portion of the OPSO sampling matrix, giving a total of 16 x 1024 "lines" of the 1024x1024 total 
-OPSO matrix. Summing results over hundreds of runs into even this sub-portion of the matrix should 
-eventually lead to a normal distribution of values, and shifts in the mean and spread can give 
-hints into the amount of systemic bias a given ring oscillator could be showing. As of the writing 
-of this comment, there are 24x RAMB36's available in the FPGA still.
-
-- A "monobit" test is pretty easy to implement, and it will catch biased ring oscillators. This test
-just consists of a running count of 1's seen over all the bits up to a defined sampling level, and then 
-storing the results in a memory that can be later on read out and compared to an expected distribution table.
-        """)
-        self.enable = Signal()
-        self.healthy = Signal() # if currently healthy or not
-        self.rand = Signal(32)  # the random number to check
-        self.update = Signal()  # update the health checker state
-
-        last_rand = Signal(32)
-        self.sync += [
-            If(self.enable,
-                If(self.update,
-                    last_rand.eq(self.rand)
-                ),
-                If(last_rand == self.rand,
-                    self.healthy.eq(0)
-                ).Else(
-                    self.healthy.eq(1)
-                )
-            )
+        # instantiate the test modules in this block so the CSRs are mapped to this space, but wire up inside the manager
+        self.submodules.av_repcount0 = RepCountTest(cutoff_max=127, nbits=5)
+        self.submodules.av_repcount1 = RepCountTest(cutoff_max=127, nbits=5)
+        self.submodules.av_adaprop0 = AdaptivePropTest(cutoff_max=512, nbits=5)
+        self.submodules.av_adaprop1 = AdaptivePropTest(cutoff_max=512, nbits=5)
+        for core in range(ro_cores):
+            setattr(self.submodules, 'ro_rep' + str(core), RepCountTest(cutoff_max=127, nbits=1))
+            setattr(self.submodules, 'ro_adp' + str(core), AdaptivePropTest(cutoff_max=1024, nbits=1))
+            setattr(self.submodules, 'ro_run' + str(core), MiniRuns(maxrun=5, maxwindow=2048))
+        self.submodules.av_excursion0 = ExcursionTest()
+        self.submodules.av_excursion1 = ExcursionTest()
+        self.comb += [
+            self.ev.excursion0.trigger.eq(self.av_excursion0.failure),
+            self.ev.excursion0.trigger.eq(self.av_excursion1.failure)
         ]
+
+        self.ev.finalize()
 
 class RepCountTest(Module, AutoDoc):
     def __init__(self, cutoff_max=32, nbits=1):
@@ -218,9 +211,11 @@ source samples, and the cutoff value C, the repetition count test is performed a
         self.reset = Signal()
         # output
         self.failure = Signal() # latches ON until reset. Also used in its inverse form to indicate a "ready" status (only valid after some run time, which is selected by the higher level logic).
+        self.b = Signal(max=cutoff_max) # monitor the b output
 
         a = Signal(nbits)
         b = Signal(max=cutoff_max)
+        self.comb += self.b.eq(b)
 
         fsm = FSM(reset_state="START")
         self.submodules += fsm
@@ -284,13 +279,27 @@ The cutoff value C is chosen such that the probability of observing C or more id
         self.rand = Signal(nbits) # a connection to the source of entropy to sample
         self.reset = Signal()
         self.enabled = Signal() # used to reset the "ready" signal
+        self.b_read = Signal() # indicate that the "b" value was read, single cycle pulse
         # output
         self.failure = Signal() # latches ON until reset
         self.ready = Signal() # indicates oscillator has passed at least one test iteration
+        self.b = Signal(max=cutoff_max)  # monitor the "b" variable externally
+        self.b_fresh = Signal() # indicates a new value since last read of b
 
         a = Signal(nbits)
         b = Signal(max=cutoff_max)
         w = Signal(max=window_max)
+        b_updated = Signal()
+
+        self.sync += [
+            If(b_updated,
+                self.b_fresh.eq(1),
+            ).Elif(self.b_read,
+                self.b_fresh.eq(0),
+            ).Else(
+                self.b_fresh.eq(self.b_fresh)
+            )
+        ]
 
         fsm = FSM(reset_state="START")
         self.submodules += fsm
@@ -315,6 +324,8 @@ The cutoff value C is chosen such that the probability of observing C or more id
                 NextValue(self.ready, 0),
             ).Elif(w == window_max-1,
                 NextState("START"),
+                NextValue(self.b, b),
+                b_updated.eq(1),
                 If(~self.failure & self.enabled,
                     NextValue(self.ready, 1)
                 ),
@@ -349,7 +360,8 @@ This block includes CSRs, as there are only two instance expected.
         self.rand = Signal(nbits)
         self.power_on = Signal() # when de-asserted, resets the "self.ready" output
         # outputs
-        self.ready = Signal()  # signal to other logic that we've passed test at least once
+        self.ready = Signal()   # signal to other logic that we've passed test at least once
+        self.failure = Signal() # connect to an EventSourcePulse()
 
         self.ctrl = CSRStorage(fields=[
             CSRField("cutoff", size=nbits, description="Minimum excursion required to pass", reset=320), # 78mV amplitude cutoff; 10x min entropy window of 32; 6.4x margin on expected p-p amplitude of 0.5V
@@ -364,9 +376,13 @@ This block includes CSRs, as there are only two instance expected.
             CSRField("min", size=nbits, description="Minimum of last error window"),
             CSRField("max", size=nbits, description="Maximum of last error window"),
         ])
-        self.submodules.ev = EventManager()
-        self.ev.failure = EventSourcePulse(description="An error has occurred")
-        self.ev.finalize()
+
+        failing = Signal()
+        failing_r = Signal()
+        self.sync += [
+            failing_r.eq(failing),
+            self.failure.eq(~failing_r & failing)
+        ]
 
         w = Signal(self.ctrl.fields.window.size)
         min = Signal(nbits, reset=((2**nbits)-1))
@@ -400,7 +416,7 @@ This block includes CSRs, as there are only two instance expected.
             ).Else(
                 If(w == 0,
                     If(max - min < self.ctrl.fields.cutoff,
-                        self.ev.failure.trigger.eq(1),
+                        failing.eq(1),
                         NextValue(err_min, min),
                         NextValue(err_max, max),
                         NextValue(self.ready, 0),
@@ -522,7 +538,7 @@ decisions about the health of the ring oscillators.
 
 
 class TrngManaged(Module, AutoCSR, AutoDoc):
-    def __init__(self, platform, analog_pads, noise_pads, kernel, server, sim=False, revision='pvt'):
+    def __init__(self, platform, analog_pads, noise_pads, kernel, server, sim=False, revision='pvt', ro_cores=4):
         if sim == True:
             fifo_depth = 64
             refill_mark = int(fifo_depth // 2)
@@ -717,7 +733,6 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
 
         # instantiate the on-chip ring oscillator TRNG. This one has no power-on delay, but the first
         # reading should be discarded after enabling (this is handled by the high level sequencer)
-        ro_cores=4
         if sim == False:
             self.submodules.ringosc = TrngRingOscV2Managed(platform, cores=ro_cores)
         else:
@@ -742,8 +757,6 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
         ###### Avalanche generator on-line health checks
         # "Excursion" health test for the Avalanche generator. A simple check to make sure there's enough wiggle on the noise source.
         # note: this block has its own CSR interface, and will appear separately in the CSR list
-        self.submodules.av_excursion0 = ExcursionTest()
-        self.submodules.av_excursion1 = ExcursionTest()
         av0_fresh_r = Signal()
         av0_sample = Signal()
         av1_fresh_r = Signal()
@@ -755,50 +768,57 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
         self.comb += [
             av0_sample.eq(~av0_fresh_r & av_noise0_fresh),
             av1_sample.eq(~av1_fresh_r & av_noise1_fresh),
-            self.av_excursion0.sample.eq(av0_sample),
-            self.av_excursion1.sample.eq(av1_sample),
-            self.av_excursion0.rand.eq(av_noise0_data),
-            self.av_excursion1.rand.eq(av_noise1_data),
-            self.av_excursion0.power_on.eq(av_powerstate),
-            self.av_excursion1.power_on.eq(av_powerstate),
+            server.av_excursion0.sample.eq(av0_sample),
+            server.av_excursion1.sample.eq(av1_sample),
+            server.av_excursion0.rand.eq(av_noise0_data),
+            server.av_excursion1.rand.eq(av_noise1_data),
+            server.av_excursion0.power_on.eq(av_powerstate),
+            server.av_excursion1.power_on.eq(av_powerstate),
         ]
         # "Repetition Count" test as required by NIST SP 800-90B
         # To generate 32 bits of entropy, we take 32 rounds of samples from 2 generators, so 64 total samples.
         # select a cutoff_max of 127, to give _lots_ of margin for future-proofing options; in practice, I think
         # we will arrive at a much smaller number than a larger number.
-        self.submodules.av_repcount0 = RepCountTest(cutoff_max=127, nbits=5)
-        self.submodules.av_repcount1 = RepCountTest(cutoff_max=127, nbits=5)
         self.comb += [
-            self.av_repcount0.sample.eq(av0_sample),
-            self.av_repcount1.sample.eq(av1_sample),
-            self.av_repcount0.rand.eq(av_noise0_data[:5]), # we only assume the bottom 5 bits are usable entropy
-            self.av_repcount1.rand.eq(av_noise1_data[:5]),
-            self.av_repcount0.reset.eq(server.control.fields.clr_err),
-            self.av_repcount1.reset.eq(server.control.fields.clr_err),
-            self.av_repcount0.cutoff.eq(server.av_nist.fields.repcount_cutoff),
-            self.av_repcount1.cutoff.eq(server.av_nist.fields.repcount_cutoff),
-            server.nist_errors.fields.av_repcount.eq(Cat(self.av_repcount0.failure, self.av_repcount1.failure)),
+            server.av_repcount0.sample.eq(av0_sample),
+            server.av_repcount1.sample.eq(av1_sample),
+            server.av_repcount0.rand.eq(av_noise0_data[:5]), # we only assume the bottom 5 bits are usable entropy
+            server.av_repcount1.rand.eq(av_noise1_data[:5]),
+            server.av_repcount0.reset.eq(server.control.fields.clr_err),
+            server.av_repcount1.reset.eq(server.control.fields.clr_err),
+            server.av_repcount0.cutoff.eq(server.av_nist.fields.repcount_cutoff),
+            server.av_repcount1.cutoff.eq(server.av_nist.fields.repcount_cutoff),
+            server.nist_errors.fields.av_repcount.eq(Cat(server.av_repcount0.failure, server.av_repcount1.failure)),
         ]
         # "Adaptive Proportion" test as required by NIST SP 800-90B
-        self.submodules.av_adaprop0 = AdaptivePropTest(cutoff_max=512, nbits=5)
-        self.submodules.av_adaprop1 = AdaptivePropTest(cutoff_max=512, nbits=5)
         self.comb += [
-            self.av_adaprop0.sample.eq(av0_sample),
-            self.av_adaprop1.sample.eq(av1_sample),
-            self.av_adaprop0.rand.eq(av_noise0_data[:5]), # we only assume the bottom 5 bits are usable entropy
-            self.av_adaprop1.rand.eq(av_noise1_data[:5]),
-            self.av_adaprop0.enabled.eq(av_powerstate),
-            self.av_adaprop1.enabled.eq(av_powerstate),
-            self.av_adaprop0.reset.eq(server.control.fields.clr_err),
-            self.av_adaprop1.reset.eq(server.control.fields.clr_err),
-            self.av_adaprop0.cutoff.eq(server.av_nist.fields.adaptive_cutoff),
-            self.av_adaprop1.cutoff.eq(server.av_nist.fields.adaptive_cutoff),
-            server.nist_errors.fields.av_adaptive.eq(Cat(self.av_adaprop0.failure, self.av_adaprop1.failure)),
+            server.av_adaprop0.sample.eq(av0_sample),
+            server.av_adaprop1.sample.eq(av1_sample),
+            server.av_adaprop0.rand.eq(av_noise0_data[:5]), # we only assume the bottom 5 bits are usable entropy
+            server.av_adaprop1.rand.eq(av_noise1_data[:5]),
+            server.av_adaprop0.enabled.eq(av_powerstate),
+            server.av_adaprop1.enabled.eq(av_powerstate),
+            server.av_adaprop0.reset.eq(server.control.fields.clr_err),
+            server.av_adaprop1.reset.eq(server.control.fields.clr_err),
+            server.av_adaprop0.cutoff.eq(server.av_nist.fields.adaptive_cutoff),
+            server.av_adaprop1.cutoff.eq(server.av_nist.fields.adaptive_cutoff),
+            server.nist_errors.fields.av_adaptive.eq(Cat(server.av_adaprop0.failure, server.av_adaprop1.failure)),
+        ]
+        # wire up the telemetry
+        self.comb += [
+            server.nist_av_stat0.fields.adap_b.eq(server.av_adaprop0.b),
+            server.nist_av_stat1.fields.adap_b.eq(server.av_adaprop1.b),
+            server.nist_av_stat0.fields.fresh.eq(server.av_adaprop0.b_fresh),
+            server.nist_av_stat1.fields.fresh.eq(server.av_adaprop1.b_fresh),
+            server.nist_av_stat0.fields.rep_b.eq(server.av_repcount0.b),
+            server.nist_av_stat1.fields.rep_b.eq(server.av_repcount1.b),
+            server.av_adaprop0.b_read.eq(server.nist_av_stat0.we),
+            server.av_adaprop1.b_read.eq(server.nist_av_stat1.we),
         ]
 
         ## aggregate ready (e.g., passed power-on self-check) into one signal
         av_pass = Signal()
-        self.comb += av_pass.eq(self.av_adaprop0.ready & self.av_adaprop1.ready & self.av_excursion0.ready & self.av_excursion1.ready)
+        self.comb += av_pass.eq(server.av_adaprop0.ready & server.av_adaprop1.ready & server.av_excursion0.ready & server.av_excursion1.ready)
 
         ###### Ring oscillator on-line health checks
         # "Repetition Count" test as required by NIST SP 800-90B
@@ -808,44 +828,45 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
         #    failure modes more specific to ring oscillators
         index = 0
         for core in range(ro_cores):
-            setattr(self.submodules, 'ro_rep' + str(core), RepCountTest(cutoff_max=127, nbits=1))
-            setattr(self.submodules, 'ro_adp' + str(core), AdaptivePropTest(cutoff_max=1024, nbits=1))
-            setattr(self.submodules, 'ro_run' + str(core), MiniRuns(maxrun=5, maxwindow=2048))
             self.comb += [
-                getattr(self, 'ro_rep'+str(core)).sample.eq(getattr(self.ringosc, 'rocore'+str(core)).sample_now),
-                getattr(self, 'ro_adp'+str(core)).sample.eq(getattr(self.ringosc, 'rocore'+str(core)).sample_now),
-                getattr(self, 'ro_run'+str(core)).sample.eq(getattr(self.ringosc, 'rocore'+str(core)).sample_now),
+                getattr(server, 'ro_rep'+str(core)).sample.eq(getattr(self.ringosc, 'rocore'+str(core)).sample_now),
+                getattr(server, 'ro_adp'+str(core)).sample.eq(getattr(self.ringosc, 'rocore'+str(core)).sample_now),
+                getattr(server, 'ro_run'+str(core)).sample.eq(getattr(self.ringosc, 'rocore'+str(core)).sample_now),
 
-                getattr(self, 'ro_rep'+str(core)).rand.eq(getattr(getattr(self.ringosc, 'rocore'+str(core)),'ro_samp32')), # ro_samp32 is the "big ring" output
-                getattr(self, 'ro_adp'+str(core)).rand.eq(getattr(getattr(self.ringosc, 'rocore'+str(core)),'ro_samp32')),
-                getattr(self, 'ro_run'+str(core)).rand.eq(getattr(getattr(self.ringosc, 'rocore'+str(core)),'ro_samp32')),
+                getattr(server, 'ro_rep'+str(core)).rand.eq(getattr(getattr(self.ringosc, 'rocore'+str(core)),'ro_samp32')), # ro_samp32 is the "big ring" output
+                getattr(server, 'ro_adp'+str(core)).rand.eq(getattr(getattr(self.ringosc, 'rocore'+str(core)),'ro_samp32')),
+                getattr(server, 'ro_run'+str(core)).rand.eq(getattr(getattr(self.ringosc, 'rocore'+str(core)),'ro_samp32')),
 
-                getattr(self, 'ro_rep'+str(core)).reset.eq(server.control.fields.clr_err),
-                getattr(self, 'ro_adp'+str(core)).reset.eq(server.control.fields.clr_err),
+                getattr(server, 'ro_rep'+str(core)).reset.eq(server.control.fields.clr_err),
+                getattr(server, 'ro_adp'+str(core)).reset.eq(server.control.fields.clr_err),
 
-                getattr(self, 'ro_rep'+str(core)).cutoff.eq(server.ro_nist.fields.repcount_cutoff),
-                getattr(self, 'ro_adp'+str(core)).cutoff.eq(server.ro_nist.fields.adaptive_cutoff),
+                getattr(server, 'ro_rep'+str(core)).cutoff.eq(server.ro_nist.fields.repcount_cutoff),
+                getattr(server, 'ro_adp'+str(core)).cutoff.eq(server.ro_nist.fields.adaptive_cutoff),
 
-                getattr(self, 'ro_adp'+str(core)).enabled.eq(self.ringosc.ena),
-                getattr(self, 'ro_run'+str(core)).power_on.eq(self.ringosc.ena),
+                getattr(server, 'ro_adp'+str(core)).enabled.eq(self.ringosc.ena),
+                getattr(server, 'ro_run'+str(core)).power_on.eq(self.ringosc.ena),
 
-                server.nist_errors.fields.ro_repcount[index].eq(getattr(self, 'ro_rep'+str(core)).failure),
-                server.nist_errors.fields.ro_adaptive[index].eq(getattr(self, 'ro_adp'+str(core)).failure),
+                server.nist_errors.fields.ro_repcount[index].eq(getattr(server, 'ro_rep'+str(core)).failure),
+                server.nist_errors.fields.ro_adaptive[index].eq(getattr(server, 'ro_adp'+str(core)).failure),
+
+                getattr(server, 'nist_ro_stat'+str(core)).fields.adap_b.eq(getattr(server, 'ro_adp'+str(core)).b),
+                getattr(server, 'nist_ro_stat'+str(core)).fields.fresh.eq(getattr(server, 'ro_adp'+str(core)).b_fresh),
+                getattr(server, 'ro_adp'+str(core)).b_read.eq(getattr(server, 'nist_ro_stat'+str(core)).we),
+                getattr(server, 'nist_ro_stat'+str(core)).fields.rep_b.eq(getattr(server, 'ro_rep'+str(core)).b),
             ]
             index += 1
 
-
         ro_pass=Signal()
-        self.comb += ro_pass.eq(self.ro_adp0.ready & self.ro_adp1.ready & self.ro_adp2.ready & self.ro_adp3.ready)
+        self.comb += ro_pass.eq(server.ro_adp0.ready & server.ro_adp1.ready & server.ro_adp2.ready & server.ro_adp3.ready)
 
         ## aggregate failures and feed back into all-in-one interrupt
         any_failure = Signal()
         any_failure_r = Signal()
         self.sync += any_failure_r.eq(any_failure)
         self.comb += [
-            any_failure.eq(self.av_repcount0.failure | self.av_repcount1.failure | self.av_adaprop0.failure | self.av_adaprop1.failure
-               | self.ro_rep0.failure | self.ro_rep1.failure | self.ro_rep2.failure | self.ro_rep3.failure
-               | self.ro_adp0.failure | self.ro_adp1.failure | self.ro_adp2.failure | self.ro_adp3.failure
+            any_failure.eq(server.av_repcount0.failure | server.av_repcount1.failure | server.av_adaprop0.failure | server.av_adaprop1.failure
+               | server.ro_rep0.failure | server.ro_rep1.failure | server.ro_rep2.failure | server.ro_rep3.failure
+               | server.ro_adp0.failure | server.ro_adp1.failure | server.ro_adp2.failure | server.ro_adp3.failure
             ),
             server.ev.health.trigger.eq(any_failure & ~any_failure_r),
         ]

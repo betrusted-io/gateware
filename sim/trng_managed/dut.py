@@ -186,8 +186,8 @@ def generate_top():
 
 """
 script to drive xsim
-Add local verilog models by adding to the extra_cmds array, 
-or tweak the simulator in unusual ways (e.g. translate a .bin to a .init file) 
+Add local verilog models by adding to the extra_cmds array,
+or tweak the simulator in unusual ways (e.g. translate a .bin to a .init file)
 before calling SimRunner
 """
 def run_sim(ci=False):
