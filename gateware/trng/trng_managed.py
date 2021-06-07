@@ -552,6 +552,7 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
         """.format(refill_mark, fifo_depth))
         refill_needed = Signal()
         powerup = Signal()
+        self.warm_reset = Signal()
 
         if (revision == 'pvt') or (revision == 'pvt2'):
             # this state machine manages the avalanche generator's power-on delay. It ensures that
@@ -849,6 +850,22 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             server.ev.health.trigger.eq(any_failure & ~any_failure_r),
         ]
 
+        # meet DRC rules for FIFO reset timing
+        fifo_rst_cnt = Signal(3, reset=5)
+        fifo_reset   = Signal()
+        self.sync += [
+            If(ResetSignal(),
+                fifo_rst_cnt.eq(5),  # 5 cycles reset required by design
+                fifo_reset.eq(1)
+            ).Else(
+                If(fifo_rst_cnt == 0,
+                    fifo_reset.eq(0)
+                ).Else(
+                    fifo_rst_cnt.eq(fifo_rst_cnt - 1),
+                    fifo_reset.eq(1)
+                )
+            )
+        ]
         #### now build two fifos, one for kernel, one for server
         # At a width of 32 bits, an 36kiB fifo is 1024 entries deep
         ## server fifo
@@ -870,7 +887,7 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             p_ALMOST_FULL_OFFSET=almost_full,
             p_DO_REG=0,
             i_CLK=ClockSignal(),
-            i_RST=ResetSignal(),
+            i_RST=fifo_reset,
             o_ALMOSTFULL=server_fifo_full, # use ALMOSTFULL so simulations don't take forever to run :P
             o_EMPTY=server_fifo_empty,
             i_WREN=server_fifo_wren,
@@ -926,7 +943,7 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             p_ALMOST_FULL_OFFSET=almost_full,
             p_DO_REG=0,
             i_CLK=ClockSignal(),
-            i_RST=ResetSignal(),
+            i_RST=fifo_reset,
             o_ALMOSTFULL=kernel_fifo_full, # use ALMOSTFULL so simulations don't take forever to run :P
             o_EMPTY=kernel_fifo_empty,
             i_WREN=kernel_fifo_wren,
