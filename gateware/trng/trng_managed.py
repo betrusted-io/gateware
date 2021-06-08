@@ -105,13 +105,18 @@ to as little as 15-20ms and still probably be quite safe.
         #    Makes for a run count of 67; 7-bits used to hold the max value
         #    For the adaptive test, let's start with 840 -- that's around 0.4 bits of entropy per core
         # These can be tightened up after boot, but we prefer a looser bound initially to avoid the boot locking up unless we have a truly catastrophic TRNG failure.
+        av_repcount_bits=7  # based on a conservative upper bound
+        av_adaptive_bits=9  # set by NIST requirement of 512 for non-binary
+        ro_repcount_bits=7  # based on a conservative upper bound
+        ro_adaptive_bits=10 # this is set by NIST requirements of 1024 for binary
+        ro_maxruns=5 # maximum number of runs to count on the RO maxruns
         self.av_nist = CSRStorage(fields=[
-            CSRField("repcount_cutoff", 7, description="Sets the `C` (cutoff) parameter in the NIST repetition count test for the avalanche generator", reset=41),
-            CSRField("adaptive_cutoff", 9, description="Sets the `C` (cutoff) parameter in the NIST adaptive proportion test for the avalanche generator", reset=410),
+            CSRField("repcount_cutoff", av_repcount_bits, description="Sets the `C` (cutoff) parameter in the NIST repetition count test for the avalanche generator", reset=41),
+            CSRField("adaptive_cutoff", av_adaptive_bits, description="Sets the `C` (cutoff) parameter in the NIST adaptive proportion test for the avalanche generator", reset=410),
         ])
         self.ro_nist = CSRStorage(fields=[
-            CSRField("repcount_cutoff", 7, description="Sets the `C` (cutoff) parameter in the NIST repetition count test for the ringosc generator", reset=67),
-            CSRField("adaptive_cutoff", 10, description="Sets the `C` (cutoff) parameter in the NIST adaptive proportion test for the ringosg generator", reset=840),
+            CSRField("repcount_cutoff", ro_repcount_bits, description="Sets the `C` (cutoff) parameter in the NIST repetition count test for the ringosc generator", reset=67),
+            CSRField("adaptive_cutoff", ro_adaptive_bits, description="Sets the `C` (cutoff) parameter in the NIST adaptive proportion test for the ringosg generator", reset=840),
         ])
         self.underruns = CSRStatus(fields=[
             CSRField("server_underrun", size=10, description="If non-zero, a server underrun has occurred. Will count number of underruns up to max field size"),
@@ -122,37 +127,53 @@ to as little as 15-20ms and still probably be quite safe.
             CSRField("av_adaptive", size=2, description="Indicates a failure in a adaptive proportion test for one of two avalanche generators"),
             CSRField("ro_repcount", size=4, description="Indicates a failure in the repcount test for the ring oscillators"),
             CSRField("ro_adaptive", size=4, description="Indicates a failure in the adaptive proportion test for the ring oscillators"),
+            CSRField("ro_miniruns", size=4, description="Indicates a failure in the miniruns test"),
         ])
         self.nist_ro_stat0 = CSRStatus(fields=[
-            CSRField("adap_b", size=10, description="last window's `b` value for core 0 adaptive proportion test"),
+            CSRField("adap_b", size=ro_adaptive_bits, description="last window's `b` value for core 0 adaptive proportion test"),
             CSRField("fresh", description="when `1`, adaptive proprotion b has been updated since last read"),
-            CSRField("rep_b", size=7, description="max `b` value for core 0 repetition count test"),
+            CSRField("rep_b", size=ro_repcount_bits, description="max `b` value for core 0 repetition count test"),
         ])
         self.nist_ro_stat1 = CSRStatus(fields=[
-            CSRField("adap_b", size=10, description="last window's `b` value for core 1 adaptive proportion test"),
+            CSRField("adap_b", size=ro_adaptive_bits, description="last window's `b` value for core 1 adaptive proportion test"),
             CSRField("fresh", description="when `1`, adaptive proprotion b has been updated since last read"),
-            CSRField("rep_b", size=7, description="max `b` value for core 0 repetition count test"),
+            CSRField("rep_b", size=ro_repcount_bits, description="max `b` value for core 0 repetition count test"),
         ])
         self.nist_ro_stat2 = CSRStatus(fields=[
-            CSRField("adap_b", size=10, description="last window's `b` value for core 2 adaptive proportion test"),
+            CSRField("adap_b", size=ro_adaptive_bits, description="last window's `b` value for core 2 adaptive proportion test"),
             CSRField("fresh", description="when `1`, adaptive proprotion b has been updated since last read"),
-            CSRField("rep_b", size=7, description="max `b` value for core 0 repetition count test"),
+            CSRField("rep_b", size=ro_repcount_bits, description="max `b` value for core 0 repetition count test"),
         ])
         self.nist_ro_stat3 = CSRStatus(fields=[
-            CSRField("adap_b", size=10, description="last window's `b` value for core 3 adaptive proportion test"),
+            CSRField("adap_b", size=ro_adaptive_bits, description="last window's `b` value for core 3 adaptive proportion test"),
             CSRField("fresh", description="when `1`, adaptive proprotion b has been updated since last read"),
-            CSRField("rep_b", size=7, description="max `b` value for core 0 repetition count test"),
+            CSRField("rep_b", size=ro_repcount_bits, description="max `b` value for core 0 repetition count test"),
         ])
         self.nist_av_stat0 = CSRStatus(fields=[
-            CSRField("adap_b", size=10, description="last window's `b` value for core 0 adaptive proportion test"),
+            CSRField("adap_b", size=ro_adaptive_bits, description="last window's `b` value for core 0 adaptive proportion test"),
             CSRField("fresh", description="when `1`, adaptive proprotion b has been updated since last read"),
-            CSRField("rep_b", size=7, description="max `b` value for core 0 repetition count test"),
+            CSRField("rep_b", size=ro_repcount_bits, description="max `b` value for core 0 repetition count test"),
         ])
         self.nist_av_stat1 = CSRStatus(fields=[
-            CSRField("adap_b", size=10, description="last window's `b` value for core 0 adaptive proportion test"),
+            CSRField("adap_b", size=ro_adaptive_bits, description="last window's `b` value for core 0 adaptive proportion test"),
             CSRField("fresh", description="when `1`, adaptive proprotion b has been updated since last read"),
-            CSRField("rep_b", size=7, description="max `b` value for core 0 repetition count test"),
+            CSRField("rep_b", size=ro_repcount_bits, description="max `b` value for core 0 repetition count test"),
         ])
+
+        mr_max=2048 # max value of a minirun
+        # Attempts to derive thresholds on this that are sane:
+        # https://docs.google.com/spreadsheets/d/1_2r9GkMPnQaNDT1rO6dodm4zKR1j2ADs3-et-QkkGiw/edit?usp=sharing
+        # You can also do a chi-square test on the data, but this is too much math for an integrated hardware min/max test
+        # Thus we do a per-bin min/max based on an expected distribution of the run lengths
+        # Calculate for p = 1/2**20 chance of it going outside the value, z-score=4.79
+        # again, these basically just catch if the RO is horribly bad, can be tightened up at run-time.
+        mins = {1:435, 2:189, 3:77,  4:26,  5:5}
+        maxs = {1:589, 2:322, 3:179, 4:101, 5:59}
+        for run in range(1, ro_maxruns+1):
+            setattr(self, 'ro_runslimit'+str(run), CSRStorage(name='ro_runslimit'+str(run), fields=[
+                CSRField("min", size=log2_int(mr_max), description="Minimum runs limit for runs of length {}".format(run), reset=mins[run]),
+                CSRField("max", size=log2_int(mr_max), description="Minimum runs limit for runs of length {}".format(run), reset=maxs[run]),
+            ]))
 
         self.submodules.ev = EventManager()
         self.ev.avail = EventSourceLevel(description="Triggered anytime there is data available on the server interface")
@@ -162,14 +183,14 @@ to as little as 15-20ms and still probably be quite safe.
         self.ev.excursion1 = EventSourcePulse(description="Triggered by a failure in the avalanche generator core 1 on-line excursion test")
 
         # instantiate the test modules in this block so the CSRs are mapped to this space, but wire up inside the manager
-        self.submodules.av_repcount0 = RepCountTest(cutoff_max=127, nbits=5)
-        self.submodules.av_repcount1 = RepCountTest(cutoff_max=127, nbits=5)
-        self.submodules.av_adaprop0 = AdaptivePropTest(cutoff_max=512, nbits=5)
-        self.submodules.av_adaprop1 = AdaptivePropTest(cutoff_max=512, nbits=5)
+        self.submodules.av_repcount0 = RepCountTest(cutoff_max=(2**av_repcount_bits)-1, nbits=5)
+        self.submodules.av_repcount1 = RepCountTest(cutoff_max=(2**av_repcount_bits)-1, nbits=5)
+        self.submodules.av_adaprop0 = AdaptivePropTest(cutoff_max=2**av_adaptive_bits, nbits=5)
+        self.submodules.av_adaprop1 = AdaptivePropTest(cutoff_max=2**av_adaptive_bits, nbits=5)
         for core in range(ro_cores):
-            setattr(self.submodules, 'ro_rep' + str(core), RepCountTest(cutoff_max=127, nbits=1))
-            setattr(self.submodules, 'ro_adp' + str(core), AdaptivePropTest(cutoff_max=1024, nbits=1))
-            setattr(self.submodules, 'ro_run' + str(core), MiniRuns(maxrun=5, maxwindow=2048))
+            setattr(self.submodules, 'ro_rep' + str(core), RepCountTest(cutoff_max=(2**ro_repcount_bits)-1, nbits=1))
+            setattr(self.submodules, 'ro_adp' + str(core), AdaptivePropTest(cutoff_max=2**ro_adaptive_bits, nbits=1))
+            setattr(self.submodules, 'ro_run' + str(core), MiniRuns(maxrun=ro_maxruns, maxwindow=mr_max))
         self.submodules.av_excursion0 = ExcursionTest()
         self.submodules.av_excursion1 = ExcursionTest()
         self.comb += [
@@ -242,7 +263,8 @@ source samples, and the cutoff value C, the repetition count test is performed a
         )
         fsm.act("ITERATE",
             If(self.reset,
-                NextState("START")
+                NextState("START"),
+                NextValue(self.failure, 0),
             ).Else(
                 If(b >= self.cutoff,
                     NextValue(self.failure, 1)
@@ -318,7 +340,8 @@ The cutoff value C is chosen such that the probability of observing C or more id
         self.submodules += fsm
         fsm.act("START",
             If(self.reset | ~self.enabled,
-                NextValue(self.ready, 0)
+                NextValue(self.ready, 0),
+                NextValue(self.failure, 0),
             ),
             If(self.reset,
                 NextValue(self.failure, 0),
@@ -458,6 +481,7 @@ This block includes CSRs, as there are only two instance expected.
 
 class MiniRuns(Module, AutoDoc, AutoCSR):
     def __init__(self, maxrun=5, maxwindow=2048):
+        self.maxrun = maxrun
         self.intro = ModuleDoc("""Miniature Runs Test (supplemental tailored to ring oscillator source)
 
 For a given window w, count the number of runs (e.g., 000/111 each count as a run of 3) of varying
@@ -470,6 +494,14 @@ decisions about the health of the ring oscillators.
         self.sample = Signal()
         self.rand = Signal()
         self.power_on = Signal() # when de-asserted, resets the counts
+        self.runs_fail = Signal(maxrun)
+        self.reset_failure = Signal()
+        for run in range(1, maxrun+1):
+            setattr(self, 'runs_min'+str(run), Signal(max=maxwindow))
+            setattr(self, 'runs_max'+str(run), Signal(max=maxwindow))
+
+        # outputs
+        self.failure = Signal()
 
         self.ctrl = CSRStorage(fields=[
             CSRField("window", size=log2_int(maxwindow), description="Number of samples over which to measure. Must be less than {}, or else undefined behavior occurs".format(maxwindow), reset=(maxwindow//2)),
@@ -513,11 +545,28 @@ decisions about the health of the ring oscillators.
                         window_end.eq(1)
                     )
                 )
+            ),
+            # aggregate & report failures
+            If(self.reset_failure,
+                self.failure.eq(0)
+            ).Else(
+                If(self.runs_fail != 0,
+                    self.failure.eq(1)
+                ).Else(
+                    self.failure.eq(self.failure)
+                )
             )
         ]
         for run in range(1, maxrun+1):
             setattr(self, 'count'+str(run), CSRStatus(size=log2_int(maxwindow), name="count"+str(run), description="Count of sequence length {} runs seen in the past window".format(run)))
             setattr(self, 'runcount'+str(run), Signal(log2_int(maxwindow)))
+            self.comb += [
+                self.runs_fail[run-1].eq(
+                    ((getattr(self, 'count'+str(run)).status < getattr(self, 'runs_min'+str(run)) ) |
+                     (getattr(self, 'count'+str(run)).status > getattr(self, 'runs_max'+str(run)) )
+                    ) & (self.fresh.status != 0) # if any entries are 'fresh', all have actually been updated, but some may have been read out by the OS
+                )
+            ]
             self.sync += [
                 If(~self.power_on,
                     getattr(self, 'runcount'+str(run)).eq(0)
@@ -862,6 +911,7 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
 
                 getattr(server, 'ro_rep'+str(core)).reset.eq(server.control.fields.clr_err),
                 getattr(server, 'ro_adp'+str(core)).reset.eq(server.control.fields.clr_err),
+                getattr(server, 'ro_run'+str(core)).reset_failure.eq(server.control.fields.clr_err),
 
                 getattr(server, 'ro_rep'+str(core)).cutoff.eq(server.ro_nist.fields.repcount_cutoff),
                 getattr(server, 'ro_adp'+str(core)).cutoff.eq(server.ro_nist.fields.adaptive_cutoff),
@@ -871,16 +921,24 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
 
                 server.nist_errors.fields.ro_repcount[index].eq(getattr(server, 'ro_rep'+str(core)).failure),
                 server.nist_errors.fields.ro_adaptive[index].eq(getattr(server, 'ro_adp'+str(core)).failure),
+                server.nist_errors.fields.ro_miniruns[index].eq(getattr(server, 'ro_run'+str(core)).failure),
 
                 getattr(server, 'nist_ro_stat'+str(core)).fields.adap_b.eq(getattr(server, 'ro_adp'+str(core)).b),
                 getattr(server, 'nist_ro_stat'+str(core)).fields.fresh.eq(getattr(server, 'ro_adp'+str(core)).b_fresh),
                 getattr(server, 'ro_adp'+str(core)).b_read.eq(getattr(server, 'nist_ro_stat'+str(core)).we),
                 getattr(server, 'nist_ro_stat'+str(core)).fields.rep_b.eq(getattr(server, 'ro_rep'+str(core)).b),
             ]
+            for run in range(1, getattr(server, 'ro_run'+str(core)).maxrun + 1):
+                self.comb += [
+                    getattr(getattr(server, 'ro_run'+str(core)), 'runs_min'+str(run)).eq(getattr(server, 'ro_runslimit'+str(run)).fields.min),
+                    getattr(getattr(server, 'ro_run'+str(core)), 'runs_max'+str(run)).eq(getattr(server, 'ro_runslimit'+str(run)).fields.max),
+                ]
             index += 1
 
         ro_pass=Signal()
-        self.comb += ro_pass.eq(server.ro_adp0.ready & server.ro_adp1.ready & server.ro_adp2.ready & server.ro_adp3.ready)
+        self.comb += ro_pass.eq(server.ro_adp0.ready & server.ro_adp1.ready & server.ro_adp2.ready & server.ro_adp3.ready &
+            ~(server.ro_run0.failure | server.ro_run1.failure | server.ro_run2.failure | server.ro_run3.failure)
+        )
         self.comb += [
             server.ready.fields.ro_adaprop.eq(Cat(
                 server.ro_adp0.ready,
@@ -898,6 +956,7 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             any_failure.eq(server.av_repcount0.failure | server.av_repcount1.failure | server.av_adaprop0.failure | server.av_adaprop1.failure
                | server.ro_rep0.failure | server.ro_rep1.failure | server.ro_rep2.failure | server.ro_rep3.failure
                | server.ro_adp0.failure | server.ro_adp1.failure | server.ro_adp2.failure | server.ro_adp3.failure
+               | server.ro_run0.failure | server.ro_run1.failure | server.ro_run2.failure | server.ro_run3.failure
             ),
             server.ev.health.trigger.eq(any_failure & ~any_failure_r),
         ]
@@ -1092,6 +1151,7 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
         #         NextState("SELFTEST")
         #     )
         # )
+        # we don't need to discard the first value anymore because we pump out lots of values for the selftest
         refill.act("SELFTEST",
             # pump each machine as fast as we can for the self-test
             If( av_noiseout_ready,
@@ -1104,7 +1164,11 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             ).Else(
                 ro_rand_read.eq(0)
             ),
-            If((av_pass | server.control.fields.av_dis) & (ro_pass | server.control.fields.ro_dis),
+            #### NOTE: we allow the refill to happen if *either* TRNG passes. This allows us to proceed and get minimum
+            #### functionality in the case that one generator source is failing. But at least one must pass!
+            #### For the "and" you need this: (av_pass | server.control.fields.av_dis) & (ro_pass | server.control.fields.ro_dis)
+            #### the *_dis fields must be considered otherwise you would block on a deliberately disabled TRNG source before booting
+            If( av_pass | ro_pass,
                 NextState("REFILL_KERNEL")
             )
         )
