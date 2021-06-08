@@ -167,8 +167,10 @@ to as little as 15-20ms and still probably be quite safe.
         # Thus we do a per-bin min/max based on an expected distribution of the run lengths
         # Calculate for p = 1/2**20 chance of it going outside the value, z-score=4.79
         # again, these basically just catch if the RO is horribly bad, can be tightened up at run-time.
-        mins = {1:435, 2:189, 3:77,  4:26,  5:5}
-        maxs = {1:589, 2:322, 3:179, 4:101, 5:59}
+        #mins = {1:435, 2:189, 3:77,  4:26,  5:5} # these are 2^-20
+        #maxs = {1:589, 2:322, 3:179, 4:101, 5:59}
+        mins = {1:440, 2:193, 3:80,  4:29,  5:7} # these are 2^-18
+        maxs = {1:584, 2:318, 3:175, 4:99,  5:57}
         for run in range(1, ro_maxruns+1):
             setattr(self, 'ro_runslimit'+str(run), CSRStorage(name='ro_runslimit'+str(run), fields=[
                 CSRField("min", size=log2_int(mr_max), description="Minimum runs limit for runs of length {}".format(run), reset=mins[run]),
@@ -487,8 +489,8 @@ class MiniRuns(Module, AutoDoc, AutoCSR):
 For a given window w, count the number of runs (e.g., 000/111 each count as a run of 3) of varying
 lengths that have occurred.
 
-Currently, no automatic alarms are triggered. This is more to help the upper-level software make
-decisions about the health of the ring oscillators.
+Automated alarms are based on shared min/max thresholds that need to be mapped in via a higher level
+CSR block.
 """)
         # inputs
         self.sample = Signal()
@@ -899,15 +901,21 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
         # "MiniRuns" as supplemental statistics gathering for the supervising software to make more informed decisions about
         #    failure modes more specific to ring oscillators
         index = 0
+        inject_failure = False
         for core in range(ro_cores):
+            if (core == 0) and inject_failure:
+                # wire up one core directly to a low-quality entropy source so we can see tests fail
+                self.comb +=  getattr(server, 'ro_run'+str(core)).rand.eq(getattr(getattr(self.ringosc, 'rocore'+str(core)),'ro_samp32')),
+            else:
+                self.comb += getattr(server, 'ro_run'+str(core)).rand.eq(getattr(getattr(self.ringosc, 'rocore'+str(core)),'rand')[0]),
+
             self.comb += [
                 getattr(server, 'ro_rep'+str(core)).sample.eq(getattr(self.ringosc, 'rocore'+str(core)).sample_now),
                 getattr(server, 'ro_adp'+str(core)).sample.eq(getattr(self.ringosc, 'rocore'+str(core)).sample_now),
                 getattr(server, 'ro_run'+str(core)).sample.eq(getattr(self.ringosc, 'rocore'+str(core)).sample_now),
 
-                getattr(server, 'ro_rep'+str(core)).rand.eq(getattr(getattr(self.ringosc, 'rocore'+str(core)),'rand')[0]), # pick of one bit of the ring oscillator
+                getattr(server, 'ro_rep'+str(core)).rand.eq(getattr(getattr(self.ringosc, 'rocore'+str(core)),'rand')[0]),
                 getattr(server, 'ro_adp'+str(core)).rand.eq(getattr(getattr(self.ringosc, 'rocore'+str(core)),'rand')[0]),
-                getattr(server, 'ro_run'+str(core)).rand.eq(getattr(getattr(self.ringosc, 'rocore'+str(core)),'rand')[0]),
 
                 getattr(server, 'ro_rep'+str(core)).reset.eq(server.control.fields.clr_err),
                 getattr(server, 'ro_adp'+str(core)).reset.eq(server.control.fields.clr_err),
@@ -952,7 +960,7 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
         any_failure = Signal()
         any_failure_r = Signal()
         self.sync += any_failure_r.eq(any_failure)
-        self.comb += [
+        self.comb += [ # note that excursion test has its own failure trigger and interrupt
             any_failure.eq(server.av_repcount0.failure | server.av_repcount1.failure | server.av_adaprop0.failure | server.av_adaprop1.failure
                | server.ro_rep0.failure | server.ro_rep1.failure | server.ro_rep2.failure | server.ro_rep3.failure
                | server.ro_adp0.failure | server.ro_adp1.failure | server.ro_adp2.failure | server.ro_adp3.failure
@@ -1176,7 +1184,9 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             If(kernel_fifo_full,
                 NextState("REFILL_SERVER")
             ).Else(
-                If((av_noiseout_ready | server.control.fields.av_dis) & (ro_fresh | server.control.fields.ro_dis),
+                # this logic is set to allow the system to boot to minimum viable kernel, even if one of the TRNGs is failing
+                # if there is a spontaneous failure during run-time, it's up to the OS to catch this and make a policy decision.
+                If((av_noiseout_ready | server.control.fields.av_dis | ~av_pass) & (ro_fresh | server.control.fields.ro_dis | ~ro_pass),
                     kernel_fifo_wren.eq(1),
                     av_noiseout_read.eq(1),  # note that trng stream selection considers the _dis field state, so it's safe to always pump both even if one is disabled
                     ro_rand_read.eq(1),
@@ -1673,10 +1683,10 @@ Metastable Ring Oscillator", with modifications. I actually suspect the ring osc
 is not quite metastable during the small-ring phase, but it is accumulating phase noise
 as an independent variable, so I think the paper's core idea still works.
 
-The system as described above is referred to as a "core". This version is built with {} 
+The system as described above is referred to as a "core". This version is built with {}
 parallel cores that are XOR'd simultaneously to generate the final output.
 
-* `self.trng_slow` and `self.trng_fast` are debug hooks for sampled TRNG data and the fast ring oscillator, respectively. 
+* `self.trng_slow` and `self.trng_fast` are debug hooks for sampled TRNG data and the fast ring oscillator, respectively.
         """.format(cores))
         ### to/from management interface
         self.ena = Signal()
