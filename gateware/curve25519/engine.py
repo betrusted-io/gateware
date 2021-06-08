@@ -155,7 +155,7 @@ an address width of 9 bits.
                     self.rb_dat.eq(self.rb_dat),
                 ),
             ]
-        wren_pipe = Signal()
+        wren_pipe = Signal() # do not change this variable name, it is constrained in the XDC
         self.sync.rf_clk += [
             If(eng_sync,
                 phase.eq(0),
@@ -1894,6 +1894,9 @@ Here are the currently implemented opcodes for The Engine:
         # engine running will set up a full eng_clk cycle before any RF accesses need to be valid
         platform.add_platform_command("set_multicycle_path 4 -setup -from [get_clocks clk50] -to [get_clocks clk200] -through [get_nets {{ {net1} {net2} {net3} }}]", net1=running, net2=running_r, net3=rf.running)
         platform.add_platform_command("set_multicycle_path 3 -hold -end -from [get_clocks clk50] -to [get_clocks clk200] -through [get_nets {{ {net1} {net2} {net3} }}]", net1=running, net2=running_r, net3=rf.running)
+        # this signal is a combo from clk50+sys
+        platform.add_platform_command("set_multicycle_path 4 -setup -from [get_clocks clk50] -to [get_clocks clk200] -through [get_pins *rf_wren_pipe_reg/D]")
+        platform.add_platform_command("set_multicycle_path 3 -hold -end -from [get_clocks clk50] -to [get_clocks clk200] -through [get_pins *rf_wren_pipe_reg/D]")
         # data writeback happens on phase==2, and thus is stable for at least two clk200 clocks extra
         platform.add_platform_command("set_multicycle_path 2 -setup -from [get_clocks clk50] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/DI*DI*]")
         platform.add_platform_command("set_multicycle_path 1 -hold -end -from [get_clocks clk50] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/DI*DI*]")
@@ -1905,3 +1908,6 @@ Here are the currently implemented opcodes for The Engine:
         platform.add_platform_command("set_multicycle_path 3 -hold -end -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/DI*DI*]")
         platform.add_platform_command("set_multicycle_path 4 -setup -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/ADDR*ADDR*]")
         platform.add_platform_command("set_multicycle_path 3 -hold -end -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/ADDR*ADDR*]")
+        # this signal is a combo from clk50+sys
+        platform.add_platform_command("set_multicycle_path 4 -setup -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins *rf_wren_pipe_reg/D]")
+        platform.add_platform_command("set_multicycle_path 3 -hold -end -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins *rf_wren_pipe_reg/D]")
