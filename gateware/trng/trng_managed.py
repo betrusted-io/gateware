@@ -101,8 +101,8 @@ to as little as 15-20ms and still probably be quite safe.
         #    For an α of 2^-20, eg, a one-in-a-million chance, the cutoff value for the reptest should be 1 + ceil(20/0.5) = 41.
         #    For the adaptive test, should be 410.
         # Ring oscillator:
-        #    Let's shoot for an initial minimum entropy of 0.4 bits per core giving a max repcount of 51
-        #    Makes for a run count of 51; 7-bits used to hold the max value
+        #    Let's shoot for an initial minimum entropy of 0.3 bits per core giving a max repcount of 67
+        #    Makes for a run count of 67; 7-bits used to hold the max value
         #    For the adaptive test, let's start with 840 -- that's around 0.4 bits of entropy per core
         # These can be tightened up after boot, but we prefer a looser bound initially to avoid the boot locking up unless we have a truly catastrophic TRNG failure.
         self.av_nist = CSRStorage(fields=[
@@ -110,7 +110,7 @@ to as little as 15-20ms and still probably be quite safe.
             CSRField("adaptive_cutoff", 9, description="Sets the `C` (cutoff) parameter in the NIST adaptive proportion test for the avalanche generator", reset=410),
         ])
         self.ro_nist = CSRStorage(fields=[
-            CSRField("repcount_cutoff", 7, description="Sets the `C` (cutoff) parameter in the NIST repetition count test for the ringosc generator", reset=51),
+            CSRField("repcount_cutoff", 7, description="Sets the `C` (cutoff) parameter in the NIST repetition count test for the ringosc generator", reset=67),
             CSRField("adaptive_cutoff", 10, description="Sets the `C` (cutoff) parameter in the NIST adaptive proportion test for the ringosg generator", reset=840),
         ])
         self.underruns = CSRStatus(fields=[
@@ -120,38 +120,38 @@ to as little as 15-20ms and still probably be quite safe.
         self.nist_errors = CSRStatus(fields=[
             CSRField("av_repcount", size=2, description="Indicates a failure in a repcount test for one of two avalanche generators"),
             CSRField("av_adaptive", size=2, description="Indicates a failure in a adaptive proportion test for one of two avalanche generators"),
-            CSRField("ro_repcount", size=4, description="Inducates a failure in the repcount test for the ring oscillators"),
-            CSRField("ro_adaptive", size=4, description="Inducates a failure in the adaptive proportion test for the ring oscillators"),
+            CSRField("ro_repcount", size=4, description="Indicates a failure in the repcount test for the ring oscillators"),
+            CSRField("ro_adaptive", size=4, description="Indicates a failure in the adaptive proportion test for the ring oscillators"),
         ])
         self.nist_ro_stat0 = CSRStatus(fields=[
             CSRField("adap_b", size=10, description="last window's `b` value for core 0 adaptive proportion test"),
             CSRField("fresh", description="when `1`, adaptive proprotion b has been updated since last read"),
-            CSRField("rep_b", size=7, description="instantaneous `b` value for core 0 repetition count test"),
+            CSRField("rep_b", size=7, description="max `b` value for core 0 repetition count test"),
         ])
         self.nist_ro_stat1 = CSRStatus(fields=[
             CSRField("adap_b", size=10, description="last window's `b` value for core 1 adaptive proportion test"),
             CSRField("fresh", description="when `1`, adaptive proprotion b has been updated since last read"),
-            CSRField("rep_b", size=7, description="instantaneous `b` value for core 0 repetition count test"),
+            CSRField("rep_b", size=7, description="max `b` value for core 0 repetition count test"),
         ])
         self.nist_ro_stat2 = CSRStatus(fields=[
             CSRField("adap_b", size=10, description="last window's `b` value for core 2 adaptive proportion test"),
             CSRField("fresh", description="when `1`, adaptive proprotion b has been updated since last read"),
-            CSRField("rep_b", size=7, description="instantaneous `b` value for core 0 repetition count test"),
+            CSRField("rep_b", size=7, description="max `b` value for core 0 repetition count test"),
         ])
         self.nist_ro_stat3 = CSRStatus(fields=[
             CSRField("adap_b", size=10, description="last window's `b` value for core 3 adaptive proportion test"),
             CSRField("fresh", description="when `1`, adaptive proprotion b has been updated since last read"),
-            CSRField("rep_b", size=7, description="instantaneous `b` value for core 0 repetition count test"),
+            CSRField("rep_b", size=7, description="max `b` value for core 0 repetition count test"),
         ])
         self.nist_av_stat0 = CSRStatus(fields=[
             CSRField("adap_b", size=10, description="last window's `b` value for core 0 adaptive proportion test"),
             CSRField("fresh", description="when `1`, adaptive proprotion b has been updated since last read"),
-            CSRField("rep_b", size=7, description="instantaneous `b` value for core 0 repetition count test"),
+            CSRField("rep_b", size=7, description="max `b` value for core 0 repetition count test"),
         ])
         self.nist_av_stat1 = CSRStatus(fields=[
             CSRField("adap_b", size=10, description="last window's `b` value for core 0 adaptive proportion test"),
             CSRField("fresh", description="when `1`, adaptive proprotion b has been updated since last read"),
-            CSRField("rep_b", size=7, description="instantaneous `b` value for core 0 repetition count test"),
+            CSRField("rep_b", size=7, description="max `b` value for core 0 repetition count test"),
         ])
 
         self.submodules.ev = EventManager()
@@ -176,6 +176,11 @@ to as little as 15-20ms and still probably be quite safe.
             self.ev.excursion0.trigger.eq(self.av_excursion0.failure),
             self.ev.excursion0.trigger.eq(self.av_excursion1.failure)
         ]
+        self.ready = CSRStatus(fields=[
+            CSRField("av_excursion", size=2, description="ready bits from the excursion test"),
+            CSRField("av_adaprop", size=2, description="ready bits from the adaptive proportion test"),
+            CSRField("ro_adaprop", size=4, description="ready bits from the adaptive proportion test"),
+        ])
 
         self.ev.finalize()
 
@@ -215,7 +220,15 @@ source samples, and the cutoff value C, the repetition count test is performed a
 
         a = Signal(nbits)
         b = Signal(max=cutoff_max)
-        self.comb += self.b.eq(b)
+        self.sync += [ # latch the max observed "b" value for diagnostic purposes
+            If(self.reset,
+                self.b.eq(0),
+            ).Elif(self.b < b,
+                self.b.eq(b)
+            ).Else(
+                self.b.eq(self.b)
+            )
+        ]
 
         fsm = FSM(reset_state="START")
         self.submodules += fsm
@@ -819,6 +832,16 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
         ## aggregate ready (e.g., passed power-on self-check) into one signal
         av_pass = Signal()
         self.comb += av_pass.eq(server.av_adaprop0.ready & server.av_adaprop1.ready & server.av_excursion0.ready & server.av_excursion1.ready)
+        self.comb += [
+            server.ready.fields.av_excursion.eq(Cat(
+                server.av_excursion0.ready,
+                server.av_excursion1.ready,
+            )),
+            server.ready.fields.av_adaprop.eq(Cat(
+                server.av_adaprop0.ready,
+                server.av_adaprop1.ready,
+            )),
+        ]
 
         ###### Ring oscillator on-line health checks
         # "Repetition Count" test as required by NIST SP 800-90B
@@ -833,9 +856,9 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
                 getattr(server, 'ro_adp'+str(core)).sample.eq(getattr(self.ringosc, 'rocore'+str(core)).sample_now),
                 getattr(server, 'ro_run'+str(core)).sample.eq(getattr(self.ringosc, 'rocore'+str(core)).sample_now),
 
-                getattr(server, 'ro_rep'+str(core)).rand.eq(getattr(getattr(self.ringosc, 'rocore'+str(core)),'ro_samp32')), # ro_samp32 is the "big ring" output
-                getattr(server, 'ro_adp'+str(core)).rand.eq(getattr(getattr(self.ringosc, 'rocore'+str(core)),'ro_samp32')),
-                getattr(server, 'ro_run'+str(core)).rand.eq(getattr(getattr(self.ringosc, 'rocore'+str(core)),'ro_samp32')),
+                getattr(server, 'ro_rep'+str(core)).rand.eq(getattr(getattr(self.ringosc, 'rocore'+str(core)),'rand')[0]), # pick of one bit of the ring oscillator
+                getattr(server, 'ro_adp'+str(core)).rand.eq(getattr(getattr(self.ringosc, 'rocore'+str(core)),'rand')[0]),
+                getattr(server, 'ro_run'+str(core)).rand.eq(getattr(getattr(self.ringosc, 'rocore'+str(core)),'rand')[0]),
 
                 getattr(server, 'ro_rep'+str(core)).reset.eq(server.control.fields.clr_err),
                 getattr(server, 'ro_adp'+str(core)).reset.eq(server.control.fields.clr_err),
@@ -858,6 +881,14 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
 
         ro_pass=Signal()
         self.comb += ro_pass.eq(server.ro_adp0.ready & server.ro_adp1.ready & server.ro_adp2.ready & server.ro_adp3.ready)
+        self.comb += [
+            server.ready.fields.ro_adaprop.eq(Cat(
+                server.ro_adp0.ready,
+                server.ro_adp1.ready,
+                server.ro_adp2.ready,
+                server.ro_adp3.ready,
+            ))
+        ]
 
         ## aggregate failures and feed back into all-in-one interrupt
         any_failure = Signal()
@@ -873,7 +904,7 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
 
         # meet DRC rules for FIFO reset timing
         fifo_rst_cnt = Signal(3, reset=5)
-        fifo_reset   = Signal()
+        fifo_reset   = Signal(reset=1)
         self.sync += [
             If(ResetSignal(),
                 fifo_rst_cnt.eq(5),  # 5 cycles reset required by design
@@ -1032,7 +1063,7 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
                     NextState("CONFIG"),
                     NextValue(av_config_noise, 1),  # switch to noise-only sampling for the XADC
                 ).Else(
-                    NextState("PUMP")
+                    NextState("SELFTEST")
                 )
             ).Else(
                 NextValue(powerup, 0),
@@ -1045,27 +1076,35 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
         )
         refill.act("WAIT_ON",
             If(av_powerstate & av_configured,
-                NextState("PUMP"),
+                NextState("SELFTEST"), # skip PUMP in favor of SELFTEST
                 NextValue(av_config_noise, 0),  # prep for next av_reconfigure pulse
             )
         )
-        refill.act("PUMP", # discard the first value out of the TRNG, as it's potentially biased by power-on effects
-            # do pump here
-            If((av_noiseout_ready | server.control.fields.av_dis) & (ro_fresh | server.control.fields.ro_dis),
-                av_noiseout_read.eq(1),
-                ro_rand_read.eq(1),
-                NextState("SELFTEST")
-            )
-        )
+        # refill.act("PUMP", # discard the first value out of the TRNG, as it's potentially biased by power-on effects
+        #     # do pump here
+        #     If((av_noiseout_ready | server.control.fields.av_dis) & (ro_fresh | server.control.fields.ro_dis),
+        #         If(~server.control.fields.av_dis,
+        #             av_noiseout_read.eq(1),
+        #         ),
+        #         If(~server.control.fields.ro_dis,
+        #             ro_rand_read.eq(1),
+        #         ),
+        #         NextState("SELFTEST")
+        #     )
+        # )
         refill.act("SELFTEST",
             # pump each machine as fast as we can for the self-test
-            If(av_noiseout_ready | server.control.fields.av_dis,
-                av_noiseout_read.eq(1),
+            If( av_noiseout_ready,
+                av_noiseout_read.eq(~server.control.fields.av_dis),
+            ).Else(
+                av_noiseout_read.eq(0)
             ),
-            If(ro_fresh | server.control.fields.ro_dis,
-                ro_rand_read.eq(1),
+            If( ro_fresh,
+                ro_rand_read.eq(~server.control.fields.ro_dis), # don't read from a disabled source
+            ).Else(
+                ro_rand_read.eq(0)
             ),
-            If(av_pass & ro_pass,
+            If((av_pass | server.control.fields.av_dis) & (ro_pass | server.control.fields.ro_dis),
                 NextState("REFILL_KERNEL")
             )
         )
@@ -1411,6 +1450,7 @@ class TrngRingOscCoreSim(Module):
         self.update = Signal()
         self.ro_samp32 = Signal()
         self.sample_now = Signal()
+        self.rand = Signal(32)
         lfsr = Signal(16)
         self.comb += lfsr.eq(self.rand_out[:16])
         self.sync += [
@@ -1421,6 +1461,7 @@ class TrngRingOscCoreSim(Module):
             )
         ]
         self.comb += self.ro_samp32.eq(self.rand_out[0])
+        self.comb += self.rand.eq(self.rand_out)
 
 
 class TrngRingOscSim(Module, AutoDoc):

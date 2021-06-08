@@ -42,6 +42,10 @@ fn run(p: &pac::Peripherals) {
     step = 0x3000_0000;
     report(&p, step);
 
+    // check the fresh bit
+    report(&p, p.TRNG_SERVER.nist_ro_stat0.read().bits());
+    report(&p, p.TRNG_SERVER.nist_ro_stat0.read().bits());
+
     while p.TRNG_SERVER.status.read().full().bit_is_clear() {
         step += 1;
         report(&p, step);
