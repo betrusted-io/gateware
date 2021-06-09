@@ -407,7 +407,7 @@ module chacha_core(
           state_we   = 1;
         end // if (init_state)
 
-      if (update_state || ext_update)
+      if (update_state || force_round)
         begin
           state_we = 1;
           case (qr_ctr_reg)

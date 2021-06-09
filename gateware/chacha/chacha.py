@@ -21,7 +21,7 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
         self.userdata = Signal(32) # input / whatever user-provided data for seeding (optional)
         self.seed_now = Signal() # input / a single-cycle pulse that applies the userdata value. ignored until ready is asserted.
         self.ready = Signal()    # indicates all seeding operations are done
-        self.reseed_interval = Signal(16) # input / indicates how many ChaCha rounds we can generate before demanding a reseed. 0 means never auto-reseed.
+        self.reseed_interval = Signal(12) # input / indicates how many ChaCha rounds we can generate before demanding a reseed. 0 means never auto-reseed.
 
         self.advance_a = Signal()   # input / a single-cycle pulse that advances the value of output_a
         self.output_a = Signal(32)  # output / one of two output ports
@@ -32,7 +32,7 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
         self.valid_b = Signal()     # output / when high, the value on output_a is valid
 
         self.selfmix_ena = Signal()     # input / enables opportunistic self-mixing in the background
-        self.selfmix_interval = Signal(8)  # input / sysclk cycles in between opportunistic self mixings; for power savings
+        self.selfmix_interval = Signal(16)  # input / sysclk cycles in between opportunistic self mixings; for power savings
 
         state = Signal(384) # key + iv + ctr
         state_rot = Signal()
@@ -41,7 +41,7 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
         holding_buf_shift_by_2 = Signal()
         holding_buf_load = Signal()
         advance_block = Signal()
-        selfmix_ctr = Signal(8)
+        selfmix_ctr = Signal(self.selfmix_interval.nbits)
 
         self.sync += [
             If(state_rot | (self.ready & self.seed_now),
@@ -67,7 +67,7 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
         din_shift = Signal()
         self.sync += [
             If(din_shift,
-                data_in.eq(Cat(data_in[-32:] ^ self.seed), data_in[:-32])
+                data_in.eq(Cat(data_in[-32:] ^ self.seed, data_in[:-32]))
             ).Else(
                 data_in.eq(data_in)
             )
@@ -229,6 +229,8 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
         reseed_ctr = Signal(self.reseed_interval.nbits)
         seed_ctr = Signal(4, reset=15)
         seedfsm = FSM(reset_state="RESET")
+        seed_req = Signal()
+        self.comb += self.seed_req.eq(seed_req) # using self.seed_req directly somehow causes migen to puke...seems a mild bug?
         self.submodules += seedfsm
         seedfsm.act("RESET",
             NextValue(reseed_ctr, 0),
@@ -242,11 +244,11 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
                 NextValue(seed_ctr, seed_ctr - 1),
             ),
             If(seed_ctr == 0,
-                NextValue(self.seed_req, 0),
+                NextValue(seed_req, 0),
                 NextValue(seed_ctr, 15), # seed in 512 bits for DIN
                 NextState("DIN_SEEDING"),
             ).Else(
-                NextValue(self.seed_req, ~self.seed_gnt),
+                NextValue(seed_req, ~self.seed_gnt),
             )
         )
         seedfsm.act("DIN_SEEDING",
@@ -255,10 +257,10 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
                 NextValue(seed_ctr, seed_ctr - 1),
             ),
             If(seed_ctr == 0,
-                NextValue(self.seed_req, 0),
+                NextValue(seed_req, 0),
                 NextState("SEEDED"),
             ).Else(
-                NextValue(self.seed_req, ~self.seed_gnt),
+                NextValue(seed_req, ~self.seed_gnt),
             )
         )
         seedfsm.act("SEEDED",
@@ -270,7 +272,7 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
             If(ready,
                 NextState("RUN"),
                 NextValue(self.ready, 1),
-                NextValue(selfmix_ctr.eq, self.selfmix_interval),
+                NextValue(selfmix_ctr, self.selfmix_interval),
                 holding_buf_load.eq(1),
             )
         )
@@ -295,7 +297,7 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
             NextValue(next, 0),
             If(valid,
                 If((reseed_ctr == self.reseed_interval) & (self.reseed_interval != 0),
-                    NextValue(self.seed_req, 1),
+                    NextValue(seed_req, 1),
                     NextState("RUN_RESEED"),
                 ).Else(
                     holding_buf_load.eq(1),
@@ -307,7 +309,7 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
             If(self.seed_gnt,
                 state_rot.eq(1),
                 holding_buf_load.eq(1),
-                NextValue(self.seed_req, 0),
+                NextValue(seed_req, 0),
                 NextState("RUN"),
             )
         )

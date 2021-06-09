@@ -6,6 +6,8 @@ from litex.soc.interconnect.csr import *
 from litex.soc.integration.doc import AutoDoc, ModuleDoc
 from litex.soc.interconnect.csr_eventmanager import *
 
+from deps.gateware.gateware.chacha.chacha import ChaChaConditioner
+
 class TrngManagedKernel(Module, AutoCSR, AutoDoc):
     def __init__(self):
         self.intro = ModuleDoc("""
@@ -20,8 +22,14 @@ the top-level SoC and passed to TrngManaged as an argument.
         ])
 
         self.data = CSRStatus(fields=[
-            CSRField("data", size=32, description="Latest random data from the FIFO; only valid if ``avail`` bit is set")
+            CSRField("data", size=32, description="(DEPRECATED - use `urandom`) Latest random data from the FIFO; \
+                only valid if ``avail`` bit is set. This interface is preserved primarily for test programs to access\
+                raw TRNG data, but normal kernel code should never use this port, due to a race condition with the\
+                automatic reseeding algorithm for urandom.")
         ])
+
+        self.urandom = CSRStatus(name="urandom", size=32, description="Unlimited random numbers, output from the ChaCha conditioner. Generally, you want to use this.")
+        self.urandom_valid = CSRStatus(size=1, description="Set when `urandom` is valid. Always check before taking `urandom`")
 
         self.submodules.ev = EventManager()
         self.ev.avail = EventSourceLevel(description="Triggered anytime there is data available on the kernel interface")
@@ -59,13 +67,16 @@ to as little as 15-20ms and still probably be quite safe.
         ])
 
         self.data = CSRStatus(fields=[
-            CSRField("data", size=32, description="Latest random data from the FIFO; only valid if available bit is set")
+            CSRField("data", size=32, description="Latest random data from the FIFO; only valid if available bit is set\
+                Unlike the kernel's raw data port, this one is safe to use as there is no race condition with the reseeding algorithm.\
+                That being said, it is preferred to use `urandom` because the Conditioner protects against unanticipated dropouts in the raw TRNG stream.")
         ])
         self.status = CSRStatus(fields=[
             CSRField("avail", size=1, description="FIFO data is available"),
             CSRField("rdcount", size=10, description="Read fifo pointer"),
             CSRField("wrcount", size=10, description="Write fifo pointer"),
             CSRField("full", size=1, description="Both kernel and server FIFOs have been topped off"),
+            CSRField("chacha_ready", size=1, description="Chacha conditioner is seeded and ready"),
         ])
 
         # raw data:
@@ -206,6 +217,19 @@ to as little as 15-20ms and still probably be quite safe.
         ])
 
         self.ev.finalize()
+
+        # conditioner setup
+        self.chacha = CSRStorage(fields=[
+            CSRField("reseed_interval", size=12, description="How many ChaCha blocks to generate before automatically rotating the key pool", reset=2),
+            CSRField("selfmix_interval", size=16, description="How many sysclk cycles in between automatic round advancement (adjust to reduce standby power)", reset=200),
+            CSRField("selfmix_ena", size=1, description="Enable self mixing feature", reset=1),
+        ])
+        self.more_seed = CSRStorage(name="seed", size=32, description="Extra data to be rotated into the seed pool. This is supplemental to the automatically seeded TRNG data. Data is committed to the pool immediately upon write.")
+        self.urandom = CSRStatus(name="urandom", size=32, description="Unlimited random numbers, output from the ChaCha conditioner. Generally, you want to use this.")
+        self.urandom_valid = CSRStatus(size=1, description="Set when `urandom` is valid. Always check before taking `urandom`")
+        self.test = CSRStorage(fields=[
+            CSRField("simultaneous", size=1, description="Force a simultaneous advance of kernel/user urandom. Used to exercise a corner case in testing. Not harmful in production, just wasteful.", pulse=True)
+        ])
 
 class RepCountTest(Module, AutoDoc):
     def __init__(self, cutoff_max=32, nbits=1):
@@ -1074,18 +1098,44 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             o_WRCOUNT=kernel_fifo_wrcount,
             o_ALMOSTEMPTY=kernel_fifo_almostempty,
         )
-        self.comb += [
-            kernel.ev.avail.trigger.eq(~kernel_fifo_empty),
-            kernel.ev.error.trigger.eq(kernel_fifo_rderr), # this should only pulse when RE is triggered; it should not be stuck at a level
-            If(~kernel_fifo_empty,
+        seed_req = Signal()
+        seed_gnt = Signal()
+        seed_buf = Signal(32)
+        self.sync += [
+            kernel.ev.avail.trigger.eq(~kernel_fifo_empty & ~seed_req),
+            kernel.status.fields.avail.eq(~kernel_fifo_empty & ~seed_req), # note potential race condition if the fifo is drained after avail has been read...
+            If(~kernel_fifo_empty & ~seed_req,
                 kernel_fifo_rden.eq(kernel.data.we),
                 kernel.data.fields.data.eq(kernel_fifo_dout),
             ).Else(
                 kernel.data.fields.data.eq(0xDEADBEEF),
             ),
-            kernel.status.fields.rdcount.eq(kernel_fifo_rdcount),
-            kernel.status.fields.wrcount.eq(kernel_fifo_wrcount),
-            kernel.status.fields.avail.eq(~kernel_fifo_empty),
+            If(seed_req,
+                If(~kernel_fifo_empty,
+                    seed_gnt.eq(1),
+                    seed_buf.eq(kernel_fifo_dout),
+                ).Else(
+                    seed_gnt.eq(0),
+                    seed_buf.eq(seed_buf),
+                )
+            ).Else(
+                seed_gnt.eq(0),
+                seed_buf.eq(seed_buf),
+            )
+        ]
+
+        self.comb += [
+            # kernel.ev.avail.trigger.eq(~kernel_fifo_empty),
+            kernel.ev.error.trigger.eq(kernel_fifo_rderr), # this should only pulse when RE is triggered; it should not be stuck at a level
+            # If(~kernel_fifo_empty,
+            #     kernel_fifo_rden.eq(kernel.data.we),
+            #     kernel.data.fields.data.eq(kernel_fifo_dout),
+            # ).Else(
+            #     kernel.data.fields.data.eq(0xDEADBEEF),
+            # ),
+            # kernel.status.fields.rdcount.eq(kernel_fifo_rdcount),
+            # kernel.status.fields.wrcount.eq(kernel_fifo_wrcount),
+            # kernel.status.fields.avail.eq(~kernel_fifo_empty),
         ]
         self.sync += [
             If(server.control.fields.clr_err,
@@ -1209,6 +1259,32 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             av_reconfigure.eq(1), # pulse to set XADC back into the "system" sampling mode
             NextState("IDLE")
         )
+
+        self.submodules.chacha = ChaChaConditioner(platform)
+        self.comb += [
+            # CSR configs
+            self.chacha.reseed_interval.eq(server.chacha.fields.reseed_interval),
+            self.chacha.selfmix_interval.eq(server.chacha.fields.selfmix_interval),
+            self.chacha.selfmix_ena.eq(server.chacha.fields.selfmix_ena),
+            self.chacha.userdata.eq(server.more_seed.storage),
+            self.chacha.seed_now.eq(server.more_seed.re),
+            server.status.fields.chacha_ready.eq(self.chacha.ready),
+
+            # data outputs
+            # userland gets "B" port
+            server.urandom.status.eq(self.chacha.output_b),
+            server.urandom_valid.status.eq(self.chacha.valid_b),
+            self.chacha.advance_b.eq(server.urandom.we | server.test.fields.simultaneous),
+            # kernel gets "A" port (has priority over B in case of simultaeous read)
+            kernel.urandom.status.eq(self.chacha.output_a),
+            kernel.urandom_valid.status.eq(self.chacha.valid_a),
+            self.chacha.advance_a.eq(kernel.urandom.we | server.test.fields.simultaneous),
+
+            # TRNG tap to local hardware
+            self.chacha.seed.eq(seed_buf),
+            self.chacha.seed_req.eq(seed_req),
+            self.chacha.seed_gnt.eq(seed_gnt),
+        ]
 
 analog_layout = [("vauxp", 16), ("vauxn", 16), ("vp", 1), ("vn", 1)]
 
