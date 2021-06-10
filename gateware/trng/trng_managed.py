@@ -86,7 +86,8 @@ to as little as 15-20ms and still probably be quite safe.
         self.av_config = CSRStorage(fields=[
             CSRField("powerdelay", size=20, description="Delay in microseconds for avalanche generator to stabilize", reset=50000),
             CSRField("samples", size=8, description="Number of samples to fold into a single result. Smaller values increase rate but decrease quality. Default is {}.".format(default_samples), reset=default_samples),
-            CSRField("test", size=1, description="When set, puts the generator into test mode -- full-size, raw ADC samples are directly placed into the FIFO at full rate, creating a 'virtual oscilloscope' snapshot of the avalanche generator waveform.")
+            CSRField("test", size=1, description="When set, puts the generator into test mode -- full-size, raw ADC samples are directly placed into the FIFO at full rate, creating a 'virtual oscilloscope' snapshot of the avalanche generator waveform."),
+            CSRField("required", size=1, description="Require avalanche generator to work in order for boot (used by the synthetic test bench as this self-test 'runs long' compared to the other operations)"),
         ])
 
         self.ro_config = CSRStorage(fields=[
@@ -228,7 +229,7 @@ to as little as 15-20ms and still probably be quite safe.
         self.urandom = CSRStatus(name="urandom", size=32, description="Unlimited random numbers, output from the ChaCha conditioner. Generally, you want to use this.")
         self.urandom_valid = CSRStatus(size=1, description="Set when `urandom` is valid. Always check before taking `urandom`")
         self.test = CSRStorage(fields=[
-            CSRField("simultaneous", size=1, description="Force a simultaneous advance of kernel/user urandom. Used to exercise a corner case in testing. Not harmful in production, just wasteful.", pulse=True)
+            CSRField("simultaneous", size=1, description="Force a simultaneous advance of kernel/user urandom. Used to exercise a corner case in testing. Not harmful in production, just wasteful.", pulse=True),
         ])
 
 class RepCountTest(Module, AutoDoc):
@@ -1232,7 +1233,7 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             #### functionality in the case that one generator source is failing. But at least one must pass!
             #### For the "and" you need this: (av_pass | server.control.fields.av_dis) & (ro_pass | server.control.fields.ro_dis)
             #### the *_dis fields must be considered otherwise you would block on a deliberately disabled TRNG source before booting
-            If( av_pass | ro_pass,
+            If( av_pass | ro_pass & ~server.av_config.fields.required, # added a clause to force av_pass to be required, if desired by the user
                 NextState("REFILL_KERNEL")
             )
         )
@@ -1242,7 +1243,7 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             ).Else(
                 # this logic is set to allow the system to boot to minimum viable kernel, even if one of the TRNGs is failing
                 # if there is a spontaneous failure during run-time, it's up to the OS to catch this and make a policy decision.
-                If((av_noiseout_ready | server.control.fields.av_dis | ~av_pass) & (ro_fresh | server.control.fields.ro_dis | ~ro_pass),
+                If((av_noiseout_ready | server.control.fields.av_dis) & (ro_fresh | server.control.fields.ro_dis) & (av_pass | ro_pass),
                     kernel_fifo_wren.eq(1),
                     av_noiseout_read.eq(1),  # note that trng stream selection considers the _dis field state, so it's safe to always pump both even if one is disabled
                     ro_rand_read.eq(1),
@@ -1253,7 +1254,7 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             If(server_fifo_full,
                 NextState("GO_IDLE"),
             ).Else(
-                If((av_noiseout_ready | server.control.fields.av_dis) & (ro_fresh | server.control.fields.ro_dis),
+                If((av_noiseout_ready | server.control.fields.av_dis) & (ro_fresh | server.control.fields.ro_dis) & (av_pass | ro_pass),
                     server_fifo_wren.eq(1),
                     av_noiseout_read.eq(1),
                     ro_rand_read.eq(1),

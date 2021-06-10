@@ -23,8 +23,10 @@ fn run(p: &pac::Peripherals) {
     let mut step = 0x1000_0000;
     report(&p, step);
 
-    // setup the TRNG to run "fast" so the simulation finishes in a reasonable amount of time
-    unsafe{p.TRNG_SERVER.av_config.write(|w| w.samples().bits(0x1));}
+    // setup the TRNG to run "fast" so the simulation finishes in a reasonable amount of time, but "required" so we can check that the self-test passes in simulation
+    // the ring oscillator is just a bodge so it tests much faster than the avalanche generator in this test bench
+    unsafe{p.TRNG_SERVER.av_config.write(|w| w.samples().bits(0x1).required().bit(true));}
+    unsafe{p.TRNG_SERVER.chacha.write(|w| w.reseed_interval().bits(1));} // make it reseed every block for this test
 
     // this turns off the ring oscillator
     // p.TRNG_SERVER.control.write(|w| w.ro_dis().set_bit());
@@ -35,7 +37,7 @@ fn run(p: &pac::Peripherals) {
         report(&p, step);
     }
 
-    // now do a quick test on the chacha generator
+    //////////// CHACHA generator tests
     let mut i = 0;
     while i < 128 {
         while p.TRNG_SERVER.urandom_valid.read().bits() == 0 {}
@@ -116,6 +118,7 @@ fn run(p: &pac::Peripherals) {
         report(&p, p.TRNG_SERVER.urandom.read().bits());
         i += 1;
     }
+    unsafe{p.TRNG_SERVER.chacha.write(|w| w.reseed_interval().bits(2));} // make it reseed every two blocks to confirm the counter works right
     for _ in 0..64 {report(&p, 0xCCCC_CCCC);} // leave a marker so we can find this test in a trace
     i = 0;
     while i < 256 { // random pattern
@@ -128,7 +131,9 @@ fn run(p: &pac::Peripherals) {
         }
         i += 1;
     }
+    //////////// end CHACHA generator tests
 
+    // we continue on here to test various aspects of filling/emptying FIFOs reading raw entropy
     step = 0x2000_0000;
     report(&p, step);
 

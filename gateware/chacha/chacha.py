@@ -261,7 +261,7 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
         self.comb += seed_gnt_rising.eq(~seed_gnt_r & self.seed_gnt)
         self.submodules += seedfsm
         seedfsm.act("RESET",
-            NextValue(reseed_ctr, 0),
+            NextValue(reseed_ctr, 1),
             NextValue(self.ready, 0),
             NextValue(seed_ctr, 13), # seed in 384 bits for key + 1 dummy word to toss the first 0 on the FIFO
             NextState("SEEDING"),
@@ -303,7 +303,6 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
             If(valid,
                 NextState("RUN"),
                 NextValue(self.ready, 1),
-                holding_buf_load.eq(1),
             )
         )
         seedfsm.act("RUN",
@@ -316,38 +315,39 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
                 )
             ),
             If(advance_block,
-                NextState("WAIT_READY")
-            )
-        )
-        seedfsm.act("WAIT_READY",
-            If(ready,
-                NextValue(next, 1),
-                NextState("WAIT_NEXT"),
                 If(reseed_ctr < self.reseed_interval,
                     NextValue(reseed_ctr, reseed_ctr + 1),
-                )
-            )
-        )
-        seedfsm.act("WAIT_NEXT",
-            NextValue(next, 0),
-            If(valid,
+                ),
                 If((reseed_ctr == self.reseed_interval) & (self.reseed_interval != 0),
+                    NextValue(reseed_ctr, 1),
                     NextValue(self.seed_req, 1),
                     NextState("RUN_RESEED"),
-                ).Else(
-                    holding_buf_load.eq(1),
-                    NextState("RUN"),
                 )
             )
         )
         seedfsm.act("RUN_RESEED",
             If(seed_gnt_rising,
                 state_rot.eq(1),
-                holding_buf_load.eq(1),
                 NextValue(self.seed_req, 0),
                 NextState("RUN"),
             )
         )
+        # a simple FSM just to manage the ready/wait on the chacha block itself
+        advfsm = FSM(reset_state="WAITING")
+        self.submodules += advfsm
+        advfsm.act("WAITING",
+            NextValue(next, 0),
+            If(advance_block,
+                NextState("WAIT_READY")
+            )
+        )
+        advfsm.act("WAIT_READY",
+            If(ready,
+                NextValue(next, 1),
+                NextState("WAITING"),
+            )
+        )
+        self.sync += holding_buf_load.eq(valid) # just load the buf whenever we see a new valid block come out
 
         # verilog block instantiation
         self.comb += [
