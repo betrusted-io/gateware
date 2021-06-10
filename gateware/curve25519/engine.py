@@ -1858,18 +1858,18 @@ Here are the currently implemented opcodes for The Engine:
         # read data is stable by the 3rd phase of the RF fetch cycle, and so it is in fact ready even before
         # the other signals that trigger the execute mode, hence 4+1 cycles total setup time
         platform.add_platform_command("set_multicycle_path 5 -setup -start -from [get_clocks clk200] -to [get_clocks clk50] -through [get_cells *rf_r*_dat_reg*]")
-        platform.add_platform_command("set_multicycle_path 4 -hold -from [get_clocks clk200] -to [get_clocks clk50] -through [get_cells *rf_r*_dat_reg*]")
+        platform.add_platform_command("set_multicycle_path 4 -hold -end -from [get_clocks clk200] -to [get_clocks clk50] -through [get_cells *rf_r*_dat_reg*]")
         ### clk200->clk100 multi-cycle paths:
         # same as above, but for the multiplier path.
         platform.add_platform_command("set_multicycle_path 3 -setup -start -from [get_clocks clk200] -to [get_clocks sys_clk] -through [get_cells *rf_r*_dat_reg*]")
-        platform.add_platform_command("set_multicycle_path 2 -hold -from [get_clocks clk200] -to [get_clocks sys_clk] -through [get_cells *rf_r*_dat_reg*]")
+        platform.add_platform_command("set_multicycle_path 2 -hold -end -from [get_clocks clk200] -to [get_clocks sys_clk] -through [get_cells *rf_r*_dat_reg*]")
 
         # unregistered exec units need this set of rules
         ### clk200->clk200 multi-cycle paths:
         # this is for the case when we don't register the data, and just go straight from RF out put RF input. In the worst case
         # we have three (? maybe five?) clk200 cycles to compute as we phase through the reads and writes
         platform.add_platform_command("set_multicycle_path 3 -setup -from [get_clocks clk200] -to [get_clocks clk200] -through [get_cells *rf_r*_dat_reg*]")
-        platform.add_platform_command("set_multicycle_path 2 -hold -from [get_clocks clk200] -to [get_clocks clk200] -through [get_cells *rf_r*_dat_reg*]")
+        platform.add_platform_command("set_multicycle_path 2 -hold -end -from [get_clocks clk200] -to [get_clocks clk200] -through [get_cells *rf_r*_dat_reg*]")
 
         # other paths
         ### sys->clk200 multi-cycle paths:
@@ -1889,7 +1889,7 @@ Here are the currently implemented opcodes for The Engine:
         ### sys->clk50 multi-cycle paths:
         # microcode fetch is guaranteed not to transition in the middle of an exec computation
         platform.add_platform_command("set_multicycle_path 2 -setup -start -from [get_clocks sys_clk] -to [get_clocks clk50] -through [get_cells microcode_reg*]")
-        platform.add_platform_command("set_multicycle_path 1 -hold -from [get_clocks sys_clk] -to [get_clocks clk50] -through [get_cells microcode_reg*]")
+        platform.add_platform_command("set_multicycle_path 1 -hold -end -from [get_clocks sys_clk] -to [get_clocks clk50] -through [get_cells microcode_reg*]")
         ### clk50->clk200 multi-cycle paths:
         # engine running will set up a full eng_clk cycle before any RF accesses need to be valid
         platform.add_platform_command("set_multicycle_path 4 -setup -from [get_clocks clk50] -to [get_clocks clk200] -through [get_nets {{ {net1} {net2} {net3} }}]", net1=running, net2=running_r, net3=rf.running)

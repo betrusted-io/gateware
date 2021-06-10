@@ -77,7 +77,7 @@ dutio = [
 additional clocks beyond the simulation defaults
 """
 local_clocks = {
-    "clk50": [50e6, 22.5],
+    "clk50": [50e6, 0],
     # add more clocks here, formatted as {"name" : [freq, phase]}
 }
 
@@ -192,7 +192,10 @@ before calling SimRunner
 """
 def run_sim(ci=False):
     # add third-party modules via extra_cmds, eg. "cd run && xvlog ../MX66UM1G45G/MX66UM1G45G.v"
-    extra_cmds = ['cd run && xvlog ../XADC.v']
+    extra_cmds = ['cd run && xvlog ../XADC.v',
+       'cd run && xvlog ../../../gateware/chacha/chacha_core.v',
+       'cd run && xvlog ../../../gateware/chacha/chacha_qr.v'
+    ]
     SimRunner(ci, extra_cmds)
 
 

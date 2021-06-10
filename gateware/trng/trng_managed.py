@@ -171,7 +171,7 @@ to as little as 15-20ms and still probably be quite safe.
             CSRField("rep_b", size=ro_repcount_bits, description="max `b` value for core 0 repetition count test"),
         ])
 
-        mr_max=2048 # max value of a minirun
+        mr_max=2047 # max value of a minirun
         # Attempts to derive thresholds on this that are sane:
         # https://docs.google.com/spreadsheets/d/1_2r9GkMPnQaNDT1rO6dodm4zKR1j2ADs3-et-QkkGiw/edit?usp=sharing
         # You can also do a chi-square test on the data, but this is too much math for an integrated hardware min/max test
@@ -184,8 +184,8 @@ to as little as 15-20ms and still probably be quite safe.
         maxs = {1:584, 2:318, 3:175, 4:99,  5:57}
         for run in range(1, ro_maxruns+1):
             setattr(self, 'ro_runslimit'+str(run), CSRStorage(name='ro_runslimit'+str(run), fields=[
-                CSRField("min", size=log2_int(mr_max), description="Minimum runs limit for runs of length {}".format(run), reset=mins[run]),
-                CSRField("max", size=log2_int(mr_max), description="Minimum runs limit for runs of length {}".format(run), reset=maxs[run]),
+                CSRField("min", size=log2_int(mr_max+1), description="Minimum runs limit for runs of length {}".format(run), reset=mins[run]),
+                CSRField("max", size=log2_int(mr_max+1), description="Minimum runs limit for runs of length {}".format(run), reset=maxs[run]),
             ]))
 
         self.submodules.ev = EventManager()
@@ -198,11 +198,11 @@ to as little as 15-20ms and still probably be quite safe.
         # instantiate the test modules in this block so the CSRs are mapped to this space, but wire up inside the manager
         self.submodules.av_repcount0 = RepCountTest(cutoff_max=(2**av_repcount_bits)-1, nbits=5)
         self.submodules.av_repcount1 = RepCountTest(cutoff_max=(2**av_repcount_bits)-1, nbits=5)
-        self.submodules.av_adaprop0 = AdaptivePropTest(cutoff_max=2**av_adaptive_bits, nbits=5)
-        self.submodules.av_adaprop1 = AdaptivePropTest(cutoff_max=2**av_adaptive_bits, nbits=5)
+        self.submodules.av_adaprop0 = AdaptivePropTest(cutoff_max=(2**av_adaptive_bits)-1, nbits=5)
+        self.submodules.av_adaprop1 = AdaptivePropTest(cutoff_max=(2**av_adaptive_bits)-1, nbits=5)
         for core in range(ro_cores):
             setattr(self.submodules, 'ro_rep' + str(core), RepCountTest(cutoff_max=(2**ro_repcount_bits)-1, nbits=1))
-            setattr(self.submodules, 'ro_adp' + str(core), AdaptivePropTest(cutoff_max=2**ro_adaptive_bits, nbits=1))
+            setattr(self.submodules, 'ro_adp' + str(core), AdaptivePropTest(cutoff_max=(2**ro_adaptive_bits)-1, nbits=1))
             setattr(self.submodules, 'ro_run' + str(core), MiniRuns(maxrun=ro_maxruns, maxwindow=mr_max))
         self.submodules.av_excursion0 = ExcursionTest()
         self.submodules.av_excursion1 = ExcursionTest()
@@ -257,16 +257,16 @@ source samples, and the cutoff value C, the repetition count test is performed a
  for multiplexing all the values to a CSR interface.
         """)
         # inputs
-        self.cutoff = Signal(max=cutoff_max)
+        self.cutoff = Signal(max=cutoff_max+1)
         self.sample = Signal()  # strobe to sample a random value. One sample per cycle that this strobe is high.
         self.rand = Signal(nbits) # a connection to the source of entropy to sample
         self.reset = Signal()
         # output
         self.failure = Signal() # latches ON until reset. Also used in its inverse form to indicate a "ready" status (only valid after some run time, which is selected by the higher level logic).
-        self.b = Signal(max=cutoff_max) # monitor the b output
+        self.b = Signal(max=cutoff_max+1) # monitor the b output
 
         a = Signal(nbits)
-        b = Signal(max=cutoff_max)
+        b = Signal(max=cutoff_max+1)
         self.sync += [ # latch the max observed "b" value for diagnostic purposes
             If(self.reset,
                 self.b.eq(0),
@@ -335,7 +335,7 @@ The cutoff value C is chosen such that the probability of observing C or more id
             window_max = 512
 
         # inputs
-        self.cutoff = Signal(max=cutoff_max)
+        self.cutoff = Signal(max=cutoff_max+1)
         self.sample = Signal()  # strobe to sample a random value. One sample per cycle that this strobe is high.
         self.rand = Signal(nbits) # a connection to the source of entropy to sample
         self.reset = Signal()
@@ -344,12 +344,12 @@ The cutoff value C is chosen such that the probability of observing C or more id
         # output
         self.failure = Signal() # latches ON until reset
         self.ready = Signal() # indicates oscillator has passed at least one test iteration
-        self.b = Signal(max=cutoff_max)  # monitor the "b" variable externally
+        self.b = Signal(max=cutoff_max+1)  # monitor the "b" variable externally
         self.b_fresh = Signal() # indicates a new value since last read of b
 
         a = Signal(nbits)
-        b = Signal(max=cutoff_max)
-        w = Signal(max=window_max)
+        b = Signal(max=cutoff_max+1)
+        w = Signal(max=window_max+1)
         b_updated = Signal()
 
         self.sync += [
@@ -506,7 +506,7 @@ This block includes CSRs, as there are only two instance expected.
 
 
 class MiniRuns(Module, AutoDoc, AutoCSR):
-    def __init__(self, maxrun=5, maxwindow=2048):
+    def __init__(self, maxrun=5, maxwindow=2047): # maxwindow should be 2**n - 1
         self.maxrun = maxrun
         self.intro = ModuleDoc("""Miniature Runs Test (supplemental tailored to ring oscillator source)
 
@@ -523,14 +523,14 @@ CSR block.
         self.runs_fail = Signal(maxrun)
         self.reset_failure = Signal()
         for run in range(1, maxrun+1):
-            setattr(self, 'runs_min'+str(run), Signal(max=maxwindow))
-            setattr(self, 'runs_max'+str(run), Signal(max=maxwindow))
+            setattr(self, 'runs_min'+str(run), Signal(max=maxwindow+1))
+            setattr(self, 'runs_max'+str(run), Signal(max=maxwindow+1))
 
         # outputs
         self.failure = Signal()
 
         self.ctrl = CSRStorage(fields=[
-            CSRField("window", size=log2_int(maxwindow), description="Number of samples over which to measure. Must be less than {}, or else undefined behavior occurs".format(maxwindow), reset=(maxwindow//2)),
+            CSRField("window", size=log2_int(maxwindow+1), description="Number of samples over which to measure. Must be less than {}, or else undefined behavior occurs".format(maxwindow), reset=(maxwindow//2)),
         ])
         self.fresh = CSRStatus(size=maxrun, description="The current data corresponding to a runlength of (bitposition +1) has been updated at least once since the last readout of any register")
 
@@ -584,8 +584,8 @@ CSR block.
             )
         ]
         for run in range(1, maxrun+1):
-            setattr(self, 'count'+str(run), CSRStatus(size=log2_int(maxwindow), name="count"+str(run), description="Count of sequence length {} runs seen in the past window".format(run)))
-            setattr(self, 'runcount'+str(run), Signal(log2_int(maxwindow)))
+            setattr(self, 'count'+str(run), CSRStatus(size=log2_int(maxwindow+1), name="count"+str(run), description="Count of sequence length {} runs seen in the past window".format(run)))
+            setattr(self, 'runcount'+str(run), Signal(log2_int(maxwindow+1)))
             self.comb += [
                 self.runs_fail[run-1].eq(
                     ((getattr(self, 'count'+str(run)).status < getattr(self, 'runs_min'+str(run)) ) |
@@ -1101,11 +1101,14 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
         seed_req = Signal()
         seed_gnt = Signal()
         seed_buf = Signal(32)
+        seed_read = Signal()
+        seed_read_r = Signal()
         self.sync += [
+            seed_read_r.eq(seed_read),
             kernel.ev.avail.trigger.eq(~kernel_fifo_empty & ~seed_req),
             kernel.status.fields.avail.eq(~kernel_fifo_empty & ~seed_req), # note potential race condition if the fifo is drained after avail has been read...
-            If(~kernel_fifo_empty & ~seed_req,
-                kernel_fifo_rden.eq(kernel.data.we),
+            If(~kernel_fifo_empty,
+                kernel_fifo_rden.eq( (~seed_req & kernel.data.we) | (seed_read & ~seed_read_r) ),
                 kernel.data.fields.data.eq(kernel_fifo_dout),
             ).Else(
                 kernel.data.fields.data.eq(0xDEADBEEF),
@@ -1113,13 +1116,16 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             If(seed_req,
                 If(~kernel_fifo_empty,
                     seed_gnt.eq(1),
+                    seed_read.eq(1),
                     seed_buf.eq(kernel_fifo_dout),
                 ).Else(
                     seed_gnt.eq(0),
+                    seed_read.eq(0),
                     seed_buf.eq(seed_buf),
                 )
             ).Else(
                 seed_gnt.eq(0),
+                seed_read.eq(0),
                 seed_buf.eq(seed_buf),
             )
         ]
@@ -1282,7 +1288,7 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
 
             # TRNG tap to local hardware
             self.chacha.seed.eq(seed_buf),
-            self.chacha.seed_req.eq(seed_req),
+            seed_req.eq(self.chacha.seed_req),
             self.chacha.seed_gnt.eq(seed_gnt),
         ]
 
@@ -1923,7 +1929,7 @@ class ModNoise(Module, AutoCSR, AutoDoc):
         ])
 
         shift_rand = Signal()
-        rand_cnt = Signal(max=self.rand.size + 1)
+        rand_cnt = Signal(max=self.rand.size + 2)
         rand = Signal(32)
         # keep track of how many bits have been shifted in since the last read-out
         self.sync += [
