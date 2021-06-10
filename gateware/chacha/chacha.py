@@ -34,6 +34,58 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
         self.selfmix_ena = Signal()     # input / enables opportunistic self-mixing in the background
         self.selfmix_interval = Signal(16)  # input / sysclk cycles in between opportunistic self mixings; for power savings
 
+        # local signals from the output of the system
+        advance_a_local = Signal()
+        output_a_local = Signal(32)
+        valid_a_local = Signal()
+        advance_b_local = Signal()
+        output_b_local = Signal(32)
+        valid_b_local = Signal()
+        # now, create a pipeline (more correctly, a depth-1 fifo) to isolate the CPU's r/w path from the shifter logic
+        # the problem is that we're pulsing the advancement of the output shifter based upon a single-cycle combinational path
+        # that originates deep inside the CPU load/store pipe. This becomes an unecessary critical path, so introducing
+        # this logic here will relax that over-constraint
+        outafsm = FSM(reset_state="FILL")
+        self.submodules += outafsm
+        outafsm.act("FILL",
+            If(valid_a_local,
+                NextValue(self.output_a, output_a_local),
+                NextValue(self.valid_a, valid_a_local),
+                NextState("PIPE"),
+                advance_a_local.eq(1)
+            )
+        )
+        outafsm.act("PIPE",
+            If(self.advance_a,
+                NextValue(self.output_a, output_a_local),
+                NextValue(self.valid_a, valid_a_local),
+                advance_a_local.eq(1),
+            ),
+            If(~self.valid_a,
+                NextState("FILL")
+            )
+        )
+        outbfsm = FSM(reset_state="FILL")
+        self.submodules += outbfsm
+        outbfsm.act("FILL",
+            If(valid_b_local,
+                NextValue(self.output_b, output_b_local),
+                NextValue(self.valid_b, valid_b_local),
+                NextState("PIPE"),
+                advance_b_local.eq(1)
+            )
+        )
+        outbfsm.act("PIPE",
+            If(self.advance_b,
+                NextValue(self.output_b, output_b_local),
+                NextValue(self.valid_b, valid_b_local),
+                advance_b_local.eq(1),
+            ),
+            If(~self.valid_b,
+                NextState("FILL")
+            )
+        )
+
         state = Signal(384) # key + iv + ctr
         state_rot = Signal()
         holding_buf = Signal(512)
@@ -119,8 +171,8 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
         holdfsm.act("RESET",
             NextValue(hold_init, 0),
             NextValue(words_remaining, 0),
-            NextValue(self.valid_a, 0),
-            NextValue(self.valid_b, 0),
+            NextValue(valid_a_local, 0),
+            NextValue(valid_b_local, 0),
             If(holding_buf_load,
                 NextState("INIT"),
             )
@@ -134,10 +186,10 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
             advance_block.eq(1), # immediately queue up the next block
             NextValue(hold_init, 1), # this will prevent further auto-initialization of the holding buffer
 
-            NextValue(self.output_a, holding_buf[-32:]),
-            NextValue(self.output_b, holding_buf[-64:-32]),
-            NextValue(self.valid_a, 1),
-            NextValue(self.valid_b, 1),
+            NextValue(output_a_local, holding_buf[-32:]),
+            NextValue(output_b_local, holding_buf[-64:-32]),
+            NextValue(valid_a_local, 1),
+            NextValue(valid_b_local, 1),
             NextValue(words_remaining, 14),
             holding_buf_shift_by_2.eq(1),
             NextState("OUTPUT"),
@@ -146,15 +198,15 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
             # handle the case of needing a single word
             If( ( # update conditions are either we've received an adavance, or the valid is low (we saw an advance and wasn't able to refill)
                   # if you advance while not valid, well...that's undefined behavior! you will be reading the sentinel value
-                  (self.advance_a | ~self.valid_a) & (~self.advance_b & self.valid_b) | # only a needs an update
-                  (~self.advance_a & self.valid_a) & (self.advance_b | ~self.valid_b)   # only b needs an update
+                  (advance_a_local | ~valid_a_local) & (~advance_b_local & valid_b_local) | # only a needs an update
+                  (~advance_a_local & valid_a_local) & (advance_b_local | ~valid_b_local)   # only b needs an update
                 ),
-                If((self.advance_a | ~self.valid_a) & (~self.advance_b & self.valid_b), # a needs an update
-                    NextValue(self.output_a, holding_buf[-32:]),
-                    NextValue(self.valid_a, 1),
+                If((advance_a_local | ~valid_a_local) & (~advance_b_local & valid_b_local), # a needs an update
+                    NextValue(output_a_local, holding_buf[-32:]),
+                    NextValue(valid_a_local, 1),
                 ).Else( # if not a, then must be that b needs an update
-                    NextValue(self.output_b, holding_buf[-32:]),
-                    NextValue(self.valid_b, 1),
+                    NextValue(output_b_local, holding_buf[-32:]),
+                    NextValue(valid_b_local, 1),
                 ),
                 # either way, we do this stuff to advance the next state
                 holding_buf_shift_by_1.eq(1),
@@ -171,12 +223,12 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
                 ).Else(
                     NextValue(words_remaining, words_remaining - 1),
                 )
-            ).Elif( (self.advance_a | ~self.valid_a) & (self.advance_b | ~self.valid_b), # case of needing two words
+            ).Elif( (advance_a_local | ~valid_a_local) & (advance_b_local | ~valid_b_local), # case of needing two words
                 If(words_remaining >= 2,
-                    NextValue(self.output_a, holding_buf[-32:]),
-                    NextValue(self.valid_a, 1),
-                    NextValue(self.output_b, holding_buf[-64:-32]),
-                    NextValue(self.valid_b, 1),
+                    NextValue(output_a_local, holding_buf[-32:]),
+                    NextValue(valid_a_local, 1),
+                    NextValue(output_b_local, holding_buf[-64:-32]),
+                    NextValue(valid_b_local, 1),
                     If(words_remaining == 2, # we're empty, try to pull the ready state; if not available, go wait
                         If(saw_load,
                             advance_block.eq(1),
@@ -194,16 +246,16 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
                 ).Else( # either 1 or 0 words
                     If(words_remaining == 1,
                         # we have one word remaining, arbitrarily advance a over b
-                        NextValue(self.output_a, holding_buf[-32:]),
-                        NextValue(self.valid_a, 1),
-                        NextValue(self.output_b, sentinel),
-                        NextValue(self.valid_b, 0),
+                        NextValue(output_a_local, holding_buf[-32:]),
+                        NextValue(valid_a_local, 1),
+                        NextValue(output_b_local, sentinel),
+                        NextValue(valid_b_local, 0),
                         NextValue(words_remaining, 0),
                     ).Else( # 0 words -- should never hit this case, but handle it anyways
-                        NextValue(self.output_a, sentinel),
-                        NextValue(self.valid_a, 0),
-                        NextValue(self.output_b, sentinel),
-                        NextValue(self.valid_b, 0),
+                        NextValue(output_a_local, sentinel),
+                        NextValue(valid_a_local, 0),
+                        NextValue(output_b_local, sentinel),
+                        NextValue(valid_b_local, 0),
                     ),
                     NextState("WAIT")
                 )
@@ -223,13 +275,13 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
             )
         )
         holdfsm.act("WAIT",
-            If(self.advance_a,
-                NextValue(self.output_a, sentinel),
-                NextValue(self.valid_a, 0)
+            If(advance_a_local,
+                NextValue(output_a_local, sentinel),
+                NextValue(valid_a_local, 0)
             ),
-            If(self.advance_b,
-                NextValue(self.output_b, sentinel),
-                NextValue(self.valid_b, 0)
+            If(advance_b_local,
+                NextValue(output_b_local, sentinel),
+                NextValue(valid_b_local, 0)
             ),
             If(saw_load,
                 advance_block.eq(1),
