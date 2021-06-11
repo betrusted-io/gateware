@@ -1104,10 +1104,12 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
         seed_buf = Signal(32)
         seed_read = Signal()
         seed_read_r = Signal()
+        buffered_avail = Signal()
         self.sync += [
             seed_read_r.eq(seed_read),
-            kernel.ev.avail.trigger.eq(~kernel_fifo_empty & ~seed_req),
-            kernel.status.fields.avail.eq(~kernel_fifo_empty & ~seed_req), # note potential race condition if the fifo is drained after avail has been read...
+            buffered_avail.eq(~kernel_fifo_empty & ~seed_req),
+            kernel.ev.avail.trigger.eq(buffered_avail),
+            kernel.status.fields.avail.eq(buffered_avail), # note potential race condition if the fifo is drained after avail has been read...
             If(~kernel_fifo_empty,
                 kernel_fifo_rden.eq( (~seed_req & kernel.data.we) | (seed_read & ~seed_read_r) ),
                 kernel.data.fields.data.eq(kernel_fifo_dout),

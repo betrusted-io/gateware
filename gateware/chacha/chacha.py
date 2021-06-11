@@ -1,5 +1,5 @@
 from migen import *
-from migen.genlib.cdc import MultiReg
+from migen.genlib.cdc import BlindTransfer
 
 from litex.soc.interconnect.csr import *
 from litex.soc.integration.doc import AutoDoc, ModuleDoc
@@ -20,7 +20,7 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
         self.seed_gnt = Signal()  # input / indicates seed request has been granted. this causes _req to drop, starting a new cycle.
         self.userdata = Signal(32) # input / whatever user-provided data for seeding (optional)
         self.seed_now = Signal() # input / a single-cycle pulse that applies the userdata value. ignored until ready is asserted.
-        self.ready = Signal()    # indicates all seeding operations are done
+        self.ready = Signal()    # output / indicates all seeding operations are done
         self.reseed_interval = Signal(12) # input / indicates how many ChaCha rounds we can generate before demanding a reseed. 0 means never auto-reseed.
 
         self.advance_a = Signal()   # input / a single-cycle pulse that advances the value of output_a
@@ -33,6 +33,20 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
 
         self.selfmix_ena = Signal()     # input / enables opportunistic self-mixing in the background
         self.selfmix_interval = Signal(16)  # input / sysclk cycles in between opportunistic self mixings; for power savings
+
+        # rename so we can easily isolate non-critical path input to avoid false timing dependencies
+        userdata_local = Signal(self.userdata.nbits)
+        seed_now_local = Signal()
+        reseed_interval_local = Signal(self.reseed_interval.nbits)
+        selfmix_ena_local = Signal()
+        selfmix_interval_local = Signal(self.selfmix_interval.nbits)
+        self.comb += [
+            userdata_local.eq(self.userdata),
+            seed_now_local.eq(self.seed_now),
+            reseed_interval_local.eq(self.reseed_interval),
+            selfmix_ena_local.eq(self.selfmix_ena),
+            selfmix_interval_local.eq(self.selfmix_interval),
+        ]
 
         # local signals from the output of the system
         advance_a_local = Signal()
@@ -52,14 +66,18 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
                 NextValue(self.output_a, output_a_local),
                 NextValue(self.valid_a, valid_a_local),
                 NextState("PIPE"),
-                advance_a_local.eq(1)
+                NextValue(advance_a_local, 1)
+            ).Else(
+                NextValue(advance_a_local, 0)
             )
         )
         outafsm.act("PIPE",
             If(self.advance_a,
                 NextValue(self.output_a, output_a_local),
                 NextValue(self.valid_a, valid_a_local),
-                advance_a_local.eq(1),
+                NextValue(advance_a_local, 1)
+            ).Else(
+                NextValue(advance_a_local, 0)
             ),
             If(~self.valid_a,
                 NextState("FILL")
@@ -72,14 +90,18 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
                 NextValue(self.output_b, output_b_local),
                 NextValue(self.valid_b, valid_b_local),
                 NextState("PIPE"),
-                advance_b_local.eq(1)
+                NextValue(advance_b_local, 1),
+            ).Else(
+                NextValue(advance_b_local, 0)
             )
         )
         outbfsm.act("PIPE",
             If(self.advance_b,
                 NextValue(self.output_b, output_b_local),
                 NextValue(self.valid_b, valid_b_local),
-                advance_b_local.eq(1),
+                NextValue(advance_b_local, 1),
+            ).Else(
+                NextValue(advance_b_local, 0),
             ),
             If(~self.valid_b,
                 NextState("FILL")
@@ -96,9 +118,9 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
         selfmix_ctr = Signal(self.selfmix_interval.nbits)
 
         self.sync += [
-            If(state_rot | (self.ready & self.seed_now),
-                If(self.seed_now,
-                    state.eq(Cat(state[-32:] ^ self.seed ^ self.userdata, state[:-32]))
+            If(state_rot | (self.ready & seed_now_local),
+                If(seed_now_local,
+                    state.eq(Cat(state[-32:] ^ self.seed ^ userdata_local, state[:-32]))
                 ).Else(
                     state.eq(Cat(state[-32:] ^ self.seed, state[:-32]))
                 )
@@ -350,7 +372,7 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
             )
         )
         seedfsm.act("WAIT_INIT",
-            NextValue(selfmix_ctr, self.selfmix_interval),
+            NextValue(selfmix_ctr, selfmix_interval_local),
             NextValue(init, 0),
             If(valid,
                 NextState("RUN"),
@@ -358,19 +380,19 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
             )
         )
         seedfsm.act("RUN",
-            If(self.selfmix_ena,
+            If(selfmix_ena_local,
                 If(selfmix_ctr != 0,
                     NextValue(selfmix_ctr, selfmix_ctr - 1),
                 ).Else(
-                    NextValue(selfmix_ctr, self.selfmix_interval),
+                    NextValue(selfmix_ctr, selfmix_interval_local),
                     force_round.eq(1),
                 )
             ),
             If(advance_block,
-                If(reseed_ctr < self.reseed_interval,
+                If(reseed_ctr < reseed_interval_local,
                     NextValue(reseed_ctr, reseed_ctr + 1),
                 ),
-                If((reseed_ctr == self.reseed_interval) & (self.reseed_interval != 0),
+                If((reseed_ctr == reseed_interval_local) & (reseed_interval_local != 0),
                     NextValue(reseed_ctr, 1),
                     NextValue(self.seed_req, 1),
                     NextState("RUN_RESEED"),
@@ -408,22 +430,37 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
             ctr.eq(state[320:]),
         ]
         # stretch control signal pulses out
-        init_d = Signal()
-        next_d = Signal()
-        force_round_d = Signal()
-        self.sync += [
-            init_d.eq(init),
-            next_d.eq(next),
-            force_round_d.eq(force_round),
+        self.submodules.init_xfer = BlindTransfer("sys", "clk50")
+        self.submodules.next_xfer = BlindTransfer("sys", "clk50")
+        self.submodules.force_xfer = BlindTransfer("sys", "clk50")
+        self.comb += [
+            self.init_xfer.i.eq(init),
+            self.next_xfer.i.eq(next),
+            self.force_xfer.i.eq(force_round),
+            init_50.eq(self.init_xfer.o),
+            next_50.eq(self.next_xfer.o),
+            force_round_50.eq(self.force_xfer.o),
         ]
+        # make sure we have a solid local reset
+        resetter = Signal(4, reset=15)
+        local_reset_n = Signal(reset=0)
         self.sync.clk50 += [
-            init_50.eq(init_d | init),
-            next_50.eq(next_d | next),
-            force_round_50.eq(force_round_d | force_round),
+            If(resetter != 0,
+                resetter.eq(resetter - 1),
+                    local_reset_n.eq(0),
+            ).Else(
+                If(ResetSignal("clk50"),
+                    resetter.eq(15),
+                    local_reset_n.eq(0),
+                ).Else(
+                    resetter.eq(0),
+                    local_reset_n.eq(1),
+                )
+            )
         ]
         self.specials += Instance("chacha_core",
             i_clk = ClockSignal("clk50"),
-            i_reset_n = ~ResetSignal(),
+            i_reset_n = local_reset_n,
 
             i_init = init_50,
             i_next = next_50,
