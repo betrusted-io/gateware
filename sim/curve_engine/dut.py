@@ -94,6 +94,7 @@ def generate_top():
     global dutio
     global boot_from_spi
 
+    os.system("cp ../../sim_support/placeholder_bios.bin run/software/bios/bios.bin")
     if ~os.path.isfile('testbench/curve25519-dalek/test_vectors.bin'):
         # create a dummy file so that DUT can bootstrap and build soc.svd, required for building test vectors
         with open('testbench/curve25519-dalek/test_vectors.bin', 'wb') as out:
@@ -124,10 +125,7 @@ def generate_top():
     platform = Platform(dutio)
     soc = Dut(platform, spiboot=boot_from_spi)
 
-    builder = Builder(soc, output_dir="./run")
-    builder.software_packages = [  # Point to a dummy Makefile, so Litex pulls in bios.bin but doesn't try building over it
-        ("bios", os.path.abspath(os.path.join(os.path.dirname(__file__), "testbench")))
-    ]
+    builder = Builder(soc, output_dir="./run", compile_software=False)
     vns = builder.build(run=False)
     soc.do_exit(vns)
 

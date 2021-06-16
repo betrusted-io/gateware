@@ -127,6 +127,7 @@ class Sim(SoCCore):
 
         SoCCore.__init__(self, platform, crg_config["sys"][0],
             integrated_rom_size=rom_size,
+            integrated_rom_init='run/software/bios/bios.bin',
             integrated_sram_size=0x20000,
             ident="simulation LiteX Base SoC",
             cpu_type="vexriscv",

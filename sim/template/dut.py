@@ -102,6 +102,14 @@ def generate_top():
 
     # we have to do two passes: once to make the SVD, without compiling the BIOS
     # second, to compile the BIOS, which is then built into the gateware.
+    if os.name == 'nt':
+        cpname = 'copy'
+    else:
+        cpname = 'cp'
+
+    os.system("{} ..{}..{}sim_support{}placeholder_bios.bin run{}software{}bios{}bios.bin".format(cpname,
+        os.path.sep, os.path.sep, os.path.sep, os.path.sep, os.path.sep, os.path.sep
+    ))
 
     # pass #1 -- make the SVD
     platform = Platform(dutio)
@@ -118,10 +126,7 @@ def generate_top():
     platform = Platform(dutio)
     soc = Dut(platform, spiboot=boot_from_spi)
 
-    builder = Builder(soc, output_dir="./run")
-    builder.software_packages = [  # Point to a dummy Makefile, so Litex pulls in bios.bin but doesn't try building over it
-        ("bios", os.path.abspath(os.path.join(os.path.dirname(__file__), "testbench")))
-    ]
+    builder = Builder(soc, output_dir="./run", compile_software=False)
     vns = builder.build(run=False)
     soc.do_exit(vns)
 
