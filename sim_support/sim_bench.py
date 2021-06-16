@@ -124,10 +124,13 @@ class Sim(SoCCore):
         if spiboot:
             reset_address = self.mem_map["spiflash"]
             rom_size = 0x0
+            rom_init = []
+        else:
+            rom_init = 'run/software/bios/bios.bin'
 
         SoCCore.__init__(self, platform, crg_config["sys"][0],
             integrated_rom_size=rom_size,
-            integrated_rom_init='run/software/bios/bios.bin',
+            integrated_rom_init=rom_init,
             integrated_sram_size=0x20000,
             ident="simulation LiteX Base SoC",
             cpu_type="vexriscv",
