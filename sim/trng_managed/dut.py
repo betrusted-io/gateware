@@ -165,6 +165,7 @@ def generate_top():
     else:
         cpname = 'cp'
 
+    os.system("mkdir -p run{}sofware{}bios".format(os.path.sep, os.path.sep))
     os.system("{} ..{}..{}sim_support{}placeholder_bios.bin run{}software{}bios{}bios.bin".format(cpname,
         os.path.sep, os.path.sep, os.path.sep, os.path.sep, os.path.sep, os.path.sep
     ))

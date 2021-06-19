@@ -94,7 +94,16 @@ def generate_top():
     global dutio
     global boot_from_spi
 
-    os.system("cp ../../sim_support/placeholder_bios.bin run/software/bios/bios.bin")
+    if os.name == 'nt':
+        cpname = 'copy'
+    else:
+        cpname = 'cp'
+
+    os.system("mkdir -p run{}sofware{}bios".format(os.path.sep, os.path.sep))
+    os.system("{} ..{}..{}sim_support{}placeholder_bios.bin run{}software{}bios{}bios.bin".format(cpname,
+        os.path.sep, os.path.sep, os.path.sep, os.path.sep, os.path.sep, os.path.sep
+    ))
+
     if ~os.path.isfile('testbench/curve25519-dalek/test_vectors.bin'):
         # create a dummy file so that DUT can bootstrap and build soc.svd, required for building test vectors
         with open('testbench/curve25519-dalek/test_vectors.bin', 'wb') as out:
