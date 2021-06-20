@@ -96,8 +96,12 @@ def generate_top():
 
     if os.name == 'nt':
         cpname = 'copy'
+        with open('testbench/curve25519-dalek/.cargo/config', 'w') as config:
+            config.write('[build]\ntarget="x86_64-pc-windows-msvc"\n')
     else:
         cpname = 'cp'
+        with open('testbench/curve25519-dalek/.cargo/config', 'w') as config:
+            config.write('[build]\ntarget="x86_64-unknown-linux-gnu"\n')
 
     os.system("mkdir -p run{}sofware{}bios".format(os.path.sep, os.path.sep))
     os.system("{} ..{}..{}sim_support{}placeholder_bios.bin run{}software{}bios{}bios.bin".format(cpname,

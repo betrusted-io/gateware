@@ -11,6 +11,7 @@ pub fn report(p: &pac::Peripherals, data: u32) {
     }
 }
 
+#[cfg(not(test))]
 #[sim_test]
 fn run(p: &pac::Peripherals) {
     let microcode_ptr: *mut u32 = 0xe002_0000 as *mut u32;
