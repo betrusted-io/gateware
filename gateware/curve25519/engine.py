@@ -1507,13 +1507,23 @@ Here are the currently implemented opcodes for The Engine:
         ])
         self.power = CSRStorage(fields=[
             CSRField("on", size=1, reset=0,
-                description="Writing `1` turns on the clocks to this block, `0` stops the clocks (for power savings)")
+                description="Writing `1` turns on the clocks to this block, `0` stops the clocks (for power savings). The handling of the clock gate is in a different module, this is just a flag to that block."),
+            CSRField("pause_req", size=1, description="Writing a `1` to this block will pause execution at the next micro-op, and allow for read-out of data from RF/microcode. Must check pause_gnt to confirm the pause has happened. Used to interrupt flow for suspend/resume."),
         ])
-        self.status = CSRStorage(fields=[
+        pause_req = Signal()
+        self.sync.eng_clk += pause_req.eq(self.power.fields.pause_req)
+        self.status = CSRStatus(fields=[
             CSRField("running", size=1, description="When set, the microcode engine is running. All wishbone access to RF and microcode memory areas will stall until this bit is clear"),
             CSRField("mpc", size=log2_int(microcode_depth), description="Current location of the microcode program counter. Mostly for debug."),
+            CSRField("pause_gnt", size=1, description="When set, the engine execution has been paused, and the RF & microcode ROM can be read out for suspend/resume"),
         ])
-        self.comb += self.status.fields.running.eq(running)
+        pause_gnt = Signal()
+        mpc = Signal(log2_int(microcode_depth))  # the microcode program counter
+        self.sync += [
+            self.status.fields.running.eq(running),
+            self.status.fields.pause_gnt.eq(pause_gnt),
+            self.status.fields.mpc.eq(mpc),
+        ]
 
         self.submodules.ev = EventManager()
         self.ev.finished = EventSourcePulse(description="Microcode run finished execution")
@@ -1540,7 +1550,6 @@ Here are the currently implemented opcodes for The Engine:
         micro_runport = microcode.get_port(mode=READ_FIRST) # , clock_domain="eng_clk"
         self.specials += micro_runport
 
-        mpc = Signal(log2_int(microcode_depth))  # the microcode program counter
         self.comb += [
             micro_runport.adr.eq(mpc),
             instruction.raw_bits().eq(micro_runport.dat_r),  # mapping should follow the record definition *exactly*
@@ -1571,7 +1580,7 @@ Here are the currently implemented opcodes for The Engine:
             If( ((bus.adr & ((0xFFFF_C000) >> 2)) >= ((prefix | 0x1_0000) >> 2)) & (((bus.adr & ((0xFFFF_C000) >> 2)) < ((prefix | 0x1_4000) >> 2))),
                 # fully decode register file address to avoid aliasing
                 If(bus.cyc & bus.stb & bus.we & ~bus.ack,
-                    If(~running,
+                    If(~running | pause_gnt,
                         wdata.eq(bus.dat_w),
                         wadr.eq(bus.adr[:wadr.nbits]),
                         wmask.eq(bus.sel),
@@ -1586,7 +1595,7 @@ Here are the currently implemented opcodes for The Engine:
                         bus.ack.eq(0),
                     )
                 ).Elif(bus.cyc & bus.stb & ~bus.we & ~bus.ack,
-                    If(~running,
+                    If(~running | pause_gnt,
                         radr.eq(bus.adr[:radr.nbits]),
                         rdata_re.eq(1),
                         bus.dat_r.eq( rf.ra_dat >> ((radr & 0x7) * 32) ),
@@ -1664,7 +1673,7 @@ Here are the currently implemented opcodes for The Engine:
             self.rb_const_rom.adr.eq(rb_adr),
             rf.window.eq(self.window.fields.window),
 
-            If(running,
+            If(running & ~pause_gnt,
                 rf.ra_adr.eq(Cat(ra_adr, self.window.fields.window)),
                 rf.rb_adr.eq(Cat(rb_adr, self.window.fields.window)),
                 rf.instruction_pipe_in.eq(instruction.raw_bits()),
@@ -1695,7 +1704,7 @@ Here are the currently implemented opcodes for The Engine:
         bus_rd_wait = Signal(max=(rd_wait_states+1))
         self.sync.rf_clk += [
             If(rdata_req,
-                If(~running,
+                If(~running | pause_gnt,
                     If(bus_rd_wait != 0,
                         bus_rd_wait.eq(bus_rd_wait-1),
                     ).Else(
@@ -1736,6 +1745,7 @@ Here are the currently implemented opcodes for The Engine:
         done = Signal()  # indicates when the given execution units are done (as-muxed from subunits)
         self.comb += rf.running.eq(~seq.ongoing("IDLE") | rdata_re),  # let the RF know when we're not executing, so it can idle to save power
         seq.act("IDLE",
+            NextValue(pause_gnt, 0),
             If(engine_go,
                 NextValue(mpc, self.mpstart.fields.mpstart),
                 NextValue(mpc_stop, self.mpstart.fields.mpstart + self.mplen.fields.mplen - 1),
@@ -1747,8 +1757,14 @@ Here are the currently implemented opcodes for The Engine:
             )
         )
         seq.act("FETCH",
-            # one cycle latency for instruction fetch
-            NextState("EXEC"),
+            If(pause_req,
+                NextState("PAUSED"),
+                NextValue(pause_gnt, 1),
+            ).Else(
+                # one cycle latency for instruction fetch
+                NextState("EXEC"),
+                NextValue(pause_gnt, 0),
+            )
         )
         seq.act("EXEC", # not a great name. This is actually where the register file fetches its contents.
             If(instruction.opcode == opcodes["BRZ"][0],
@@ -1797,6 +1813,12 @@ Here are the currently implemented opcodes for The Engine:
                     NextValue(running, 0),
                 )
             ),
+        )
+        seq.act("PAUSED",
+            If(~pause_req,
+                NextValue(pause_gnt, 0),
+                NextState("FETCH"), # could probably go directly to "EXEC", but, this is a minor detail recovering from pause
+            )
         )
 
         exec_units = {

@@ -70,12 +70,32 @@ fn run(p: &pac::Peripherals) {
                 p.ENGINE.mplen.write(|w| w.bits(code_len));
                 // start the run
                 p.ENGINE.control.write(|w| w.go().set_bit());
+
+                // test pause for suspend/resume
+                let mut pause_cnt = 0;
                 loop {
-                    let status = p.ENGINE.status.read().bits();
-                    report(&p, status);
-                    if (status & 1) == 0 {
-                        break;
+                    if pause_cnt != 50 {
+                        let status = p.ENGINE.status.read().bits();
+                        report(&p, status);
+                        if (status & 1) == 0 {
+                            break;
+                        }
+                    } else {
+                        // on the 50th cycle, do a quick pause/resume test
+                        p.ENGINE.power.write(|w| w.pause_req().set_bit());
+                        while p.ENGINE.status.read().pause_gnt().bit_is_clear() {
+                        }
+                        // read from microcode & rf
+                        report(&p, (*(rf.add(0x4))).read());
+                        report(&p, (*(rf.add(0x0))).read());
+                        report(&p, (*(rf.add(0x8))).read());
+                        report(&p, (*(microcode.add(0x4))).read());
+                        report(&p, (*(microcode.add(0x0))).read());
+                        report(&p, (*(microcode.add(0x8))).read());
+                        // now resume
+                        p.ENGINE.power.write(|w| w.pause_req().clear_bit());
                     }
+                    pause_cnt += 1;
                 }
 
                 // check result
