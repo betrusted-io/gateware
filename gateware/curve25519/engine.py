@@ -222,7 +222,7 @@ class Curve25519Const(Module, AutoDoc):
             1: [1, "one", "The number one"],
             2: [121665, "am24", "The value $\\frac{{A-2}}{{4}}$"],
             3: [0x7FFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFED, "field", f"Binary coding of {prime_string}"],
-            4: [121666, "ap24", "The value $\\frac{{A+2}}{{4}}"],
+            4: [121666, "ap24", "The value $\\frac{{A+2}}{{4}}$"],
         }
         self.adr = Signal(5)
         self.const = Signal(256)
@@ -246,20 +246,20 @@ class ExecUnit(Module, AutoDoc):
         if insert_docs:
             self.intro = ModuleDoc(title="ExecUnit class", body="""
     ExecUnit is the superclass template for execution units.
-    
+
     Configuration Arguments:
       - `opcode_list` is the list of opcodes that an ExecUnit can process
       - `width` is the bit-width of the execution pathway
-    
+
     Signal API for an exec unit:
-      - `a` and `b` are the inputs. 
+      - `a` and `b` are the inputs.
       - `instruction_in` is the instruction corresponding to the currently present `a` and `b` inputs
       - `start` is a single-clock signal which indicates processing should start
       - `q` is the output
-      - `instruction_out` is the instruction for the result present at the `q` output 
+      - `instruction_out` is the instruction for the result present at the `q` output
       - `q_valid` is a single cycle pulse that indicates that the `q` result and `wa_out` value is valid
-      
-      
+
+
             """)
         self.instruction = Record(instruction_layout)
 
@@ -291,7 +291,7 @@ Here is an example of how to swap the contents of `ra` and `rb` based on the val
   XOR  dummy, ra, rb       // dummy $\gets$ ra ^ rb
   MSK  dummy, swap, dummy  // If swap[0] then dummy $\gets$ dummy, else dummy $\gets$ 0
   XOR  ra, dummy, ra       // ra $\gets$ ra ^ dummy
-  XOR  rb, dummy, rb       // rb $\gets$ rb ^ dummy  
+  XOR  rb, dummy, rb       // rb $\gets$ rb ^ dummy
 """)
         self.sync.eng_clk += [
             self.q_valid.eq(self.start),
@@ -305,8 +305,8 @@ class ExecLogic(ExecUnit):
     def __init__(self, width=256):
         ExecUnit.__init__(self, width, ["XOR", "NOT", "PSA", "PSB", "XBT", "SHL"])
         self.intro = ModuleDoc(title="Logic ExecUnit Subclass", body=f"""
-This execution unit implements bit-wise logic operations: XOR, NOT, and 
-passthrough. 
+This execution unit implements bit-wise logic operations: XOR, NOT, and
+passthrough.
 
 * XOR returns the result of A^B
 * NOT returns the result of !A
@@ -353,7 +353,7 @@ Addition of Ra + Rb into Rc in {field_latex}:
 
   ADD Rc, Ra, Rb    // Rc <- Ra + Rb
   TRD Rd, Rc        // Rd <- ReductionValue(Rc)
-  SUB Rc, Rc, Rd    // Rc <- Rc - Rd 
+  SUB Rc, Rc, Rd    // Rc <- Rc - Rd
 
 Negation of Ra into Rc in {field_latex}:
 
@@ -372,9 +372,9 @@ Subtraction of Ra - Rb into Rc in {field_latex}:
   SUB Rb, #FIELDPRIME, Rb   //  Rb <- 2^255-19 - Rb
   ADD Rc, Ra, Rb    // Rc <- Ra + Rb
   TRD Rd, Rc        // Rd <- ReductionValue(Rc)
-  SUB Rc, Rc, Rd    // Rc <- Rc - Rd 
+  SUB Rc, Rc, Rd    // Rc <- Rc - Rd
 
-In all the examples above, Ra and Rb must be members of {field_latex}. 
+In all the examples above, Ra and Rb must be members of {field_latex}.
         """)
 
         self.sync.eng_clk += [
@@ -395,17 +395,17 @@ class ExecTestReduce(ExecUnit, AutoDoc):
 
         self.notes = ModuleDoc(title="Modular Reduction Test ExecUnit Subclass", body=f"""
 First, observe that $2^n-19$ is 0x07FF....FFED.
-Next, observe that arithmetic in the field of {prime_string} will never
+Next, observe that arithmetic in the field of {prime_string} will never set
 the 256th bit.
 
 Modular reduction must happen when an arithmetic operation
 overflows the bounds of the modulus. When this happens, one must
-subtract the modulus (in this case {prime_string}). 
+subtract the modulus (in this case {prime_string}).
 
 The reduce operation is done in two halves. The first half is
 to check if a reduction must happen. The second is to do the subtraction.
 In order to allow for constant-time operation, we always do the subtraction,
-even if it is not strictly necessary. 
+even if it is not strictly necessary.
 
 We use this to our advantage, and compute a reduction using
 a test operator that produces a residue, and a subtraction operation.
@@ -453,11 +453,11 @@ The base algorithm for this implementation is lifted from the paper "Compact and
 of Ed25519 and X25519" by Furkan Turan and Ingrid Verbauwhede (https://doi.org/10.1145/3312742).  The algorithm
 specified in this paper is optimized for the DSP48E blocks found inside a 7-Series Xilinx FPGA. In particular,
 we can compute 17-bit multiplies using this hardware block, and 255 divides evenly into 17 to produce
-a requirement of 15x DSP48E blocks. 
+a requirement of 15x DSP48E blocks.
 
 At a high level, the steps to compute the multiplication are:
 
-1. Schoolbook multiplication 
+1. Schoolbook multiplication
 2. Collapse partial sums
 3. Propagate carries
 4. Is the sum $\geq$ $2^{{255}}-19$?
@@ -474,16 +474,16 @@ we are spending a bunch of cycles propagating zeros most of the time.
 
 A constant-time optimization would be for the multiplier to simply produce a 256-bit
 result, and then use a subsequent TRD/SUB instruction pair. However, the non-pipelined
-version of the engine25519 executes at a rate of 60ns per instruction, or 120ns total to 
-compute the TRD/SUB combination, whereas iterating through the carry propagates 
-would take 140ns total (as the mul core runs 2x clock speed of the rest of the engine). 
-This is basically a wash. 
+version of the engine25519 executes at a rate of 60ns per instruction, or 120ns total to
+compute the TRD/SUB combination, whereas iterating through the carry propagates
+would take 140ns total (as the mul core runs 2x clock speed of the rest of the engine).
+This is basically a wash.
 
-However, if pipelining (and bypassing) were implemented, this might become a viable 
-optimization, but bypassing such a wide core would also have resource and speed 
+However, if pipelining (and bypassing) were implemented, this might become a viable
+optimization, but bypassing such a wide core would also have resource and speed
 implications of its own.
 
-The above steps are coordinated by the `mseq` state machine. Control lines for 
+The above steps are coordinated by the `mseq` state machine. Control lines for
 the DSP48E blocks are grouped into two sets, one controls the global state of
 things such as the operation mode and input modes, and the other controls the
 routing of individual 17-bit limbs (e.g. "digits" of our 17-bit representation of
@@ -497,12 +497,12 @@ Schoolbook Multiplication
 The first step in the algorithm is called "schoolbook multiplication". It's
 almost that, but with a twist. Below is what actual schoolbook multiplication
 would be like, if you had a pair of numbers that were broken into three "limbs" (digits)
-A[2:0] and B[2:0]. 
+A[2:0] and B[2:0].
 
 ::
 
                    |    A2        A1       A0
-    x              |    B2        B1       B0 
+    x              |    B2        B1       B0
    ------------------------------------------
                    | A2*B0     A1*B0    A0*B0
             A2*B1  | A1*B1     A0*B1
@@ -510,7 +510,7 @@ A[2:0] and B[2:0].
      (overflow)         (not overflowing)
 
 The result of schoolbook multiplication is a result that potentially has
-2x the number of limbs than the either multiplicand. 
+2x the number of limbs than the either multiplicand.
 
 Mapping the overflow back into the prime field (e.g. wrapping the overflow around)
 is a process called reduction. It turns out that for
@@ -518,15 +518,15 @@ a prime field like {field_latex}, reduction works out to taking the limbs that
 extend beyond the base number of limbs in the field, shifting them right by the
 number of limbs, multiplying it by 19, and adding it back in; and if the result
 isn't a member of the field, add 19 one last time, and take the result as just
-the bottom 255 bits (ignore any carry overflow). 
+the bottom 255 bits (ignore any carry overflow).
 
 This trick works because the form of the field is $2^{{n}}-p$: it is a power
 of 2, reduced by some small amount $p$. By starting from a power of 2,
 most of the binary numbers representable in an n-bit word are valid members of
-the field. The only ones that are not valid field members are the numbers that are equal 
+the field. The only ones that are not valid field members are the numbers that are equal
 to $2^{{n}}-p$ but less than $2^{{n}}-1$ (the biggest number that fits in n bits).
-To turn these invalid binary numbers into members of the field, you just need 
-to add $p$, and the reduction is complete. 
+To turn these invalid binary numbers into members of the field, you just need
+to add $p$, and the reduction is complete.
 
 .. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/reduction_diagram.png
    :alt: A diagram illustrating modular reduction
@@ -537,22 +537,22 @@ and increment until they roll over. The point at which $\mathbf{{F}}_{{{{2^{{n}}
 rolls over is a distance $p$ from the end of the binary number line: thus, we can
 observe that $2^{{n}}-1$ reduces to $p-1$. Adding 1 results in $2^{{n}}$, which reduces
 to $p$: that is, the top bit, wrapped around, and multiplied
-it by $p$. 
+it by $p$.
 
 As we continue toward the right, the numbers continue to go up and wrap around, and
 for each wrap the distance between the binary wrap point and the $\mathbf{{F}}_{{{{2^{{n}}}}-p}}$
 wrap point increases by a factor of $p$, such that $2^{{n+1}}$ reduces to $2*p$. Thus modular
 reduction of natural binary numbers that are larger than our field $2^{{n}}-p$
-consists of taking the bits that overflow an $n$-bit representation, shifting them to 
-the right by $n$, and multiplying by $p$. 
+consists of taking the bits that overflow an $n$-bit representation, shifting them to
+the right by $n$, and multiplying by $p$.
 
-A more tractable example to compute than {field_latex} is the field $\mathbf{{F}}_{{{{2^{{6}}}}-5}} = 59$. 
+A more tractable example to compute than {field_latex} is the field $\mathbf{{F}}_{{{{2^{{6}}}}-5}} = 59$.
 The members of the field are from 0-58, and reduction is done by taking any number modulo 59. Thus,
-the number 59 reduces to 0; 60 reduces to 1; 61 reduces to 2, and so forth, until we get to 64, which 
-reduces to 5 -- the value of the overflowed bits (1) times $p$. 
+the number 59 reduces to 0; 60 reduces to 1; 61 reduces to 2, and so forth, until we get to 64, which
+reduces to 5 -- the value of the overflowed bits (1) times $p$.
 
-Let's look at some more examples. First, recall that the biggest member of the 
-field, 58, in binary is 0b00_11_1010. 
+Let's look at some more examples. First, recall that the biggest member of the
+field, 58, in binary is 0b00_11_1010.
 
 Let's consider a simple case where we are presented a partial sum that overflows
 the field by one bit, say, the number 0b01_11_0000, which is decimal 112. In this case, we take
@@ -569,28 +569,28 @@ by yet another bit, say, the number 0b11_11_0000. Let's try the math again:
      ^ move to the right and multiply by 0b101: 0b101 * 0b11 = 0b1111
   0b00_11_0000 + 0b1111 = 0b00_11_1111
 
-This result is still not a member of the field, as the maximum value is 0b0011_1010. 
+This result is still not a member of the field, as the maximum value is 0b0011_1010.
 In this case, we need to add the number 5 once again to resolve this "special-case"
 overflow where we have a binary number that fits in $n$ bits but is in that sliver
 between $2^{{n}}-p$ and $2^{{n}}-1$:
-  
+
   0b00_11_1111 + 0b101 = 0b01_00_0100
 
-At this step, we can discard the MSB overflow, and the result is 0b0100 = 4; 
+At this step, we can discard the MSB overflow, and the result is 0b0100 = 4;
 and we can check with a calculator that 240 % 59 = 4.
 
-Therefore, when doing schoolbook multiplication, the partial products that start to 
+Therefore, when doing schoolbook multiplication, the partial products that start to
 overflow to the left can be brought back around to the right hand side, after
 multiplying by $p$, in this case, the number 19. This magical property is one
 of the reasons why {field_latex} is quite amenable to math on binary machines.
 
 Let's use this finding to rewrite the straight schoolbook
-multiplication form from above, but now with the modular reduction applied to 
+multiplication form from above, but now with the modular reduction applied to
 the partial sums, so it all wraps around into this compact form:
 ::
 
                    |    A2        A1       A0
-    x              |    B2        B1       B0 
+    x              |    B2        B1       B0
    ------------------------------------------
                    | A2*B0     A1*B0    A0*B0
                    | A1*B1     A0*B1 19*A2*B1
@@ -601,11 +601,11 @@ the partial sums, so it all wraps around into this compact form:
 As discussed above, each overflowed limb is wrapped around and multiplied by 19,
 creating a number of partial sums S[2:0] that now has as many terms as
 there are limbs, but with each partial sum still potentially
-overflowing the native width of the limb. Thus, the inputs to a limb are 17 bits wide, 
-but we retain precision up to 48 bits during the partial sum stage, and then do a 
+overflowing the native width of the limb. Thus, the inputs to a limb are 17 bits wide,
+but we retain precision up to 48 bits during the partial sum stage, and then do a
 subsequent condensation of partial sums to reduce things back down to 17 bits again.
 The condensation is done in the next three steps, "collapse partial sums", "propagate carries",
-and finally "normalize". 
+and finally "normalize".
 
 However, before moving on to those sections, there is an additional trick we need
 to apply for an efficient implementation of this multiplication step in hardware.
@@ -616,7 +616,7 @@ constant along the diagonals. Thus we can avoid re-loading the "A" values every
 cycle by shifting the partial sums diagonally through the computation, allowing
 the "A" values to be loaded as "A" and "A*19" into holding register once before
 the computations starts, and selecting between the two options based on the step
-number during the computation. 
+number during the computation.
 
 .. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/mapping.png
    :alt: Mapping schoolbook multiply onto the hardware array to minimize data movement
@@ -627,7 +627,7 @@ partial sums that would extend to the left have been multiplied by 19 and wrappe
 Each colored block corresponds to a given DSP48E1 block. The red arrow
 illustrates the path of a partial sum in both the schoolbook form and the unwrapped
 form for hardware implementation. In the bottom diagram, one can clearly see that
-the Ax coefficients are constant for each column, and that for each row, the Bx 
+the Ax coefficients are constant for each column, and that for each row, the Bx
 values are identical across all blocks in each step. Thus each column corresponds to
 a single DSP48E1 block. We take advantage of the ability of the DSP48E1 block to
 hold two selectable A values to pre-load Ax and Ax*19 before the computation starts, and
@@ -638,7 +638,7 @@ result is one cycle shifted from the canonical mapping.
 We have a one-cycle structural pipeline delay going from this step to the next one, so
 we use this pipeline delay to do a shift with no add by setting the `opmode` from `C+M` to
 `C+0` (in other words, instead of adding to the current multiplication output for the last
-step, we squash that input and set it to 0). 
+step, we squash that input and set it to 0).
 
 The fact that we pipeline the data also gives us an opportunity to pick up the upper limb
 of the partial sum collapse "for free" by copying it into the "D" register of the DSP48E1
@@ -648,13 +648,13 @@ In C, the code basically looks like this:
 
 .. code-block:: c
 
-   // initialize the a_bar set of data                                                                                                                                                                                                        
+   // initialize the a_bar set of data
    for( int i = 0; i < DSP17_ARRAY_LEN; i++ ) {{
       a_bar_dsp[i] = a_dsp[i] * 19;
    }}
    operand p;
-   for( int i = 0; i < DSP17_ARRAY_LEN; i++ ) {{ 
-      p[i] = 0; 
+   for( int i = 0; i < DSP17_ARRAY_LEN; i++ ) {{
+      p[i] = 0;
    }}
 
    // core multiply
@@ -674,12 +674,12 @@ Collapse Partial Sums
 ---------------------
 
 The potential width of the partial sum is up to 43 bits wide (according to
-the paper cited above; the native partial sum precision of the DSP48E1 is 48 bits). 
+the paper cited above; the native partial sum precision of the DSP48E1 is 48 bits).
 This step divides the partial sums up into 17-bit words, and then shifts the higher
-to the next limbs over, allowing them to collapse into a smaller sum that 
+to the next limbs over, allowing them to collapse into a smaller sum that
 overflows less.
 
-:: 
+::
 
    ... P2[16:0]   P1[16:0]      P0[16:0]
    ... P1[33:17]  P0[33:17]     P14[33:17]*19
@@ -689,7 +689,7 @@ Again, the magic number 19 shows up to allow sums which "wrapped around"
 to add back in. Note that in the timing diagram below, we refer to the
 mid- and upper- words of the shifted partial sums as "Q" and "R" respectively,
 because the timing diagram lacks the width within a data bubble to
-write out the full notation: so `Q0,1` is P14[33:17] and `R0,2` is P13[50:34] for P0[16:0]. 
+write out the full notation: so `Q0,1` is P14[33:17] and `R0,2` is P13[50:34] for P0[16:0].
 
 This is what the C code equivalent looks like for this operation.
 
@@ -732,10 +732,10 @@ Normalize
 ---------
 
 We're almost here, except that $0 \leq result \leq 2^{{256}}-1$, which is slightly
-larger than the range of {field_latex}. 
+larger than the range of {field_latex}.
 
 Thus we need to check if number is somewhere in between 0x7ff....ffed and
-0x7ff....ffff, or if the 256th bit will be set. In these cases, we need to add 19 to 
+0x7ff....ffff, or if the 256th bit will be set. In these cases, we need to add 19 to
 the result, so that the result is a member of the field $2^{{255}}-19$ (the 256th bit
 is dropped automatically when concatenating the fifteen 17-bit limbs together).
 
@@ -745,15 +745,15 @@ detect" (PD) feature of the DSP48E1 to check for all "1's" in bit positions 255-
 single LUT to compare the final 5 bits to check for numbers between {prime_string} and
 $2^{{255}}-1$. We then OR this result with the 256th bit.
 
-If the result falls within this special "overflow" case, we add the number 19, otherwise, 
+If the result falls within this special "overflow" case, we add the number 19, otherwise,
 we add 0. Note that this add-by-19-or-0 step is implemented by pre-loading the number 19 into the A:B
 pipeline registers of the DSP4E1 block during the "propagate" stage. Selection of
 whether to add 19 or 0 relies on the fact that the DSP48E1 block has an input multiplexer
 to its internal adder that can pick data from multiple sources, including the ability to
 pick no source by loading the number 0. Thus the operation mode of the DSP48E1 is adjusted
-to either pull an input from A:B (that is, the number 19) or the number 0, based on the 
+to either pull an input from A:B (that is, the number 19) or the number 0, based on the
 result of the overflow computation. Thus the PD feature is important in preventing this
-step from being rate-limiting. With the PD feature we only have to check an effective 16 
+step from being rate-limiting. With the PD feature we only have to check an effective 16
 intermediate results, instead of 256 raw bits, and then drive set the operation mode of
 the ALU.
 
@@ -768,16 +768,16 @@ Once the second carry propagate is finished, we have the final result.
 Potential corner case
 ---------------------
 
-There is a potential corner case where if the carry-propagated result going into 
+There is a potential corner case where if the carry-propagated result going into
 "normalize" is between
 
   0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFDA and
   0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFEC
 
-In this case, the top bit would be wrapped around, multiplied by 19, and added to 
+In this case, the top bit would be wrapped around, multiplied by 19, and added to
 the LSB, but the result would not be a member of $2^{{255}}-19$ (it would be one
 of the 19 numbers just short of $2^{{255}}-1$), and the multiplier would pass it
-on as if it were a valid result. 
+on as if it were a valid result.
 
 In some cases, this isn't even a problem, because if the subsequent result goes through
 any operation that includes a "TRD" instruction, it should reduce the number
@@ -787,14 +787,14 @@ However, I do not think this corner case is possible, because the overflow path 
 high bit is from the top limb going from 0x1_FFFF -> 0x2_0000 (that is, 0x7FFFC -> 0x80000
 when written MSB-aligned) due to a carry coming in from the lower limb, and
 it would require the carry to be very large, not just +1 as shown in the simple
-rollover case, but a value from 0x1_FFED-0x1_FFDB.  
+rollover case, but a value from 0x1_FFED-0x1_FFDB.
 
-I don't have a formal mathematical proof of this, but I strongly suspect that 
+I don't have a formal mathematical proof of this, but I strongly suspect that
 carry values going into the top limb cannot approach these large numbers, and therefore
 it is not possible to hit this corner case.
 
 In the case that it _could_ be hit, the fix would be to add an additional
-detection stage to handle the case that the result is not normalized, and 
+detection stage to handle the case that the result is not normalized, and
 to add 19 to the final sum. This can be accelerated to a single cycle by also
 adding 1 into the partial products, short-circuiting the carry propagate because
 this should be the only special case we're trying to check for (we should definitely
@@ -807,7 +807,7 @@ Maybe this is a more solid reasoning why this corner case can't happen:
 
 The biggest value of a partial sum is 0x53_FFAC_0015 (0x1_FFFF * 0x1_FFFF * 15).
 This means the biggest value of the third overflowed 17-bit limb is 0x14. Therefore
-the biggest value resulting from the "collapse partial sums" stage is 
+the biggest value resulting from the "collapse partial sums" stage is
 0x1_FFFF + 0x1_FFFF + 0x14 = 0x4_0012. Thus the largest carry term that has
 to propagate is 0x4_0012 >> 17 = 2. 2 is much smaller than the amount required
 to trigger this condition, that is, a value in the range of 0x1_FFED-0x1_FFDB.
@@ -874,7 +874,7 @@ Signal descriptions:
 * `step` is a counter used by `mseq` to control how many iterations to run in a given state
 * `prop` is a counter used to count which iteration of the carry propagate we're on
 * `dsp.a`-`dsp.d` is the `a-d` inputs to the DSP48E1 blocks
-* `A1_CE` is the enable to the A1 pipe register. Note that we configure 2x pipeline registers on the A input. 
+* `A1_CE` is the enable to the A1 pipe register. Note that we configure 2x pipeline registers on the A input.
 * `A1` is a pipe register internal to the DSP48E1 block
 * `A2_CE` is the enable to the A2 pipe register
 * `A2` is a pipe register internal to the DSP48E1 block
@@ -884,7 +884,7 @@ Signal descriptions:
 * `D_CE` is the enable to the D pipe register. There is only one possible D register in the DSP48E1
 * `D` is a pipe register internal to the DSP48E1 block that feeds the pre-adder
 * `inmode` configures the input mode to the DSP48E1 ALU blocks. It is not pipelined and allows us to re-route data from A, B, C, and D to various ALU internals.
-* `opmode` configures what computation to perform by the DSP48E1 ALU on the current cycle. It is not pipelined. 
+* `opmode` configures what computation to perform by the DSP48E1 ALU on the current cycle. It is not pipelined.
 * `P_CE` is the enable for the output product register.
 * `P` is the output product register presented by the DSP48E1 ALU.
 * `overflow` is the overflow detection output from the DSP48E1 ALU. Its result timing is synchronous with the `P` register.
@@ -892,7 +892,7 @@ Signal descriptions:
 
 .. wavedrom::
   :caption: Detailed timing of the multiply operation
-  
+
   { "config": {skin : "default"},
   "signal" : [
   { "name": "clk",         "wave": "p......|.........|.......|....." },
@@ -924,9 +924,9 @@ Signal descriptions:
   { "name": "overflow",    "wave": "x...................2x.........", "data":["Y/N"]},
   { "name": "done",        "wave": "0...........................10." },
   ]}
-  
+
 Notes:
-   
+
 1. the final product sum on the first DLY cycle is just a shift to get the
   product results into the right unit. Thus, for the load of `dsp.d` `*Q0,1`, it needs
   to pick the result off of the neighboring DSP unit, because it needs to acquire the value
@@ -935,14 +935,14 @@ Notes:
    sometimes with the 19 added to the least significant limb, in the case that the result is greater than
    or equal to $2^{{255}}-19$. This addition must be propagated through the whole result.
 3. The "done" state is slightly more complicated than illustrated here. Because the multiplier runs at
-   twice the speed of the sequencing engine (two `mul_clk` per `eng_clk`), "done" actually spans between 
-   2 and 3 states. In the case that the computation finishes in-phase with the slower engine clock, we assert 
-   "done" for two cycles. In the case that we finish out of phase, have to wait a half `eng_clk` cycle 
-   (one state in `mul_clk`) before asserting the done pulse for two `mul_clk` cycles (thus 3 total cycles). 
+   twice the speed of the sequencing engine (two `mul_clk` per `eng_clk`), "done" actually spans between
+   2 and 3 states. In the case that the computation finishes in-phase with the slower engine clock, we assert
+   "done" for two cycles. In the case that we finish out of phase, have to wait a half `eng_clk` cycle
+   (one state in `mul_clk`) before asserting the done pulse for two `mul_clk` cycles (thus 3 total cycles).
    The computation is fixed-time, so the determination of how many wait states is done at the design stage and
-   hard-coded. However, anytime the algorithm is adjusted, the designer needs to re-check the number of 
+   hard-coded. However, anytime the algorithm is adjusted, the designer needs to re-check the number of
    cycles it took and pick the correct "done" sequencing.
-  
+
           """)
 
         self.diagrams = ModuleDoc(title="Dataflow Diagrams", body="""
@@ -971,26 +971,26 @@ but if you're just getting started here's a few breadcrumbs to help you steer ar
 
 .. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/mpy_pipe3.png
    :alt: data flow block diagram of the multiplier core
-      
+
 Above is the relevant elements of the DSP48E1 block as configured for the systolic dataflow for the "schoolbook"
 multiply operation. Items shaded in gray are external to the DSP48E1 block.
-  
+
 .. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/psum3.png
    :alt: data flow block diagram of the partial sum step
-      
+
 Above is the configuration of the DSP48E1 block for the partial sum steps. Partial sum takes two cycles to
 sum together the three 17-bit segments of the partial sums.
-  
+
 .. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/carry_prop3.png
    :alt: data flow block diagram of the carry propagate
 
 Above is the configuration of the DSP48E1 block for the carry propagate step. This step must be repeated 
 14 times to handle the worst-case carry propagate path. During the carry propagate step, the pattern
 detector is active, and on the final step we check it to see if the result overflows $2^{{255}}-19$.
-  
+
 .. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/normalize4.png
    :alt: data flow block diagram of the normalization step
-  
+
 Above is the configuration of the DSP48E1 block for the normalization step. If the result overflows $2^{{255}}-19$,
 we must add 19 to make it a member of the prime field once again. We can do this in a single cycle by
 short-circuiting the carry propagate: we already know we will have to propagate a carry to handle the overflow
@@ -1167,14 +1167,33 @@ carries that have already been propagated. If we fail to do this, then we re-pro
             )
         ]
 
+        # reduce width of DSP's INMODE combinational path using a sub machine that reduces
+        # the complexity of the `mseq` machine and allows for a pipeline stage to be inserted...
+        INMODE_IDLE = 0
+        INMODE_MPY = 1
+        INMODE_PROP1 = 2
+        INMODE_PROP2 = 3
+        inmode_sel = Signal(2)
+        self.sync.mul_clk += [
+            If(mseq.ongoing("IDLE") | mseq.ongoing("SETUP_A"),
+                inmode_sel.eq(INMODE_IDLE)
+            ).Elif(mseq.ongoing("MULTIPLY"),
+                inmode_sel.eq(INMODE_MPY),
+            ).Elif(mseq.ongoing("P_DELAY") | mseq.ongoing("PSUM_LSB"),
+                inmode_sel.eq(INMODE_PROP1)
+            ).Else(
+                inmode_sel.eq(INMODE_PROP2)
+            )
+        ]
+
         for i in range(15):
             # INMODE is a critical path, so rewrite code not in computation order but in signal use order to better
             # understand how to optimize it.
             self.comb += [
-                If(mseq.ongoing("SETUP_A"),
+                If(inmode_sel == INMODE_IDLE,
                     getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_A1, INMODE_B2)),
                 ),
-                If(mseq.ongoing("MULTIPLY"),
+                If(inmode_sel == INMODE_MPY,
                     If(step == 0,
                         getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_A1, INMODE_B2)),
                         # A1 has Axx on the first step only
@@ -1185,13 +1204,10 @@ carries that have already been propagated. If we fail to do this, then we re-pro
                         # A2 has Axx for rest of steps
                     )
                 ),
-                If(mseq.ongoing("PSUM_LSB"),
+                If(inmode_sel == INMODE_PROP1,
                     getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_D, INMODE_B2)),
                 ),
-                If(mseq.ongoing("PSUM_MSB"),
-                    getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_D, INMODE_B2)),
-                ),
-                If(mseq.ongoing("NORMALIZE"),
+                If(inmode_sel == INMODE_PROP2,
                     getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_0, INMODE_B2)),
                 )
             ]
