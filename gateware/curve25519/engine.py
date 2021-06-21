@@ -50,9 +50,9 @@ to ensure a compact and performant implementation.
 The core primitive is the RAMB36E1. This can be configured as a 64/72-bit wide memory
 but only if used in "SDP" (simple dual port) mode. In SDP, you have one read, one write port.
 However, the register file needs to produce two operands per cycle, while accepting up to
-one operand per cycle. 
+one operand per cycle.
 
-In order to do this, we stipulate that the RF runs at `rf_clk` (200MHz), but uses four phases 
+In order to do this, we stipulate that the RF runs at `rf_clk` (200MHz), but uses four phases
 to produce/consume data. "Engine clock" `eng_clk` (50MHz) runs at a lower rate to accommodate
 large-width arithmetic in a single cycle.
 
@@ -66,14 +66,14 @@ Phase 2:
   - write data
 Phase 3:
   - quite cycle, used to create extra setup time for next stage (requires multicycle-path constraints)
-  
+
 The writing of data is done in the second phase means that write happen to the same address
 as being read, you get the old value. For pipelined operation, it could be desirable to shift
 the write to happen before the reads, but as of now the implementation is not pipelined.
 
 The register file is unavailable for {} `eng_clk` cycles after reset.
 
-When configured as a 64 bit memory, the depth of the block is 512 bits, corresponding to 
+When configured as a 64 bit memory, the depth of the block is 512 bits, corresponding to
 an address width of 9 bits.
 
         """.format(reset_cycles))
@@ -958,15 +958,15 @@ but if you're just getting started here's a few breadcrumbs to help you steer ar
 1. The block contains a pre-adder, multiplier, and "ALU".
 2. It has four major inputs, A, B, C, and D. A/B are typically multiplier inputs, C is mostly intended for carry propagation and shuttling partial sums, and D is a pre-adder input. Thus a common form of computation is P = (A+D)*B + C.
 3. Almost any input can be zero'd out, and so if you wanted to compute just A*B, what is actually computed is (A+D)*B + C but with the C and D values zero'd out. This is controlled by combinations of `inmode` and `opmode`.
-4. Inputs A-D and output P can all be registered, and for this implementation we put two registers on A, one register on B, zero registers on C, one register on D, and one register on P. 
-5. Inputs A and B can have two pipeline registers. While the datasheet makes it look like you could be able to selectively write from the DSP48E1 input to either A1/A2 or B1/B2, in fact, you can't. 
-  A2 can only get a value from A1 (thus setting A2 necessitates overwriting the value in A1). However, you can gate the A2's enable, so it can hold a value indefinitely, and the multiplier can route an input from either A1 or A2. We use this to our advantage and load `dsp.a` into the A2 register, and `dsp.a*19` into the A1 register, and then use the `inmode` configuration to switch between these two inputs based on which partial sum we're computing at the moment. 
-  I think normally this feature is used to implement pipelining and pipeline bypassing in other applications, and we are slightly abusing it here to our advantage.  
+4. Inputs A-D and output P can all be registered, and for this implementation we put two registers on A, one register on B, zero registers on C, one register on D, and one register on P.
+5. Inputs A and B can have two pipeline registers. While the datasheet makes it look like you could be able to selectively write from the DSP48E1 input to either A1/A2 or B1/B2, in fact, you can't.
+  A2 can only get a value from A1 (thus setting A2 necessitates overwriting the value in A1). However, you can gate the A2's enable, so it can hold a value indefinitely, and the multiplier can route an input from either A1 or A2. We use this to our advantage and load `dsp.a` into the A2 register, and `dsp.a*19` into the A1 register, and then use the `inmode` configuration to switch between these two inputs based on which partial sum we're computing at the moment.
+  I think normally this feature is used to implement pipelining and pipeline bypassing in other applications, and we are slightly abusing it here to our advantage.
 6. Because we configured C to have no input register, it can be used for cycle-to-cycle feedback of partial sums.
   Introducing an input register here (per DRC recco spit out by Vivado) could speed up the clock rate but it also introduces a single-cycle stall every time we have to do a partial sum feedback, which is a greater performance impact for our implementation.
-7. The "ALU" part of the DSP48E1 is used as the partial sum adder in our implementation (but it can also do logic operations and other fun things that we don't need). It actually adds four numbers: P <- X + Y + Z + Carry bit.  
+7. The "ALU" part of the DSP48E1 is used as the partial sum adder in our implementation (but it can also do logic operations and other fun things that we don't need). It actually adds four numbers: P <- X + Y + Z + Carry bit.
   We don't use the carry "bit" as it is only one-bit wide and we are propagating several bits of carry at once, so it is hard-wired to 0. X/Y/Z are up to 48 bits wide, and allows us to add combinations of the multiplier output, a concatenation of A:B (A as MSB, B as LSB), C, P, the number 0, and a couple other source options we don't use in this implementation. This is controlled by `opmode`.
-8. In parallel to the "ALU" is a pattern detector. The pattern being detected is hard-coded into the bitstream, and in this case we are looking for a run of `1`'s to help accelerate the overflow detection problem. The output of the pattern detector is always being computed, and dataflow-synchronous to the P output.  
+8. In parallel to the "ALU" is a pattern detector. The pattern being detected is hard-coded into the bitstream, and in this case we are looking for a run of `1`'s to help accelerate the overflow detection problem. The output of the pattern detector is always being computed, and dataflow-synchronous to the P output.
 9. Unused bits of verilog instances in Migen need to be tied to 0; Migen does not automatically extend/pad shorter `Signal` values to match verilog input widths. This is important because the DSP48E1 input widths don't always exactly match the Migen widths. We create a "zeros" signal and `Cat()` it onto the MSBs as necessary to ensure all inputs to the DSP48E1 are properly specified.
 
 .. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/mpy_pipe3.png
@@ -984,7 +984,7 @@ sum together the three 17-bit segments of the partial sums.
 .. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/carry_prop3.png
    :alt: data flow block diagram of the carry propagate
 
-Above is the configuration of the DSP48E1 block for the carry propagate step. This step must be repeated 
+Above is the configuration of the DSP48E1 block for the carry propagate step. This step must be repeated
 14 times to handle the worst-case carry propagate path. During the carry propagate step, the pattern
 detector is active, and on the final step we check it to see if the result overflows $2^{{255}}-19$.
 
@@ -1421,12 +1421,12 @@ class Engine(Module, AutoCSR, AutoDoc):
 
         self.intro = ModuleDoc(title="Curve25519 Engine", body="""
 The Curve25519 engine is a microcoded hardware accelerator for Curve25519 operations.
-The Engine loosely resembles a Harvard architecture microcoded CPU, with a single 
+The Engine loosely resembles a Harvard architecture microcoded CPU, with a single
 512-entry, 256-bit wide 2R1W windowed-register file, a handful of execution units, and a "mailbox"
-unit (like a load/store, but transactional to wishbone). The Engine's microcode is 
+unit (like a load/store, but transactional to wishbone). The Engine's microcode is
 contained in a 1k-entry, 32-bit wide microcode block. Microcode procedures are written to
-the block, and execution will start from the `mpstart` offset when the `go` bit is set.  
-Execution will stop after either one of two conditions are met: either a `FIN` instruction 
+the block, and execution will start from the `mpstart` offset when the `go` bit is set.
+Execution will stop after either one of two conditions are met: either a `FIN` instruction
 is executed, or the microcode program counter (mpc) goes past the stop threshold, computed
 as `mpstart` + `mplen`.
 
@@ -1436,7 +1436,7 @@ as point doubling and point addition, are codable using no more than 32 intermed
 registers. The same microcode can be used, then, to serve point operations to up to
 16 different clients, selectable by setting the appropriate window. Note that the register
 file will stripe across four 4kiB pages, which means that memory protection can be
-enforced at page-level boundaries by hardware (with the help of the OS) for up to four 
+enforced at page-level boundaries by hardware (with the help of the OS) for up to four
 separate clients, each getting four register windows.
 
 Every register read can be overridden from a constant ROM, by asserting `ca` or `cb` for
@@ -1447,12 +1447,12 @@ in the hardware for quick retrieval.
 
 .. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/block_diagram.png
    :alt: High-level block diagram of the Curev25519 engine
-   
+
 Above is a high-level block diagram of the Curve25519 engine. Four clocks are present
 in this microarchitecture, and they are phase-aligned thanks to the 7-Series MMCM
-and low-skew global clock network. `eng_clk` is 50MHz, `mul_clk` is 100MHz, and 
+and low-skew global clock network. `eng_clk` is 50MHz, `mul_clk` is 100MHz, and
 `rf_clk` is 200MHz. The slowest 50MHz `eng_clk` clock controls the `seq` state machine, whose
-state names are listed on the left. A 50MHz base clock is chosen because this allows a 
+state names are listed on the left. A 50MHz base clock is chosen because this allows a
 single-cycle 256-bit add/sub using hardware carry chains in the Spartan7 -1L speed grade,
 greatly simplifying most of the arithmetic blocks. Faster clocks are used to pump the microcode
 RAM (100MHz) and register file (200MHz), so that we are wasting less time fetching instructions
@@ -1471,28 +1471,28 @@ to the execution units.
 Note that execution units can take an arbitrary amount of time to complete. Most will complete
 in one cycle, but for example, the multiplier takes 52 cycles @ 100MHz, or 26 `eng_clk` cycles.
 The current implementation does not allow pipelined operation; registered stages are provided
-to break combinational paths and bring up the base clock rate, but every instruction must go through 
-the entire FETCH-EXEC-WAIT_DONE cycle before the next one can issue. 
+to break combinational paths and bring up the base clock rate, but every instruction must go through
+the entire FETCH-EXEC-WAIT_DONE cycle before the next one can issue.
 
-The design is partially outfitted with registers to facilitate pipelining in the future, but 
-the current simplified implementation is expected to provide adequate speedup. It's 
-probably not worth the additional resources to do e.g. pipeline bypassing and hazard checking, 
-as the target FPGA design is nearly at capacity.  
+The design is partially outfitted with registers to facilitate pipelining in the future, but
+the current simplified implementation is expected to provide adequate speedup. It's
+probably not worth the additional resources to do e.g. pipeline bypassing and hazard checking,
+as the target FPGA design is nearly at capacity.
 
 A conservative implementation (no optimization of intermediate values, immediate reduction of
 every add/sub operation) of Montgomery scalar multiplication using Engine25519
-completes one scalar multiply operation in 2.270ms, compared to 103ms in software. 
+completes one scalar multiply operation in 2.270ms, compared to 103ms in software.
 This does not include the time required to do the final affine inversion (done in software,
 with significant overhead -- about 100ms), or the time to load the microcode and operands (about 5us).
-The affine inversion can also be microcoded, it just hasn't been done yet. 
+The affine inversion can also be microcoded, it just hasn't been done yet.
 
 The Engine address space is divided up as follows (expressed as offset from base)::
 
  0x0_0000 - 0x0_0fff: microcode (one 4k byte page)
  0x1_0000 - 0x1_3fff: memory-mapped register file (4 x 4k pages = 16kbytes)
- 
+
 Here are the currently implemented opcodes for The Engine:
-{}  
+{}
         """.format(opdoc))
 
         microcode_width = 32
