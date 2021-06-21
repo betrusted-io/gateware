@@ -283,7 +283,7 @@ module chacha_core(
                 state_reg[i] <= state_new[i];
             end
 
-          if (update_output)
+          if (update_output || force_round)
             data_out_reg <= data_out_new;
 
           if (data_out_valid_we)
