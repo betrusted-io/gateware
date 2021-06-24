@@ -1521,6 +1521,9 @@ Here are the currently implemented opcodes for The Engine:
         self.control = CSRStorage(fields=[
             CSRField("go", size=1, pulse=True, description="Writing to this puts the engine in `run` mode, and it will execute mplen microcode instructions starting at mpstart"),
         ])
+        self.mpresume = CSRStatus(fields=[
+            CSRField("mpresume", size=log2_int(microcode_depth), description="Where to resume execution after a pause")
+        ])
         self.power = CSRStorage(fields=[
             CSRField("on", size=1, reset=0,
                 description="Writing `1` turns on the clocks to this block, `0` stops the clocks (for power savings). The handling of the clock gate is in a different module, this is just a flag to that block."),
@@ -1763,7 +1766,11 @@ Here are the currently implemented opcodes for The Engine:
         seq.act("IDLE",
             NextValue(pause_gnt, 0),
             If(engine_go,
-                NextValue(mpc, self.mpstart.fields.mpstart),
+                If(pause_req,
+                    NextValue(mpc, self.mpresume.fields.mpresume)
+                ).Else(
+                    NextValue(mpc, self.mpstart.fields.mpstart)
+                ),
                 NextValue(mpc_stop, self.mpstart.fields.mpstart + self.mplen.fields.mplen - 1),
                 NextValue(window_latch, self.window.fields.window),
                 NextValue(running, 1),
