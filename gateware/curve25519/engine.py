@@ -1746,7 +1746,7 @@ Here are the currently implemented opcodes for The Engine:
         # primitive on its own will take about as much time as a couple instructions on The Engine.
         engine_go = Signal()
         go_stretch = Signal(2)
-        self.sync += [
+        self.sync += [ # note that we will miss this if the system throttles our clocks when this pulse arrives
             If(self.control.fields.go,
                 go_stretch.eq(2)
             ).Else(
