@@ -191,7 +191,7 @@ an address width of 9 bits.
                 o_DO = rf_dat[word*64 : word*64 + 64],
                 i_RDEN = self.running, # reduce power when not running
                 i_WREN = wren_pipe, # (phase == 2) & self.we, but pipelined one stage
-                i_RST = eng_sync,
+                i_RST = ResetSignal("rf_clk"),
                 i_WE = wd_bwe_pipe[word*8 : word*8 + 8],
 
                 i_REGCE = 1, # should be ignored, but added to quiet down simulation warnings
@@ -1506,8 +1506,6 @@ Here are the currently implemented opcodes for The Engine:
         rf_depth_raw = 512
         rf_width_raw = 256
         self.submodules.rf = rf = RegisterFile(depth=rf_depth_raw, width=rf_width_raw)
-        self.specials += MultiReg(ResetSignal("eng_clk"), rf.clear, "eng_clk") # sync up the register file's fast clock to our slow clock
-
         self.window = CSRStorage(fields=[
             CSRField("window", size=log2_int(rf_depth_raw) - log2_int(num_registers), description="Selects the current register window to use"),
         ])
@@ -1524,13 +1522,40 @@ Here are the currently implemented opcodes for The Engine:
         self.mpresume = CSRStatus(fields=[
             CSRField("mpresume", size=log2_int(microcode_depth), description="Where to resume execution after a pause")
         ])
+
         self.power = CSRStorage(fields=[
             CSRField("on", size=1, reset=0,
                 description="Writing `1` turns on the clocks to this block, `0` stops the clocks (for power savings). The handling of the clock gate is in a different module, this is just a flag to that block."),
             CSRField("pause_req", size=1, description="Writing a `1` to this block will pause execution at the next micro-op, and allow for read-out of data from RF/microcode. Must check pause_gnt to confirm the pause has happened. Used to interrupt flow for suspend/resume."),
         ])
+        # bring pause into the eng_clk domain
         pause_req = Signal()
         self.sync.eng_clk += pause_req.eq(self.power.fields.pause_req)
+        # re-sync the eng_clk phase to the RF phase whenever clocks are re-applied. We don't guarantee that the clocks start exactly
+        # at the same time, so you can get phase shift...
+        power_on_delay = Signal(max=16, reset=15)
+        eng_powered_on = Signal()
+        self.sync += [ # stretch out any power on pulse so we can process a reset in the clk50 domain after its enable has been switched on
+            If(~self.power.fields.on,
+                power_on_delay.eq(15)
+            ).Elif(power_on_delay > 0,
+                power_on_delay.eq(power_on_delay - 1)
+            ).Else(
+                power_on_delay.eq(0)
+            ),
+            eng_powered_on.eq(power_on_delay == 0), # make a signal that specifies that the engine is powered on that happens 16 cycles after the clocks are turned on
+            # note that this signal drops only *after* the power has been toggled, because when the clock is cut,
+            # the downstream "eng_clk" domain signals won't capture the latest state. So, once the power comes on,
+            # eng_powered_on must drop for a few cycles, then come back up again, which properly triggers a synchronization of the RF.
+        ]
+        eng_on_50 = Signal()
+        eng_on_50_r = Signal()
+        self.specials += MultiReg(eng_powered_on, eng_on_50, "eng_clk")
+        self.sync.eng_clk += eng_on_50_r.eq(eng_on_50)
+        rf_reset_clear = Signal()
+        self.specials += MultiReg(ResetSignal("eng_clk"), rf_reset_clear, "eng_clk") # sync up the register file's fast clock to our slow clock
+        self.comb += rf.clear.eq(rf_reset_clear | (eng_on_50 & ~eng_on_50_r))
+
         self.status = CSRStatus(fields=[
             CSRField("running", size=1, description="When set, the microcode engine is running. All wishbone access to RF and microcode memory areas will stall until this bit is clear"),
             CSRField("mpc", size=log2_int(microcode_depth), description="Current location of the microcode program counter. Mostly for debug."),
