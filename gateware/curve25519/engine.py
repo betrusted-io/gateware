@@ -223,6 +223,11 @@ class Curve25519Const(Module, AutoDoc):
             2: [121665, "am24", "The value $\\frac{{A-2}}{{4}}$"],
             3: [0x7FFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFED, "field", f"Binary coding of {prime_string}"],
             4: [121666, "ap24", "The value $\\frac{{A+2}}{{4}}$"],
+            5: [5, "five", "The number 5 (for pow22501)"],
+            6: [10, "ten", "The number 10 (for pow22501)"],
+            7: [20, "twenty", "The number 20 (for pow22501)"],
+            8: [50, "fifty", "The number 50 (for pow22501)"],
+            9: [100, "one hundred", "The number 100 (for pow22501)"],
         }
         self.adr = Signal(5)
         self.const = Signal(256)
