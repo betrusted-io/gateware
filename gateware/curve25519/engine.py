@@ -21,7 +21,7 @@ opcodes = {  # mnemonic : [bit coding, docstring]
     "SUB" : [6, "Wd $\gets$ Ra - Rb  // 256-bit binary subtraction, this is not the same as a subtraction in the finite field"],
     "MUL" : [7, f"Wd $\gets$ Ra * Rb  // multiplication in {field_latex} - result is reduced"],
     "TRD" : [8, "If Ra $\geqq 2^{{255}}-19$ then Wd $\gets$ $2^{{255}}-19$, else Wd $\gets$ 0  // Test reduce"],
-    "BRZ" : [9, "If Ra == 0 then mpc[9:0] $\gets$ mpc[9:0] + immediate[9:0], else mpc $\gets$ mpc + 1  // Branch if zero"],
+    "BRZ" : [9, "If Ra == 0 then mpc[9:0] $\gets$ mpc[9:0] + immediate[9:0] + 1, else mpc $\gets$ mpc + 1  // Branch if zero"],
     "FIN" : [10, "halt execution and assert interrupt to host CPU that microcode execution is done"],
     "SHL" : [11, "Wd $\gets$ Ra << 1  // shift Ra left by one and store in Wd"],
     "XBT" : [12, "Wd[0] $\gets$ Ra[254]  // extract the 255th bit of Ra and put it into the 0th bit of Wd"],
