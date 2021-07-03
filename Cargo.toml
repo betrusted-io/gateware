@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "sim/keyrom/testbench",
     "sim/wdt/testbench",
     "sim/trng_managed/testbench",
     "sim/curve_engine/testbench",
