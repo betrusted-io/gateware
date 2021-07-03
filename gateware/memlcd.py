@@ -164,10 +164,6 @@ class MemLCD(Module, AutoCSR, AutoDoc):
         # read port for pixel data out
         self.specials.rdport = mem.get_port(write_capable=False, mode=READ_FIRST) # READ_FIRST allows BRAM to be used
         self.comb += self.rdport.adr.eq(pixadr_rd)
-        self.comb += pixdata.eq(self.rdport.dat_r)
-        # implementation note: vivado will complain about being unable to merge an output register, leading to
-        # non-optimal timing, but a check of the timing path shows that at 100MHz there is about 4-5ns of setup margin,
-        # so the merge is unnecessary in this case. Ergo, prefer comb over sync to reduce latency.
 
         # memory-mapped write port to wishbone bus
         self.bus = wishbone.Interface()
@@ -193,6 +189,21 @@ class MemLCD(Module, AutoCSR, AutoDoc):
         self.ev.finalize()
         self.comb += self.ev.done.trigger.eq(self.busy.status) # Fire an interupt when busy drops
 
+        # devboot indication facility -- create an indelible mark in the status area of the screen if the
+        # device has been booted with developer keys
+        DEVBOOT_ADDR = bytes_per_line * 16  # draw the hash on this line
+        self.devboot = CSRStorage(fields=[
+            CSRField("devboot", description="When set to ``1``, permanently add a strike-through on the top of the screen. Cannot be cleared, except by a full reset.")
+        ])
+        devboot = Signal(reset=0)
+        self.sync += [
+            If(self.devboot.fields.devboot,
+                devboot.eq(1),
+            ).Else(
+                devboot.eq(devboot),
+            )
+        ]
+
         self.sclk = sclk = getattr(pads, "sclk")
         self.scs  = scs  = getattr(pads, "scs")
         self.si   = si   = getattr(pads, "si")
@@ -202,6 +213,19 @@ class MemLCD(Module, AutoCSR, AutoDoc):
         fetch_dirty = Signal()
         update_line = Signal(max=height) # Keep track of both line and address to avoid instantiating a multiplier
         update_addr = Signal(max=height*bytes_per_line)
+        devboot_line_active = Signal()
+        self.sync += devboot_line_active.eq(devboot & (update_addr == DEVBOOT_ADDR))
+
+        self.comb += [
+            If(devboot_line_active,
+                pixdata.eq(self.rdport.dat_r & 0xCCCCCCCC) # 2 px fine dashed line
+            ).Else(
+                pixdata.eq(self.rdport.dat_r)
+            )
+        ]
+        # implementation note: vivado will complain about being unable to merge an output register, leading to
+        # non-optimal timing, but a check of the timing path shows that at 100MHz there is about 4-5ns of setup margin,
+        # so the merge is unnecessary in this case. Ergo, prefer comb over sync to reduce latency.
 
         fsm_up = FSM(reset_state="IDLE")
         self.submodules += fsm_up
@@ -232,7 +256,7 @@ class MemLCD(Module, AutoCSR, AutoDoc):
             If(update_line == 0,
                 NextState("IDLE")
             ).Else(
-                If( (pixdata[16:] != 0) | updateall,
+                If( (pixdata[16:] != 0) | updateall | devboot_line_active, # always update the devboot line!
                     NextState("DIRTYLINE"),
                 ).Else(
                     NextValue(update_line, update_line - 1),
@@ -353,20 +377,31 @@ class MemLCD(Module, AutoCSR, AutoDoc):
             )
         )
 
+        secured_prescaler = Signal(self.prescaler.storage.nbits)
+        # disallow changes to the prescaler if the devboot flag is flipped
+        # this prevents attackers from glitching the prescaler clock in order
+        # to avoid the devboot line from being updated properly
+        self.sync += [
+            If(devboot,
+                secured_prescaler.eq(secured_prescaler)
+            ).Else(
+                secured_prescaler.eq(self.prescaler.storage)
+            )
+        ]
         # This handles clock division
         fsm_bit = FSM(reset_state="IDLE")
         self.submodules += fsm_bit
         clkcnt = Signal(8)
         fsm_bit.act("IDLE",
             NextValue(sclk, 0),
-            NextValue(clkcnt, self.prescaler.storage),
+            NextValue(clkcnt, secured_prescaler),
             If(bitreq,
                 NextState("SCLK_LO")
             )
         )
         fsm_bit.act("SCLK_LO",
             NextValue(clkcnt, clkcnt - 1),
-            If(clkcnt < self.prescaler.storage[1:],
+            If(clkcnt < secured_prescaler[1:],
                NextValue(sclk, 1),
                NextState("SCLK_HI")
             )
