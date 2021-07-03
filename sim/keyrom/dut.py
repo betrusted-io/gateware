@@ -86,16 +86,17 @@ def generate_top():
         # plus path separators are different plus calling os.mkdir() is different from the mkdir version in the windows shell. ugh.
         # just...i give up. we can't use a single syscall for both. we just have to do it differently for each platform.
         subprocess.run("mkdir run\\software\\bios", shell=True)
+        subprocess.run("mkdir ..\\..\\target", shell=True)
         subprocess.run("copy ..\\..\\sim_support\\placeholder_bios.bin run\\software\\bios\\bios.bin", shell=True)
     else:
         os.system("mkdir -p run/sofware/bios")
+        os.system("mkdir -p ../../target")  # this doesn't exist on the first run
         os.system("cp ../../sim_support/placeholder_bios.bin run/software/bios/bios.bin")
 
     # pass #1 -- make the SVD
     platform = Platform(dutio)
     soc = Dut(platform, spiboot=boot_from_spi)
 
-    os.system("mkdir -p ../../target")  # this doesn't exist on the first run
     builder = Builder(soc, output_dir="./run", csr_svd="../../target/soc.svd", compile_gateware=False, compile_software=False)
     vns = builder.build(run=False)
     soc.do_exit(vns)

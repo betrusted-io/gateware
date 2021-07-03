@@ -103,10 +103,17 @@ def generate_top():
         with open('testbench/curve25519-dalek/.cargo/config', 'w') as config:
             config.write('[build]\ntarget="x86_64-unknown-linux-gnu"\n')
 
-    os.system("mkdir -p run{}sofware{}bios".format(os.path.sep, os.path.sep))
-    os.system("{} ..{}..{}sim_support{}placeholder_bios.bin run{}software{}bios{}bios.bin".format(cpname,
-        os.path.sep, os.path.sep, os.path.sep, os.path.sep, os.path.sep, os.path.sep
-    ))
+    if os.name == 'nt':
+        # windows is really, really hard to do this right. Apparently mkdir and copy aren't "commands", they are shell built-ins
+        # plus path separators are different plus calling os.mkdir() is different from the mkdir version in the windows shell. ugh.
+        # just...i give up. we can't use a single syscall for both. we just have to do it differently for each platform.
+        subprocess.run("mkdir run\\software\\bios", shell=True)
+        subprocess.run("mkdir ..\\..\\target", shell=True)
+        subprocess.run("copy ..\\..\\sim_support\\placeholder_bios.bin run\\software\\bios\\bios.bin", shell=True)
+    else:
+        os.system("mkdir -p run/sofware/bios")
+        os.system("mkdir -p ../../target")  # this doesn't exist on the first run
+        os.system("cp ../../sim_support/placeholder_bios.bin run/software/bios/bios.bin")
 
     if ~os.path.isfile('testbench/curve25519-dalek/test_vectors.bin'):
         # create a dummy file so that DUT can bootstrap and build soc.svd, required for building test vectors
@@ -121,7 +128,6 @@ def generate_top():
     platform = Platform(dutio)
     soc = Dut(platform, spiboot=boot_from_spi)
 
-    os.system("mkdir -p ../../target")  # this doesn't exist on the first run
     builder = Builder(soc, output_dir="./run", csr_svd="../../target/soc.svd", compile_gateware=False, compile_software=False)
     vns = builder.build(run=False)
     soc.do_exit(vns)
