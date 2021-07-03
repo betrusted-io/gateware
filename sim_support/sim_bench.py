@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from operator import floordiv
 import sys
 import os
 import shutil
@@ -182,6 +183,33 @@ class BiosHelper():
         ret += os.system("riscv64-unknown-elf-objdump -d ../../target/{}/release/{} > run/bios.S".format(target, sim_name))
         if ret != 0:
             sys.exit(1)  # fail the build
+
+class DoPac():
+    def __init__(self, name):
+        if os.name == 'nt':
+            subprocess.run("rm -r testbench\\{}".format(name))
+            subprocess.run("mkdir testbench\\{}".format(name))
+            subprocess.run("copy pac-cargo-template testbench\\{}\\Cargo.toml".format(name))
+            subprocess.run("cd testbench\\{} && svd2rust --target riscv -i ..\\..\\..\\..\\target\\soc.svd && rm -rf src; form -i lib.rs -o src\\; rm lib.rs".format(name))
+        else:
+            os.system("rm -rf testbench/{}".format(name))  # nuke the old PAC if it exists
+            os.system("mkdir -p testbench/{}".format(name)) # rebuild it from scratch every time
+            os.system("cp pac-cargo-template testbench/{}/Cargo.toml".format(name))
+            os.system("cd testbench/{} && svd2rust --target riscv -i ../../../../target/soc.svd && rm -rf src; form -i lib.rs -o src/; rm lib.rs".format(name))
+
+class Preamble():
+    def __init__(self):
+        if os.name == 'nt':
+            # windows is really, really hard to do this right. Apparently mkdir and copy aren't "commands", they are shell built-ins
+            # plus path separators are different plus calling os.mkdir() is different from the mkdir version in the windows shell. ugh.
+            # just...i give up. we can't use a single syscall for both. we just have to do it differently for each platform.
+            subprocess.run("mkdir run\\software\\bios", shell=True)
+            subprocess.run("mkdir ..\\..\\target", shell=True)
+            subprocess.run("copy ..\\..\\sim_support\\placeholder_bios.bin run\\software\\bios\\bios.bin", shell=True)
+        else:
+            os.system("mkdir -p run/software/bios")
+            os.system("mkdir -p ../../target")  # this doesn't exist on the first run
+            os.system("cp ../../sim_support/placeholder_bios.bin run/software/bios/bios.bin")
 
 class SimRunner():
     def __init__(self, ci, os_cmds, vex_verilog_path=VEX_CPU_PATH):

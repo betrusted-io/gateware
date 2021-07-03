@@ -29,7 +29,7 @@ from litex.build.generic_platform import *
 from litex.soc.integration.builder import *
 
 # pull in the common objects from sim_bench
-from sim_support.sim_bench import Sim, Platform, BiosHelper, CheckSim, SimRunner
+from sim_support.sim_bench import Sim, Platform, BiosHelper, CheckSim, SimRunner, Preamble
 
 # handy to keep around in case a DUT framework needs it
 from litex.soc.integration.soc_core import *
@@ -160,17 +160,7 @@ def generate_top():
 
     # we have to do two passes: once to make the SVD, without compiling the BIOS
     # second, to compile the BIOS, which is then built into the gateware.
-    if os.name == 'nt':
-        # windows is really, really hard to do this right. Apparently mkdir and copy aren't "commands", they are shell built-ins
-        # plus path separators are different plus calling os.mkdir() is different from the mkdir version in the windows shell. ugh.
-        # just...i give up. we can't use a single syscall for both. we just have to do it differently for each platform.
-        subprocess.run("mkdir run\\software\\bios", shell=True)
-        subprocess.run("mkdir ..\\..\\target", shell=True)
-        subprocess.run("copy ..\\..\\sim_support\\placeholder_bios.bin run\\software\\bios\\bios.bin", shell=True)
-    else:
-        os.system("mkdir -p run/sofware/bios")
-        os.system("mkdir -p ../../target")  # this doesn't exist on the first run
-        os.system("cp ../../sim_support/placeholder_bios.bin run/software/bios/bios.bin")
+    Preamble()
 
     # pass #1 -- make the SVD
     platform = Platform(dutio)
