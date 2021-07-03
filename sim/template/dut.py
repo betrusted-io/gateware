@@ -103,14 +103,14 @@ def generate_top():
     # we have to do two passes: once to make the SVD, without compiling the BIOS
     # second, to compile the BIOS, which is then built into the gateware.
     if os.name == 'nt':
-        cpname = 'copy'
+        # windows is really, really hard to do this right. Apparently mkdir and copy aren't "commands", they are shell built-ins
+        # plus path separators are different plus calling os.mkdir() is different from the mkdir version in the windows shell. ugh.
+        # just...i give up. we can't use a single syscall for both. we just have to do it differently for each platform.
+        subprocess.run(r"mkdir -p run\software\bios", shell=True)
+        subprocess.run(r"copy ..\..\sim_support\placeholder_bios.bin run\software\bios\bios.bin", shell=True)
     else:
-        cpname = 'cp'
-
-    os.system("mkdir -p run{}sofware{}bios".format(os.path.sep, os.path.sep))
-    os.system("{} ..{}..{}sim_support{}placeholder_bios.bin run{}software{}bios{}bios.bin".format(cpname,
-        os.path.sep, os.path.sep, os.path.sep, os.path.sep, os.path.sep, os.path.sep
-    ))
+        os.system("mkdir -p run/software/bios")
+        os.system("cp ../../sim_support/placeholder_bios.bin run/software/bios/bios.bin")
 
     # pass #1 -- make the SVD
     platform = Platform(dutio)
