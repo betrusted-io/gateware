@@ -1,0 +1,283 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wave_config>
+   <wave_state>
+   </wave_state>
+   <db_ref_list>
+      <db_ref path="top_tb_sim.wdb" id="1">
+         <top_modules>
+            <top_module name="glbl" />
+            <top_module name="top_tb" />
+         </top_modules>
+      </db_ref>
+   </db_ref_list>
+   <zoom_setting>
+      <ZoomStartTime time="157735892fs"></ZoomStartTime>
+      <ZoomEndTime time="158069039fs"></ZoomEndTime>
+      <Cursor1Time time="157827929fs"></Cursor1Time>
+   </zoom_setting>
+   <column_width_setting>
+      <NameColumnWidth column_width="273"></NameColumnWidth>
+      <ValueColumnWidth column_width="196"></ValueColumnWidth>
+   </column_width_setting>
+   <WVObjectSize size="65" />
+   <wvobject fp_name="/top_tb/dut/sys_rst" type="logic">
+      <obj_property name="ElementShortName">sys_rst</obj_property>
+      <obj_property name="ObjectShortName">sys_rst</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/sys_clk" type="logic">
+      <obj_property name="ElementShortName">sys_clk</obj_property>
+      <obj_property name="ObjectShortName">sys_clk</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/success" type="logic">
+      <obj_property name="ElementShortName">success</obj_property>
+      <obj_property name="ObjectShortName">success</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/report" type="array">
+      <obj_property name="ElementShortName">report[31:0]</obj_property>
+      <obj_property name="ObjectShortName">report[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/sram_oe_n" type="logic">
+      <obj_property name="ElementShortName">sram_oe_n</obj_property>
+      <obj_property name="ObjectShortName">sram_oe_n</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/sram_d" type="array">
+      <obj_property name="ElementShortName">sram_d[31:0]</obj_property>
+      <obj_property name="ObjectShortName">sram_d[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/sram_adr" type="array">
+      <obj_property name="ElementShortName">sram_adr[21:0]</obj_property>
+      <obj_property name="ObjectShortName">sram_adr[21:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/VexRiscv/decode_to_execute_INSTRUCTION" type="array">
+      <obj_property name="ElementShortName">decode_to_execute_INSTRUCTION[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_INSTRUCTION[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/VexRiscv/decode_to_execute_PC" type="array">
+      <obj_property name="ElementShortName">decode_to_execute_PC[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_PC[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/VexRiscv/decode_to_execute_RS1" type="array">
+      <obj_property name="ElementShortName">decode_to_execute_RS1[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_RS1[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/VexRiscv/decode_to_execute_RS2" type="array">
+      <obj_property name="ElementShortName">decode_to_execute_RS2[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_RS2[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/sram_adr" type="array">
+      <obj_property name="ElementShortName">sram_adr[21:0]</obj_property>
+      <obj_property name="ObjectShortName">sram_adr[21:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/sram_ce_n" type="logic">
+      <obj_property name="ElementShortName">sram_ce_n</obj_property>
+      <obj_property name="ObjectShortName">sram_ce_n</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/sram_oe_n" type="logic">
+      <obj_property name="ElementShortName">sram_oe_n</obj_property>
+      <obj_property name="ObjectShortName">sram_oe_n</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/sram_we_n" type="logic">
+      <obj_property name="ElementShortName">sram_we_n</obj_property>
+      <obj_property name="ObjectShortName">sram_we_n</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/sram_zz_n" type="logic">
+      <obj_property name="ElementShortName">sram_zz_n</obj_property>
+      <obj_property name="ObjectShortName">sram_zz_n</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_sync_oe_n" type="array">
+      <obj_property name="ElementShortName">soc_sync_oe_n[31:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_sync_oe_n[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/sram_d" type="array">
+      <obj_property name="ElementShortName">sram_d[31:0]</obj_property>
+      <obj_property name="ObjectShortName">sram_d[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_read_ram" type="array">
+      <obj_property name="ElementShortName">soc_read_ram[31:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_read_ram[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/sram_dm_n" type="array">
+      <obj_property name="ElementShortName">sram_dm_n[3:0]</obj_property>
+      <obj_property name="ObjectShortName">sram_dm_n[3:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_burst_adr" type="array">
+      <obj_property name="ElementShortName">soc_burst_adr[2:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_burst_adr[2:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_read_reg" type="array">
+      <obj_property name="ElementShortName">soc_read_reg[255:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_read_reg[255:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_read_shift" type="logic">
+      <obj_property name="ElementShortName">soc_read_shift</obj_property>
+      <obj_property name="ObjectShortName">soc_read_shift</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/vns_fsm_state" type="array">
+      <obj_property name="ElementShortName">vns_fsm_state[4:0]</obj_property>
+      <obj_property name="ObjectShortName">vns_fsm_state[4:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_counter" type="array">
+      <obj_property name="ElementShortName">soc_counter[3:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_counter[3:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_counter_limit" type="array">
+      <obj_property name="ElementShortName">soc_counter_limit[3:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_counter_limit[3:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_counter_en" type="logic">
+      <obj_property name="ElementShortName">soc_counter_en</obj_property>
+      <obj_property name="ObjectShortName">soc_counter_en</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_counter_done" type="logic">
+      <obj_property name="ElementShortName">soc_counter_done</obj_property>
+      <obj_property name="ObjectShortName">soc_counter_done</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_counter_almost_done" type="logic">
+      <obj_property name="ElementShortName">soc_counter_almost_done</obj_property>
+      <obj_property name="ObjectShortName">soc_counter_almost_done</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_read_ram" type="array">
+      <obj_property name="ElementShortName">soc_read_ram[31:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_read_ram[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_dut_ram_bus_adr" type="array">
+      <obj_property name="ElementShortName">soc_dut_ram_bus_adr[29:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_dut_ram_bus_adr[29:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_dut_ram_bus_dat_w" type="array">
+      <obj_property name="ElementShortName">soc_dut_ram_bus_dat_w[31:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_dut_ram_bus_dat_w[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_dut_ram_bus_dat_r" type="array">
+      <obj_property name="ElementShortName">soc_dut_ram_bus_dat_r[31:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_dut_ram_bus_dat_r[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_dut_ram_bus_sel" type="array">
+      <obj_property name="ElementShortName">soc_dut_ram_bus_sel[3:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_dut_ram_bus_sel[3:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_dut_ram_bus_cyc" type="logic">
+      <obj_property name="ElementShortName">soc_dut_ram_bus_cyc</obj_property>
+      <obj_property name="ObjectShortName">soc_dut_ram_bus_cyc</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_dut_ram_bus_stb" type="logic">
+      <obj_property name="ElementShortName">soc_dut_ram_bus_stb</obj_property>
+      <obj_property name="ObjectShortName">soc_dut_ram_bus_stb</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_dut_ram_bus_ack" type="logic">
+      <obj_property name="ElementShortName">soc_dut_ram_bus_ack</obj_property>
+      <obj_property name="ObjectShortName">soc_dut_ram_bus_ack</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_dut_ram_bus_we" type="logic">
+      <obj_property name="ElementShortName">soc_dut_ram_bus_we</obj_property>
+      <obj_property name="ObjectShortName">soc_dut_ram_bus_we</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_dut_ram_bus_cti" type="array">
+      <obj_property name="ElementShortName">soc_dut_ram_bus_cti[2:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_dut_ram_bus_cti[2:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_dut_ram_bus_bte" type="array">
+      <obj_property name="ElementShortName">soc_dut_ram_bus_bte[1:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_dut_ram_bus_bte[1:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_dut_ram_bus_err" type="logic">
+      <obj_property name="ElementShortName">soc_dut_ram_bus_err</obj_property>
+      <obj_property name="ObjectShortName">soc_dut_ram_bus_err</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_data_port_adr" type="array">
+      <obj_property name="ElementShortName">soc_data_port_adr[6:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_data_port_adr[6:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_data_port_dat_r" type="array">
+      <obj_property name="ElementShortName">soc_data_port_dat_r[255:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_data_port_dat_r[255:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_data_port_we" type="array">
+      <obj_property name="ElementShortName">soc_data_port_we[31:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_data_port_we[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_data_port_dat_w" type="array">
+      <obj_property name="ElementShortName">soc_data_port_dat_w[255:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_data_port_dat_w[255:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_write_from_slave" type="logic">
+      <obj_property name="ElementShortName">soc_write_from_slave</obj_property>
+      <obj_property name="ObjectShortName">soc_write_from_slave</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_interface0_adr" type="array">
+      <obj_property name="ElementShortName">soc_interface0_adr[29:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_interface0_adr[29:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_interface0_dat_w" type="array">
+      <obj_property name="ElementShortName">soc_interface0_dat_w[31:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_interface0_dat_w[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_interface0_dat_r" type="array">
+      <obj_property name="ElementShortName">soc_interface0_dat_r[31:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_interface0_dat_r[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_interface0_sel" type="array">
+      <obj_property name="ElementShortName">soc_interface0_sel[3:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_interface0_sel[3:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_interface0_cyc" type="logic">
+      <obj_property name="ElementShortName">soc_interface0_cyc</obj_property>
+      <obj_property name="ObjectShortName">soc_interface0_cyc</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_interface0_stb" type="logic">
+      <obj_property name="ElementShortName">soc_interface0_stb</obj_property>
+      <obj_property name="ObjectShortName">soc_interface0_stb</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_interface0_ack" type="logic">
+      <obj_property name="ElementShortName">soc_interface0_ack</obj_property>
+      <obj_property name="ObjectShortName">soc_interface0_ack</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_interface0_we" type="logic">
+      <obj_property name="ElementShortName">soc_interface0_we</obj_property>
+      <obj_property name="ObjectShortName">soc_interface0_we</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_interface0_cti" type="array">
+      <obj_property name="ElementShortName">soc_interface0_cti[2:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_interface0_cti[2:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_interface0_bte" type="array">
+      <obj_property name="ElementShortName">soc_interface0_bte[1:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_interface0_bte[1:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_interface0_err" type="logic">
+      <obj_property name="ElementShortName">soc_interface0_err</obj_property>
+      <obj_property name="ObjectShortName">soc_interface0_err</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_interface1_adr" type="array">
+      <obj_property name="ElementShortName">soc_interface1_adr[29:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_interface1_adr[29:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_interface1_dat_w" type="array">
+      <obj_property name="ElementShortName">soc_interface1_dat_w[255:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_interface1_dat_w[255:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_interface1_dat_r" type="array">
+      <obj_property name="ElementShortName">soc_interface1_dat_r[255:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_interface1_dat_r[255:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_interface1_sel" type="array">
+      <obj_property name="ElementShortName">soc_interface1_sel[31:0]</obj_property>
+      <obj_property name="ObjectShortName">soc_interface1_sel[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_interface1_cyc" type="logic">
+      <obj_property name="ElementShortName">soc_interface1_cyc</obj_property>
+      <obj_property name="ObjectShortName">soc_interface1_cyc</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_interface1_stb" type="logic">
+      <obj_property name="ElementShortName">soc_interface1_stb</obj_property>
+      <obj_property name="ObjectShortName">soc_interface1_stb</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_interface1_ack" type="logic">
+      <obj_property name="ElementShortName">soc_interface1_ack</obj_property>
+      <obj_property name="ObjectShortName">soc_interface1_ack</obj_property>
+   </wvobject>
+   <wvobject fp_name="/top_tb/dut/soc_interface1_we" type="logic">
+      <obj_property name="ElementShortName">soc_interface1_we</obj_property>
+      <obj_property name="ObjectShortName">soc_interface1_we</obj_property>
+   </wvobject>
+</wave_config>
