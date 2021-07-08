@@ -17,3 +17,5 @@ target/
 
 sim_support/rust/pac/src/pac.rs
 
+# generate with gen_keyrom.py
+keystore.bin

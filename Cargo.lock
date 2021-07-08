@@ -536,6 +536,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rom_block"
+version = "0.1.0"
+dependencies = [
+ "pac",
+ "sim-bios",
+ "volatile",
+ "xous-nommu",
+]
+
+[[package]]
 name = "rustc-demangle"
 version = "0.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
