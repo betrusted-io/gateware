@@ -74,7 +74,7 @@ class Dut(Sim):
         bios_size = 0x8000
 
         rom_bus = wishbone.Interface(data_width=self.bus.data_width)
-        rom     = BlockRom(bus=rom_bus, init=None)
+        rom     = BlockRom(bus=rom_bus, init='boot.bin')
         self.bus.add_slave("brom", rom.bus, SoCRegion(origin=0x80000000, size=bios_size, mode="r", cached=False))
         self.check_if_exists("brom")
         self.logger.info("Block ROM {} {} {}.".format(

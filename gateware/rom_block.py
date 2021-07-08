@@ -33,7 +33,7 @@ class BlockRom(Module):
                 print("CRITICAL ERROR: ROM file does not fit: {} bytes given, {} bytes available".format(len(rawdata), TOTAL_BYTES))
                 exit(1)
             elif len(rawdata) < TOTAL_BYTES:
-                rawdata.append([0] * (TOTAL_BYTES - len(rawdata)))
+                rawdata += bytearray([0] * (TOTAL_BYTES - len(rawdata)))
 
         assert len(rawdata) == TOTAL_BYTES # this must be true for anything to work downstream of this
 
@@ -71,7 +71,7 @@ class BlockRom(Module):
                     vect = 0
                     init_index = 0
 
-            print(init)
+            # print(init)
             assert len(init) == INIT_ROWS # sanity check that we actually generated the correct number of rows
             i = 0
             for data in init:
