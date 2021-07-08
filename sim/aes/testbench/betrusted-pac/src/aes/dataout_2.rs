@@ -1,1 +1,0 @@
-# [ doc = "Reader of register DATAOUT_2" ] pub type R = crate :: R < u32 , super :: DATAOUT_2 > ; # [ doc = "Reader of field `data_2`" ] pub type DATA_2_R = crate :: R < u32 , u32 > ; impl R { # [ doc = "Bits 0:31 - data output from cipher" ] # [ inline ( always ) ] pub fn data_2 ( & self ) -> DATA_2_R { DATA_2_R :: new ( ( self . bits & 0xffff_ffff ) as u32 ) } }

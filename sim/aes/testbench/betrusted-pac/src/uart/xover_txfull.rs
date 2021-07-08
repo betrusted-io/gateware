@@ -1,1 +1,0 @@
-# [ doc = "Reader of register XOVER_TXFULL" ] pub type R = crate :: R < u32 , super :: XOVER_TXFULL > ; # [ doc = "Reader of field `xover_txfull`" ] pub type XOVER_TXFULL_R = crate :: R < bool , bool > ; impl R { # [ doc = "Bit 0" ] # [ inline ( always ) ] pub fn xover_txfull ( & self ) -> XOVER_TXFULL_R { XOVER_TXFULL_R :: new ( ( self . bits & 0x01 ) != 0 ) } }
