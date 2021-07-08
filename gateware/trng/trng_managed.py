@@ -121,7 +121,7 @@ to as little as 15-20ms and still probably be quite safe.
         av_adaptive_bits=9  # set by NIST requirement of 512 for non-binary
         ro_repcount_bits=7  # based on a conservative upper bound
         ro_adaptive_bits=10 # this is set by NIST requirements of 1024 for binary
-        ro_maxruns=5 # maximum number of runs to count on the RO maxruns
+        ro_maxruns=4 # maximum number of runs to count on the RO maxruns
         self.av_nist = CSRStorage(fields=[
             CSRField("repcount_cutoff", av_repcount_bits, description="Sets the `C` (cutoff) parameter in the NIST repetition count test for the avalanche generator", reset=41),
             CSRField("adaptive_cutoff", av_adaptive_bits, description="Sets the `C` (cutoff) parameter in the NIST adaptive proportion test for the avalanche generator", reset=410),
