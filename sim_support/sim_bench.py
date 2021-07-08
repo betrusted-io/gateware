@@ -187,14 +187,21 @@ class BiosHelper():
 class DoPac():
     def __init__(self, name):
         if os.name == 'nt':
-            subprocess.run("rm -r testbench\\{}".format(name))
-            subprocess.run("mkdir testbench\\{}".format(name))
-            subprocess.run("copy pac-cargo-template testbench\\{}\\Cargo.toml".format(name))
-            subprocess.run("cd testbench\\{} && svd2rust --target riscv -i ..\\..\\..\\..\\target\\soc.svd && rm -rf src; form -i lib.rs -o src\\; rm lib.rs".format(name))
+            subprocess.run("rd /S /Q testbench\\{}".format(name), shell=True)
+            subprocess.run("mkdir testbench\\{}".format(name), shell=True)
+            subprocess.run("copy pac-cargo-template testbench\\{}\\Cargo.toml".format(name), shell=True)
+            subprocess.run("cargo install svd2rust") # make sure dependencies are installed
+            subprocess.run("cargo install form") # make sure dependencies are installed
+            subprocess.run("cd testbench\\{} && svd2rust --target riscv -i ..\\..\\..\\..\\target\\soc.svd".format(name), shell=True)
+            subprocess.run("cd testbench\\{} && rd /S /Q src".format(name), shell=True)
+            subprocess.run("cd testbench\\{} && form -i lib.rs -o src\\".format(name), shell=True)
+            subprocess.run("cd testbench\\{} && del lib.rs\\".format(name), shell=True)
         else:
             os.system("rm -rf testbench/{}".format(name))  # nuke the old PAC if it exists
             os.system("mkdir -p testbench/{}".format(name)) # rebuild it from scratch every time
             os.system("cp pac-cargo-template testbench/{}/Cargo.toml".format(name))
+            os.system("cargo install svd2rust") # make sure dependencies are installed
+            os.system("cargo install form") # make sure dependencies are installed
             os.system("cd testbench/{} && svd2rust --target riscv -i ../../../../target/soc.svd && rm -rf src; form -i lib.rs -o src/; rm lib.rs".format(name))
 
 class Preamble():
