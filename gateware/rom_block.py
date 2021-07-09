@@ -10,7 +10,7 @@ class BlockRom(Module):
     def __init__(self, init=None, bus=None):
         self.bus = bus
 
-        BANK_WIDTH = 2 # use this to adjust total size. width = 1 -> 64kiB, 2-> 32kiB, 4->16kiB, etc. must be power of 2. 64kiB is the biggest we can create.
+        BANK_WIDTH = 1 # use this to adjust total size. width = 1 -> 64kiB, 2-> 32kiB, 4->16kiB, etc. must be power of 2. 64kiB is the biggest we can create.
         BLOCKS = 32 // BANK_WIDTH   # 32 bits divided by the bank width
         BITS_PER_BLOCK = 16384 # fixed at 16384: use RAMB18E blocks for best packing density
 
@@ -63,7 +63,7 @@ class BlockRom(Module):
             init_index = 0
             vect = 0
             for word in words:
-                nibble = (word & (3 << bank*BANK_WIDTH)) >> (bank*BANK_WIDTH)
+                nibble = (word & (((2**BANK_WIDTH)-1) << bank*BANK_WIDTH)) >> (bank*BANK_WIDTH)
                 vect += nibble << init_index
                 init_index += BANK_WIDTH
                 if init_index == INIT_BITS:
