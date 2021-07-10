@@ -10,7 +10,7 @@ class BlockRom(Module):
     def __init__(self, init=None, bus=None):
         self.bus = bus
 
-        BANK_WIDTH = 1 # use this to adjust total size. width = 1 -> 64kiB, 2-> 32kiB, 4->16kiB, etc. must be power of 2. 64kiB is the biggest we can create.
+        BANK_WIDTH = 2 # use this to adjust total size. width = 1 -> 64kiB, 2-> 32kiB, 4->16kiB, etc. must be power of 2. 64kiB is the biggest we can create.
         BLOCKS = 32 // BANK_WIDTH   # 32 bits divided by the bank width
         BITS_PER_BLOCK = 16384 # fixed at 16384: use RAMB18E blocks for best packing density
 
