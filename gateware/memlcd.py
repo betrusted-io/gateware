@@ -193,8 +193,9 @@ class MemLCD(Module, AutoCSR, AutoDoc):
         # device has been booted with developer keys
         DEVBOOT_ADDR = bytes_per_line * 12  # draw the hash on this line
         self.devboot = CSRStorage(fields=[
-            CSRField("devboot", description="When set to ``1``, permanently add a strike-through on the top of the screen. Cannot be cleared, except by a full reset.")
+            CSRField("devboot", description="When set to ``1``, permanently add a strike-through on the top of the screen. Cannot be cleared, except by a full reset. Do not rely on this register to determine if a devboot has happened; the *register* may be cleared, but the internal hardware bit cannot be.")
         ])
+        self.devstatus = CSRStatus(size=1, description="Reads back as ``1`` if a devboot was set anywhere along the boot chain. This is a read-only register and reflects ground truth.")
         devboot = Signal(reset=0)
         self.sync += [
             If(self.devboot.fields.devboot,
@@ -203,6 +204,7 @@ class MemLCD(Module, AutoCSR, AutoDoc):
                 devboot.eq(devboot),
             )
         ]
+        self.comb += self.devstatus.status.eq(devboot)
 
         self.sclk = sclk = getattr(pads, "sclk")
         self.scs  = scs  = getattr(pads, "scs")
