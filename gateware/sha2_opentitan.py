@@ -43,6 +43,7 @@ class Hmac(Module, AutoDoc, AutoCSR):
             CSRField("endian_swap", size=1, description="Swap the endianness on the input data"),
             CSRField("digest_swap", size=1, description="Swap the endianness on the output digest"),
             CSRField("hmac_en", size=1, description="Enable the HMAC core"),
+            CSRField("reset", size=1, description="Resets the hardware. Power must be on for this to take effect.", pulse=True)
         ])
         control_latch = Signal(self.config.size)
         ctrl_freeze = Signal()
@@ -53,6 +54,22 @@ class Hmac(Module, AutoDoc, AutoCSR):
                 control_latch.eq(self.config.storage)
             )
         ]
+        reset_50 = Signal()
+        self.submodules.resetter = BlindTransfer("sys", "clk50")
+        self.comb += [ self.resetter.i.eq(self.config.fields.reset), reset_50.eq(self.resetter.o) ]
+        rescnt = Signal(max=16, reset=15)
+        sw_reset = Signal()
+        self.sync.clk50 += [
+            If(reset_50,
+                rescnt.eq(15)
+            ).Elif(rescnt > 0,
+                rescnt.eq(rescnt - 1)
+            ).Else(
+                rescnt.eq(rescnt)
+            ),
+            sw_reset.eq(rescnt != 0),
+        ]
+
         self.command = CSRStorage(description="Command register for the HMAC block", fields=[
             CSRField("hash_start", size=1, description="Writing a 1 indicates the beginning of hash data", pulse=True),
             CSRField("hash_process", size=1, description="Writing a 1 digests the hash data", pulse=True),
@@ -117,7 +134,7 @@ class Hmac(Module, AutoDoc, AutoCSR):
             p_EN_SYN="FALSE",
             i_RDCLK=ClockSignal("clk50"),
             i_WRCLK=ClockSignal("clk50"),
-            i_RST=ResetSignal("clk50"),
+            i_RST=ResetSignal("clk50") | sw_reset,
             o_FULL=fifo_full_local,
             i_WREN=fifo_wvalid,
             i_DI=fifo_wdata_mask[:32],
@@ -154,7 +171,7 @@ class Hmac(Module, AutoDoc, AutoCSR):
 
         self.specials += Instance("sha2_litex",
             i_clk_i = ClockSignal("clk50"),
-            i_rst_ni = ~ResetSignal("clk50"),
+            i_rst_ni = ~(ResetSignal("clk50") | sw_reset),
 
             i_secret_key_0=self.key0.storage,
             i_secret_key_1=self.key1.storage,
