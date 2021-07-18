@@ -117,30 +117,39 @@ pub fn write_tests(p: &pac::Peripherals) {
             .cmd_code().bits(0x06) // WREN
         );
      }
-     report(&p, phase); phase += 1;
      while p.SPINOR.status.read().wip().bit_is_set() {}
+     report(&p, phase); phase += 1;
 
     let mut phase = 0x8000_0000;
+    report(&p, phase); phase += 1;
      // page program some data
      // CSR is provided for non-cached writes
-     unsafe {
-        p.SPINOR.wdata.write(|w| w
-            .wdata().bits(0xbeef)
-        );
-        p.SPINOR.wdata.write(|w| w
-            .wdata().bits(0xc0de)
-        );
-    }
-        for i in 0..16 {  // overfill a bit to flush cache
-            /*
+     if false {
+        unsafe {
             p.SPINOR.wdata.write(|w| w
-                .wdata().bits(0x6000 + i)
-            );*/
+                .wdata().bits(0xbeef)
+            );
+            p.SPINOR.wdata.write(|w| w
+                .wdata().bits(0xc0de)
+            );
+        }
+    } else {
+        // one full page from CSR space
+        for i in 0..128 {
             unsafe {
-                // this is not actually reliable in the test bench because it's cached from the CPU
-                (*rom.add(i)).write( (0x5500 + i*2 | (0x5500 + i*2 + 1) << 16) as u32);
+                p.SPINOR.wdata.write(|w| w
+                    .wdata().bits(0x6000 + i)
+                );
             }
         }
+    }
+    /*
+    for i in 0..16 {  // overfill a bit to flush cache
+        unsafe {
+            // this is not actually reliable in the test bench because it's cached from the CPU
+            (*rom.add(i)).write( (0x5500 + i*2 | (0x5500 + i*2 + 1) << 16) as u32);
+        }
+    }*/
 
     report(&p, phase); phase += 1;
     unsafe {
@@ -150,10 +159,9 @@ pub fn write_tests(p: &pac::Peripherals) {
             .exec_cmd().set_bit()
             .cmd_code().bits(0x12) // PP4B
             .has_arg().set_bit()
-            .data_words().bits(16)
+            .data_words().bits( 128 ) // be sure to update this to match the amount written above
         );
      }
-     report(&p, phase); phase += 1;
      while p.SPINOR.status.read().wip().bit_is_set() {}
      report(&p, phase); phase += 1;
 
@@ -228,7 +236,7 @@ fn run(p: &pac::Peripherals) {
     // a second set of reads to just make sure that the read state machine is in good standing after writing
     report(&p, unsafe{(*(rom.add(0x2140))).read()});
     // read back the data that was written
-    for i in 0..8 {
+    for i in 0..32 {
         let readcheck =  unsafe{ (*(rom.add((0x03_cc00 / 4) + i))).read() };
         report(&p, readcheck);
     }
