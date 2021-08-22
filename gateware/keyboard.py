@@ -3,85 +3,47 @@ from migen.genlib.coding import Decoder
 
 from litex.soc.integration.doc import AutoDoc, ModuleDoc
 from litex.soc.interconnect.csr_eventmanager import *
-
-# Relies on a clock called "kbd" for delay counting
-# Input and output through "i" and "o" signals respectively
-class Debounce(Module):
-    def __init__(self, i, o, n):
-        i_kbd = Signal()
-        o_kbd = Signal()
-        count = Signal(max=(2*n))
-
-        self.specials += MultiReg(i, i_kbd, odomain="kbd");
-        self.sync.kbd += [
-            # Basic idea: We want to debounce our input signal for n cycles:
-            # If key is pressed, count up to n; if it bounces, reset count to 0. The key is declared
-            # pressed when held for n successive cycles. At this point, count is set to 2*n and the
-            # same process is so repeated for the key release, except counting down to n.
-            If(i_kbd,
-                count.eq(count + 1),
-                 # Once we've reached n, "snap" up to 2x n to prep for key release
-                If(count >= n,
-                    count.eq(2*n),
-                )
-            ).Else(
-                count.eq(count - 1),
-                # Once we've fell below n, "snap" down to 0 to prepare for next key press
-                If(count < n,
-                    count.eq(0)
-                )
-            ),
-            o_kbd.eq(count >= n)
-        ]
-        #self.specials += MultiReg(o_kbd, o)
-        self.sync.kbd += o.eq(o_kbd)  # if we want the output domain to be in kbd
-
 class KeyScan(Module, AutoCSR, AutoDoc):
     def __init__(self, pads, debounce_ms=5):
         self.background = ModuleDoc("""Matrix Keyboard Driver
 A hardware key scanner that can run even when the CPU is powered down or stopped.
 
-The hardware is assumed to be a matrix of switches, divided into rows and columns. 
+The hardware is assumed to be a matrix of switches, divided into rows and columns.
 The number of rows and columns is inferred by the number of pins dedicated in
-the `pads` record. 
+the `pads` record.
 
 The rows are inputs, and require a `PULLDOWN` to be inferred on the pins, to prevent
 them from floating when the keys are not pressed. Note that `PULLDOWN` is not offered
 on all FPGA architectures, but at the very least is present on 7-Series FPGAs.
 
 The columns are driven by tristate drivers. The state of the columns is either driven
-high (`1`), or hi-Z (`Z`). 
+high (`1`), or hi-Z (`Z`).
 
 The KeyScan module also expects a `kbd` clock domain. The preferred implementation
-makes this a 32.768KHz always-on clock input with no PLL. This allows the keyboard 
+makes this a 32.768KHz always-on clock input with no PLL. This allows the keyboard
 module to continue scanning even if the CPU is powered down.
 
 Columns are scanned sequentially using a `kbd`-domain state machine by driving each
-column in order. When a column is driven, its electrical state goes from `hi-z` to `1`. 
+column in order. When a column is driven, its electrical state goes from `hi-z` to `1`.
 The rows are then sampled with each column scan state. Since each row has
 a pulldown on it, if no keys are hit, the result is `0`. When a key is pressed, it
 will short a row to a column, and the `1` driven on a column will flip the row
-state to a `1`, thus registering a key press. 
+state to a `1`, thus registering a key press.
 
 Columns are driven for a minimum period of time known as a `settling` period. The
 settling time must be at least 2 because a Multireg (2-stage synchronizer) is used
 to sample the data on the receiving side. In this module, settling time is fixed
 to `4` cycles.
 
-Thus a 1 in the `rowdat` registers indicate the column intersection that was active for 
+Thus a 1 in the `rowdat` registers indicate the column intersection that was active for
 a given row in the matrix.
 
 There is also a row shadow register that is maintained by the hardware. The row shadow
 is used to maintain the previous state of the key matrix, so that a "key press change"
-interrupt can be generated. The first change in the row registers is recorded in the
-`rowchange` status register. It does not update until it has been read. The idea of this
-register is that it can capture one key hit while the CPU is in standby, and the CPU
-should wake up in time to read it, before a new key hit is registered. The CPU can consult
-the `rowchange` register to read just the `rowdat` CSR with the key change, instead of
-having to iterate through the entire array to find the row that changed. 
+interrupt can be generated.
 
 There is also a `keypressed` interrupt which fires every time there is a change in
-the row registers. 
+the row registers.
 
 `debounce` is the period in ms for the keyboard matrix to stabilize before triggering
 an interrupt.
@@ -214,6 +176,23 @@ an interrupt.
             inject_r.eq(self.inject_strobe),
             self.ev.inject.trigger.eq(self.inject_strobe & ~inject_r) # make sure it's just one edge
         ]
+
+        # zero state auto-clear: the "delta" methodology gets stuck if the initial sampling state of the keyboard matrix isn't 0. this fixes that.
+        rows_nonzero = Signal(rows.nbits)
+        col_zeros = Signal(cols.nbits) # form multi-bit zeros of the right width, otherwise we get 1'd0 as the rhs of equality statements
+        row_zeros = Signal(rows.nbits)
+        for r in range(0, rows.nbits):
+            self.sync.kbd +=  rows_nonzero[r].eq(getattr(self, "row_scan" + str(r)) != col_zeros)
+        all_zeros = Signal()
+        clear_deltas = Signal()
+        self.comb += all_zeros.eq(rows_nonzero == row_zeros)
+        clear_kbd = Signal()
+        self.submodules.clear_sync = BlindTransfer("sys", "kbd")
+        self.comb += [
+            self.clear_sync.i.eq(self.ev.keypressed.clear),
+            clear_kbd.eq(self.clear_sync.o)
+        ]
+
         # debounce timers and clocks
         debounce_clocks = int((debounce_ms * 0.001) * 32768.0)
         debounce_timer  = Signal(max=(debounce_clocks + 1))
@@ -222,7 +201,9 @@ an interrupt.
         rowdiff = Signal(rows.nbits)
         for r in range(0, rows.nbits):
             self.sync.kbd += [
-                If(scan_done,
+                If(clear_deltas,
+                    rowdiff[r].eq(0),
+                ).Elif(debounced, # was scan_done
                    rowdiff[r].eq( ~((getattr(self, "row_scan" + str(r)) ^ getattr(self, "rowshadow" + str(r))) == 0) )
                 ).Else(
                     rowdiff[r].eq(rowdiff[r])
@@ -237,7 +218,9 @@ an interrupt.
         rowchanging = Signal(rows.nbits)
         for r in range(0, rows.nbits):
             self.sync.kbd += [
-                If(scan_done,
+                If(clear_deltas,
+                    rowchanging[r].eq(0),
+                ).Elif(scan_done,
                     rowchanging[r].eq( ~((getattr(self, "row_scan" + str(r)) ^ getattr(self, "row_debounce" + str(r))) == 0) )
                 ).Else(
                     rowchanging[r].eq(rowchanging[r])
@@ -264,37 +247,31 @@ an interrupt.
             )
         )
         db_fsm.act("DEBOUNCED",
-            debounced.eq(1),
-            NextState("IDLE")
-        )
-
-        # Fire an interrupt during the reset_scan phase. Delay by 2 cycles so that rowchange can pick
-        # up a new value before the "pending" bit is set.
-        kp_d  = Signal()
-        kp_d2 = Signal()
-        kp_r  = Signal()
-        kp_r2 = Signal()
-        self.kbd_wakeup = Signal()
-        self.sync.kbd += kp_d.eq(debounced & (rowdiff != 0))
-        self.sync.kbd += kp_d2.eq(kp_d)
-        self.comb += self.kbd_wakeup.eq(kp_d2 | pending_kbd) # wakeup in advance of any potential keyboard change
-        self.sync += kp_r.eq(kp_d2)
-        self.sync += kp_r2.eq(kp_r)
-        self.comb += self.ev.keypressed.trigger.eq(kp_r & ~kp_r2)
-
-        self.rowchange = CSRStatus(rows.nbits, name="rowchange",
-            description="""The rows that changed at the point of interrupt generation.
-            Does not update again until the interrupt is serviced.""")
-        reset_scan_sys = Signal()
-        self.specials += MultiReg(reset_scan, reset_scan_sys)
-        self.sync += [
-            If(reset_scan_sys & ~self.ev.keypressed.pending,
-               self.rowchange.status.eq(rowdiff)
-            ).Else(
-                self.rowchange.status.eq(self.rowchange.status)
+            If(scan_done,
+                debounced.eq(1),
+                NextState("IDLE")
             )
-        ]
-        #self.specials += MultiReg(self.ev.keypressed.pending, pending_kbd, "kbd")
+        )
+        self.comb += clear_deltas.eq(all_zeros & clear_kbd & db_fsm.ongoing("IDLE"))
+
+        # Fire an interrupt during the reset_scan phase.
+        changed  = Signal()
+        changed_sys = Signal()
+        kp_r  = Signal()
+        changed_kbd = Signal()
+        changed_kbd2 = Signal()
+        debounced_d = Signal()
+        self.sync.kbd += debounced_d.eq(debounced)
+        self.kbd_wakeup = Signal()
+        self.comb += changed.eq(debounced_d & (rowdiff != 0))
+        self.sync.kbd += changed_kbd.eq(changed)
+        self.sync.kbd += changed_kbd2.eq(changed_kbd) # 2 cycles for the multireg kbd to return so we don't glitch this
+        self.comb += self.kbd_wakeup.eq(changed_kbd | changed_kbd2 | pending_kbd) # wakeup in advance of any potential keyboard change
+
+        self.specials += MultiReg(changed_kbd, changed_sys)
+        self.sync += kp_r.eq(changed_sys)
+        self.comb += self.ev.keypressed.trigger.eq(changed_sys & ~kp_r)
+
         self.submodules.pending_sync = BlindTransfer("sys", "kbd")
         self.comb += [
             self.pending_sync.i.eq(self.ev.keypressed.pending),

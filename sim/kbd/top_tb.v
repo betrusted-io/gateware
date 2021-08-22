@@ -40,7 +40,7 @@ always @(posedge lpclk) begin
 end
 always @(*) begin
    if (presscount < 11'd300) begin
-      row <= {4'b0, col[2] | col[4], 3'b0}; // initial key press, long enough to debounce
+      row <= {4'b0, col[8] | col[9], 3'b0}; // initial key press, long enough to debounce
    end else if ((presscount < 11'd600) && (presscount < 11'd650)) begin
       row <= 0;  // bounce it
    end else if ((presscount < 11'd700) && (presscount < 11'd750)) begin
