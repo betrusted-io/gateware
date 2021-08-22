@@ -10,8 +10,7 @@ class WDT(Module, AutoDoc, AutoCSR):
         default_period = 325000000
         self.intro = ModuleDoc("""Watch Dog Timer
 A watchdog timer for Betrusted. Once enabled, it cannot be disabled, and
-it must have the words `600d` then `c0de` written to the reset_code register
-in sequence, once every timeout period. 
+it must have the reset_wdt bit written periodically to avoid a watchdog reset event.
 
 If this does not happen, the WDT will attempt to toggle reset of the full chip via GSR.
 
@@ -27,27 +26,34 @@ The register cannot be updated once the WDT is running.
         platform.add_platform_command("create_clock -name wdt -period 10.256 [get_nets {net}]", net=self.cd_wdt.clk) # 65MHz + 50% tolerance
 
         ### WATCHDOG RESET, uses the extcomm_div divider to save on gates
-        self.watchdog = CSRStorage(17, fields=[
-            CSRField("reset_code", size=16,
-                description="Write `600d` then `c0de` in sequence to this register to reset the watchdog timer"),
+        self.watchdog = CSRStorage(fields=[
+            CSRField("reset_wdt", size=1,
+                description="Write to this register to reset the watchdog timer", pulse=True),
             CSRField("enable",
                 description="Enable the watchdog timer. Cannot be disabled once enabled, except with a reset. Notably, a watchdog reset will disable the watchdog.",
                 reset=0),
         ])
+        reset_wdt = Signal()
+        w_stretch = Signal(3)
+        reset_wdt_sys = Signal()
+        self.sync += [
+            If(self.watchdog.fields.reset_wdt,
+                w_stretch.eq(7)
+            ).Elif(w_stretch > 0,
+                w_stretch.eq(w_stretch - 1)
+            ),
+            reset_wdt_sys.eq(w_stretch != 0),
+        ]
+        self.submodules.reset_sync = BlindTransfer("sys", "wdt")
+        self.comb += [
+            self.reset_sync.i.eq(reset_wdt_sys),
+            reset_wdt.eq(self.reset_sync.o),
+        ]
         self.period = CSRStorage(32, fields=[
             CSRField("period", size=32,
                 description="Number of 'approximately 65MHz' CFGMCLK cycles before each reset_code must be entered. Defaults to a range of {:0.2f}-{:0.2f} seconds".format((default_period * 10.256e-9)*0.5, (default_period * 10.256e-9)*1.5), reset=default_period
             )
         ])
-
-        self.interrupt = CSRStorage(1, fields=[
-            CSRField("interrupt", size = 1, pulse=True,
-                description="Writing this causes an interrupt to fire. Used by the kernel to initiate a routine to reset the WDT in an interrupt context."
-            )
-        ])
-        self.submodules.ev = EventManager()
-        self.ev.soft_int = EventSourceProcess()
-        self.comb += self.ev.soft_int.trigger.eq(self.interrupt.fields.interrupt)
 
         self.state = CSRStatus(4, fields=[
             CSRField("enabled", size=1, description="WDT has been enabled"),
@@ -75,14 +81,7 @@ The register cannot be updated once the WDT is running.
             wdog_enabled_r.eq(wdog_enabled)
         ]
         self.specials += MultiReg(wdog_enabled, self.state.fields.enabled)
-        self.submodules.code_sync = BusSynchronizer(16, "sys", "wdt")
-        reset_code_wdt = Signal(16)
-        self.comb += [
-            self.code_sync.i.eq(self.watchdog.fields.reset_code),
-        ]
-        self.sync.wdt += [
-            reset_code_wdt.eq(self.code_sync.o)
-        ]
+
         self.submodules.period_sync = BusSynchronizer(32, "sys", "wdt")
         wdt_count = Signal(32)
         self.comb += [
@@ -125,22 +124,12 @@ The register cannot be updated once the WDT is running.
             )
         )
         wdog.act("ARMED_HOT",
-            armed1.eq(1),
-            If(wdog_cycle,
-                do_reset.eq(1),
-            ),
-            If(reset_code_wdt == 0x600d,
-                NextState("DISARM1_HOT")
-            )
-        )
-        wdog.act("DISARM1_HOT",
             armed2.eq(1),
-            If(wdog_cycle,
+            If(reset_wdt,
+                NextState("DISARMED")
+            ).Elif(wdog_cycle,
                 do_reset.eq(1),
             ),
-            If(reset_code_wdt == 0xc0de,
-                NextState("ARMED")
-            )
         )
         # double-interlock: not having responded to the watchdog code immediately
         # is not cause for a reset: this could just be the wdog_cycle hitting at an
@@ -149,18 +138,10 @@ The register cannot be updated once the WDT is running.
         # the watchdog next period, if no action was taken, we do a reset
         wdog.act("ARMED",
             armed1.eq(1),
-            If(wdog_cycle,
-                NextState("ARMED_HOT")
-            ).Elif(reset_code_wdt == 0x600d,
-                NextState("DISARM1")
-            )
-        )
-        wdog.act("DISARM1",
-            armed2.eq(1),
-            If(wdog_cycle,
-                NextState("DISARM1_HOT")
-            ).Elif(reset_code_wdt == 0xc0de,
+            If(reset_wdt,
                 NextState("DISARMED")
+            ).Elif(wdog_cycle,
+                NextState("ARMED_HOT")
             )
         )
         wdog.act("DISARMED",
@@ -176,7 +157,6 @@ The register cannot be updated once the WDT is running.
             self.do_res_sync.i.eq(do_reset),
             do_reset_sys.eq(self.do_res_sync.o),
         ]
-        self.specials += MultiReg(do_reset, do_reset_sys) # sysclk should be strictly shorter than cclk for this to work, otherwise we may need a blind synchronizer
         self.sync += [
             If(do_reset_sys,
                 reset_stretch.eq(31),
