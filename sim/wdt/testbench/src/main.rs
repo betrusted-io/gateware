@@ -28,9 +28,13 @@ fn run(p: &pac::Peripherals) {
 
     let mut wait = 0x3000_0000;
     for i in 0..1_000 {
-        p.WDT.watchdog.write(|w| unsafe{w.reset_code().bits(0x600d)});
+        p.WDT.watchdog.write(|w| w.reset_wdt().set_bit());
+        // p.WDT.watchdog.write(|w| unsafe{w.reset_code().bits(0x600d)});
         report(&p, wait + i); // should WDT reset sometime in here
-        p.WDT.watchdog.write(|w| unsafe{w.reset_code().bits(0xc0de)});
+        report(&p, wait + i + 0x100_000);
+        report(&p, wait + i + 0x200_000);
+        report(&p, wait + i + 0x300_000);
+        //p.WDT.watchdog.write(|w| unsafe{w.reset_code().bits(0xc0de)});
     }
 
     // set success to indicate to the CI framework that the test has passed
