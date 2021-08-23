@@ -259,21 +259,34 @@ an interrupt.
         changed_sys = Signal()
         kp_r  = Signal()
         changed_kbd = Signal()
-        changed_kbd2 = Signal()
         debounced_d = Signal()
         self.sync.kbd += debounced_d.eq(debounced)
         self.kbd_wakeup = Signal()
         self.comb += changed.eq(debounced_d & (rowdiff != 0))
-        self.sync.kbd += changed_kbd.eq(changed)
-        self.sync.kbd += changed_kbd2.eq(changed_kbd) # 2 cycles for the multireg kbd to return so we don't glitch this
-        self.comb += self.kbd_wakeup.eq(changed_kbd | changed_kbd2 | pending_kbd) # wakeup in advance of any potential keyboard change
+        self.sync.kbd += [
+            If(changed,
+                changed_kbd.eq(1)
+            ).Elif(key_ack,
+                changed_kbd.eq(0)
+            ).Else(
+                changed_kbd.eq(changed_kbd)
+            )
+        ]
+        self.comb += self.kbd_wakeup.eq(changed_kbd | changed)
 
         self.specials += MultiReg(changed_kbd, changed_sys)
         self.sync += kp_r.eq(changed_sys)
         self.comb += self.ev.keypressed.trigger.eq(changed_sys & ~kp_r)
 
         self.submodules.pending_sync = BlindTransfer("sys", "kbd")
+        # pulse-convert pending into a single pulse on the falling edge -- otherwise we get a pulse train
+        kp_pending_sys = Signal()
+        kp_pending_sys_r = Signal()
+        self.sync += [
+            kp_pending_sys.eq(self.ev.keypressed.pending),
+            kp_pending_sys_r.eq(kp_pending_sys),
+        ]
         self.comb += [
-            self.pending_sync.i.eq(self.ev.keypressed.pending),
+            self.pending_sync.i.eq(~kp_pending_sys & kp_pending_sys_r),
             pending_kbd.eq(self.pending_sync.o),
         ]

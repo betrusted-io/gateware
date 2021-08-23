@@ -32,28 +32,36 @@ sim_bench dut (
     .sim_report(report)
 );
 
-// simulate two key presses, the first one bounces on release, the second one holds until end of simulation
-reg [10:0] presscount;
-initial presscount = 11'd0;
+// simulate some key presses, the first one bounces on release, plus some more regular ones
+reg [11:0] presscount;
+initial presscount = 12'd0;
 always @(posedge lpclk) begin
    presscount <= presscount + 1;
 end
 always @(*) begin
-   if (presscount < 11'd300) begin
+   if (presscount < 12'd300) begin
       row <= {4'b0, col[8] | col[9], 3'b0}; // initial key press, long enough to debounce
-   end else if ((presscount < 11'd600) && (presscount < 11'd650)) begin
+   end else if ((presscount < 12'd600) && (presscount < 12'd650)) begin
       row <= 0;  // bounce it
-   end else if ((presscount < 11'd700) && (presscount < 11'd750)) begin
+   end else if ((presscount < 12'd700) && (presscount < 12'd750)) begin
       row <= {4'b0, col[2] | col[4], 3'b0};
-   end else if (presscount < 11'd1100) begin
+   end else if (presscount < 12'd1100) begin
       row <= 0;  // now let it go for a while
-   end else begin
-      row <= {5'b0, col[1], 2'b0}; // second key press to end the simulation
+   end else if (presscount < 12'd1800) begin
+      row <= {5'b0, col[3], 2'b0};
+   end else if (presscount < 12'd2400) begin
+      row <= 0;
+   end else if (presscount < 12'd3200) begin
+      row <= {4'b0, col[1] | col[7], 2'b0};
+   end else if (presscount < 12'd4000) begin
+      row <= 0;
+   end else if (presscount < 12'd4800) begin
+      row <= {5'b0, col[0], 2'b0};
    end
 end
 
 
-// add extra variables for CI watching here   
+// add extra variables for CI watching here
 initial begin
    $dumpvars(0, row);
    $dumpvars(0, col);
