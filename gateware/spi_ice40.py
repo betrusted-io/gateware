@@ -202,21 +202,16 @@ class SpiFifoPeripheral(Module, AutoCSR, AutoDoc):
         "hold" condition until the next data is made available for reading.
         """)
 
-        self.cipo = Signal()
         self.copi = pads.copi
         self.csn = pads.csn
         self.hold = Signal()
         self.oe = Signal()  # used to disable driving signals to the target device when it is powered down
-        self.cipo_ts = TSTriple(1)
         self.hold_ts = TSTriple(1)
         self.specials += [
-            self.cipo_ts.get_tristate(pads.cipo),
             self.hold_ts.get_tristate(pads.hold)
         ]
         self.comb += [
-            self.cipo_ts.oe.eq(self.oe),
             self.hold_ts.oe.eq(self.oe),
-            self.cipo_ts.o.eq(self.cipo),
             self.hold_ts.o.eq(self.hold),
         ]
 
@@ -260,7 +255,7 @@ class SpiFifoPeripheral(Module, AutoCSR, AutoDoc):
             )
         ]
 
-        # read/rx subsystemx
+        # read/rx subsystem
         self.submodules.rx_fifo = rx_fifo = ResetInserter(["sys"])(SyncFIFOBuffered(16, 1280)) # should infer SB_RAM256x16's. 2560 depth > 2312 bytes = wifi MTU
         self.comb += self.rx_fifo.reset_sys.eq(self.control.fields.reset | ResetSignal())
         self.submodules.rx_under = StickyBit()
@@ -333,7 +328,7 @@ class SpiFifoPeripheral(Module, AutoCSR, AutoDoc):
         ]
 
         # Replica CSR into "spi" clock domain
-        self.txrx = Signal(16)
+        self.tx = Signal(16)
         self.tip_r = Signal()
         self.rxfull_r = Signal()
         self.rxover_r = Signal()
@@ -360,115 +355,68 @@ class SpiFifoPeripheral(Module, AutoCSR, AutoDoc):
         ]
 
         rx = Signal(16)
-        self.comb += self.cipo.eq(self.txrx[15])
         self.comb += [
-            self.rx_fifo.din.eq(rx),
+            self.rx_fifo.din.eq(rx), # assume CS is high for quite a while before donepulse triggers the write, this stabilizes the rx din
             self.rx_fifo.we.eq(donepulse),
             self.tx_fifo.re.eq(donepulse),
         ]
 
-        tx_data = Signal(16)
+        # form the SPI-clock domain shift registers.
         self.comb += [
-            If(self.tx_fifo.readable, tx_data.eq(self.tx_fifo.dout)
-            ).Else(tx_data.eq(0xDDDD)), # in case of underflow send an error code
             self.hold.eq(~self.tx_fifo.readable),
         ]
+        # input register on copi. Falling edge sampling.
+        self.specials += Instance("SB_IO",
+            p_IO_STANDARD = "SB_LVCMOS",
+            p_PIN_TYPE = 0b0000_00,
+            p_NEG_TRIGGER = 0,
+            io_PACKAGE_PIN = self.copi,
+            i_CLOCK_ENABLE = 1,
+            i_INPUT_CLK = ClockSignal("spi_peripheral"),
+            i_OUTPUT_ENABLE = 0,
+            o_D_IN_1 = rx[0], # D_IN_1 is falling edge when NEG_TRIGGER is 0
+        )
+        for bit in range(15):
+            self.specials += Instance("SB_DFFN",
+                i_C=ClockSignal("spi_peripheral"),
+                i_D=rx[bit],
+                o_Q=rx[bit+1],
+            )
+
+        # output register on cipo. produces new result on falling-edge
+        self.specials += Instance("SB_IO",
+            p_IO_STANDARD = "SB_LVCMOS",
+            p_PIN_TYPE = 0b1001_11,
+            p_NEG_TRIGGER = 1, # this causes the output to update on the falling edge
+            io_PACKAGE_PIN = pads.cipo,
+            i_CLOCK_ENABLE = 1,
+            i_OUTPUT_CLK = ClockSignal("spi_peripheral"),
+            i_OUTPUT_ENABLE = self.oe,
+            i_D_OUT_0 = self.tx[15],
+
+        )
+        spi_bitcount = Signal(4)
+        spi_bitcount_next = Signal(4)
+        # tx is updated on the rising edge, but the SB_IO primitive pushes the new data out on the falling edge
+        # so the total time we have to move the data from this shift register to the output register is a half
+        # clock cycle.
         self.sync.spi_peripheral += [
-            # "Sloppy" clock boundary crossing allowed because rx is, in theory, static when donepulse happens
-            If(self.csn == 0,
-               self.txrx.eq(Cat(self.copi, self.txrx[0:15])),
-               rx.eq(Cat(self.copi, self.txrx[0:15])),
-            ).Else(
-               rx.eq(rx),
-               self.txrx.eq(tx_data)
-            )
-        ]
-
-
-
-class SpiPeripheral(Module, AutoCSR, AutoDoc):
-    def __init__(self, pads):
-        self.intro = ModuleDoc("""Simple soft SPI peripheral module optimized for Betrusted-EC (UP5K arch) use
-
-        Assumes a free-running sclk and csn performs the function of framing bits
-        Thus csn must go high between each frame, you cannot hold csn low for burst transfers
-        """)
-
-        self.cipo = pads.cipo
-        self.copi = pads.copi
-        self.csn = pads.csn
-
-        ### clock is not wired up in this module, it's moved up to CRG for implementation-dependent buffering
-
-        self.tx = CSRStorage(16, name="tx", description="""Tx data, to CIPO""")
-        self.rx = CSRStatus(16, name="rx", description="""Rx data, from COPI""")
-        self.control = CSRStorage(fields=[
-            CSRField("intena", description="Enable interrupt on transaction finished"),
-            CSRField("clrerr", description="Clear Rx overrun error", pulse=True),
-        ])
-        self.status = CSRStatus(fields=[
-            CSRField("tip", description="Set when transaction is in progress"),
-            CSRField("rxfull", description="Set when Rx register has new, valid contents to read"),
-            CSRField("rxover", description="Set if Rx register was not read before another transaction was started")
-        ])
-
-        self.submodules.ev = EventManager(document_fields=True)
-        self.ev.spi_int = EventSourceProcess()  # falling edge triggered
-        self.ev.finalize()
-        self.comb += self.ev.spi_int.trigger.eq(self.control.fields.intena & self.status.fields.tip)
-
-        # Replica CSR into "spi" clock domain
-        self.txrx = Signal(16)
-        self.tip_r = Signal()
-        self.rxfull_r = Signal()
-        self.rxover_r = Signal()
-        self.csn_r = Signal()
-
-        self.specials += MultiReg(self.tip_r, self.status.fields.tip)
-        self.comb += self.tip_r.eq(~self.csn)
-        tip_d = Signal()
-        donepulse = Signal()
-        self.sync += tip_d.eq(self.tip_r)
-        self.comb += donepulse.eq(~self.tip_r & tip_d)  # done pulse goes high when tip drops
-
-        self.comb += self.status.fields.rxfull.eq(self.rxfull_r)
-        self.comb += self.status.fields.rxover.eq(self.rxover_r)
-
-        self.sync += [
-            If(self.rx.we,
-               self.rxfull_r.eq(0),
-            ).Else(
-                If(donepulse,
-                   self.rxfull_r.eq(1)
+            If(spi_bitcount == 0,
+                If(self.tx_fifo.readable,
+                    self.tx.eq(self.tx_fifo.dout),
                 ).Else(
-                    self.rxfull_r.eq(self.rxfull_r),
+                    self.tx.eq(0xDDDD), # in case of underflow send error code
                 ),
-
-                If(self.tip_r & self.rxfull_r,
-                   self.rxover_r.eq(1)
-                ).Elif(self.control.fields.clrerr,
-                   self.rxover_r.eq(0)
-                ).Else(
-                    self.rxover_r.eq(self.rxover_r)
-                ),
-            )
-        ]
-
-        self.comb += self.cipo.eq(self.txrx[15])
-        csn_d = Signal()
-        self.sync.spi_peripheral += [
-            csn_d.eq(self.csn),
-            # "Sloppy" clock boundary crossing allowed because "rxfull" is synchronized and CPU should grab data based on that
-            If(self.csn == 0,
-               self.txrx.eq(Cat(self.copi, self.txrx[0:15])),
-               self.rx.status.eq(self.rx.status),
             ).Else(
-               If(self.csn & ~csn_d,
-                 self.rx.status.eq(self.txrx),
-               ).Else(
-                   self.rx.status.eq(self.rx.status)
-               ),
-               self.txrx.eq(self.tx.storage)
+                self.tx.eq(Cat(1, self.tx[0:15])) # if we overshift, we eventually get all 1's
             )
         ]
-
+        # an asynchronously resettable counter, reset whenever CS is high.
+        for bit in range(4):
+            self.specials += Instance("SB_DFFR",
+                i_C=ClockSignal("spi_peripheral"),
+                i_D=spi_bitcount_next[bit],
+                i_Q=spi_bitcount[bit],
+                i_R=self.csn, # when CS is high, this count resets to 0 asynchronously
+            )
+        self.comb += spi_bitcount_next.eq(spi_bitcount + 1)
