@@ -222,7 +222,13 @@ class SpiFifoPeripheral(Module, AutoCSR, AutoDoc):
             CSRField("host_int", description="0->1 raises an interrupt to the COM host"), # rising edge triggered on other side
             CSRField("reset", description="Reset the fifos", pulse=True),
         ])
-        self.comb += pads.irq.eq(self.control.fields.host_int)
+
+
+        #### BRING THIS BACK
+        #!!!!!!!!!!!!!!!1 self.comb += pads.irq.eq(self.control.fields.host_int)
+        ####
+
+
         self.status = CSRStatus(fields=[
             CSRField("tip", description="Set when transaction is in progress"),
             CSRField("rx_avail", description="Set when Rx FIFO has new, valid contents to read"),
@@ -235,6 +241,7 @@ class SpiFifoPeripheral(Module, AutoCSR, AutoDoc):
             CSRField("tx_over", description="Set when Tx FIFO overflows"),
             CSRField("tx_under", description = "Set when Tx FIFO underflows"),
         ])
+        """
         self.submodules.ev = EventManager()
         self.ev.spi_avail = EventSourceProcess(description="Triggered when Rx FIFO leaves empty state")  # rising edge triggered
         self.ev.spi_event = EventSourceProcess(description="Triggered every time a packet completes")  # falling edge triggered
@@ -243,7 +250,7 @@ class SpiFifoPeripheral(Module, AutoCSR, AutoDoc):
         self.comb += self.ev.spi_avail.trigger.eq(~self.status.fields.rx_avail)
         self.comb += self.ev.spi_event.trigger.eq(self.status.fields.tip)
         self.comb += self.ev.spi_err.trigger.eq(~(self.status.fields.rx_over | self.status.fields.rx_under | self.status.fields.tx_over | self.status.fields.tx_under))
-
+        """
         self.bus = bus = wishbone.Interface()
         rd_ack = Signal()
         wr_ack = Signal()
@@ -328,7 +335,7 @@ class SpiFifoPeripheral(Module, AutoCSR, AutoDoc):
         ]
 
         # Replica CSR into "spi" clock domain
-        self.tx = Signal(16)
+        self.tx = Signal(16, reset_less=True)
         self.tip_r = Signal()
         self.rxfull_r = Signal()
         self.rxover_r = Signal()
@@ -354,7 +361,7 @@ class SpiFifoPeripheral(Module, AutoCSR, AutoDoc):
             self.tx_under.flag.eq(~self.tx_fifo.readable & donepulse),
         ]
 
-        rx = Signal(16)
+        rx = Signal(16, reset_less=True)
         self.comb += [
             self.rx_fifo.din.eq(rx), # assume CS is high for quite a while before donepulse triggers the write, this stabilizes the rx din
             self.rx_fifo.we.eq(donepulse),
@@ -372,13 +379,13 @@ class SpiFifoPeripheral(Module, AutoCSR, AutoDoc):
             p_NEG_TRIGGER = 0,
             io_PACKAGE_PIN = self.copi,
             i_CLOCK_ENABLE = 1,
-            i_INPUT_CLK = ClockSignal("spi_peripheral"),
+            i_INPUT_CLK = ClockSignal("sclk"),
             i_OUTPUT_ENABLE = 0,
             o_D_IN_1 = rx[0], # D_IN_1 is falling edge when NEG_TRIGGER is 0
         )
         for bit in range(15):
             self.specials += Instance("SB_DFFN",
-                i_C=ClockSignal("spi_peripheral"),
+                i_C=ClockSignal("sclk"),
                 i_D=rx[bit],
                 o_Q=rx[bit+1],
             )
@@ -386,21 +393,20 @@ class SpiFifoPeripheral(Module, AutoCSR, AutoDoc):
         # output register on cipo. produces new result on falling-edge
         self.specials += Instance("SB_IO",
             p_IO_STANDARD = "SB_LVCMOS",
-            p_PIN_TYPE = 0b1001_11,
+            p_PIN_TYPE = 0b1001_00,
             p_NEG_TRIGGER = 1, # this causes the output to update on the falling edge
             io_PACKAGE_PIN = pads.cipo,
             i_CLOCK_ENABLE = 1,
-            i_OUTPUT_CLK = ClockSignal("spi_peripheral"),
+            i_OUTPUT_CLK = ClockSignal("sclk"),
             i_OUTPUT_ENABLE = self.oe,
             i_D_OUT_0 = self.tx[15],
-
         )
-        spi_bitcount = Signal(4)
-        spi_bitcount_next = Signal(4)
+        spi_bitcount = Signal(4, reset_less=True)
+        spi_bitcount_next = Signal(4, reset_less=True)
         # tx is updated on the rising edge, but the SB_IO primitive pushes the new data out on the falling edge
         # so the total time we have to move the data from this shift register to the output register is a half
         # clock cycle.
-        self.sync.spi_peripheral += [
+        self.sync.sclk += [
             If(spi_bitcount == 0,
                 If(self.tx_fifo.readable,
                     self.tx.eq(self.tx_fifo.dout),
@@ -414,9 +420,23 @@ class SpiFifoPeripheral(Module, AutoCSR, AutoDoc):
         # an asynchronously resettable counter, reset whenever CS is high.
         for bit in range(4):
             self.specials += Instance("SB_DFFR",
-                i_C=ClockSignal("spi_peripheral"),
+                i_C=ClockSignal("sclk"),
                 i_D=spi_bitcount_next[bit],
                 i_Q=spi_bitcount[bit],
                 i_R=self.csn, # when CS is high, this count resets to 0 asynchronously
             )
         self.comb += spi_bitcount_next.eq(spi_bitcount + 1)
+
+        self.comb += pads.irq.eq(ClockSignal("sclk"))
+"""
+        self.specials += Instance("SB_IO",
+            p_IO_STANDARD = "SB_LVCMOS",
+            p_PIN_TYPE = 0b1001_00,
+            io_PACKAGE_PIN = pads.irq,
+            i_CLOCK_ENABLE = 1,
+            i_OUTPUT_CLK = ClockSignal("sclk"),
+            i_OUTPUT_ENABLE = 1,
+            i_D_OUT_0 = spi_bitcount[0],
+        )
+
+"""
