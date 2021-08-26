@@ -170,24 +170,13 @@ class StickyBit(Module):
 
 class SpiFifoPeripheral(Module, AutoCSR, AutoDoc):
     def __init__(self, pads):
-        self.intro = ModuleDoc("""Simple soft SPI peripheral module optimized for Betrusted-EC (UP5K arch) use
+        self.intro = ModuleDoc("""SPI peripheral module optimized for Betrusted-EC (UP5K arch) use
 
-        Assumes a free-running sclk and csn performs the function of framing bits
-        Thus csn must go high between each frame, you cannot hold csn low for burst transfers.
+        A slightly non-standard SPI implementation. The implementation is very similar to
+        standard SPI Mode 1, with the exception that the CIPO is delayed by one clock. This
+        means that the controller has to sample CIPO for one "ghost" clock beyond the the number
+        of SCLK pulses.
         
-        A free-running clock is necessitated because the FIFO primitive used here is synchronous
-        to the sysclk domain, not the SPICLK domain. An async FIFO would take too many gates; a sync
-        FIFO can use ICESTORM_RAMs efficiently. However, the price is that in order to synchronize from
-        spiclk->sysclk, we need some extra trailing spiclk signals to generate the latching pulse from
-        spiclk domain to sysclk domain (we run CS_N through a MultiReg synchronizer and then do a rising
-        edge detect on that in sysclk). This need is driven in part by the fact that we anticipate that
-        SPICLK may run (much) faster than sysclk -- it's constrained to 24MHz in the design but 
-        it looks like we could run it much, much faster. 
-        
-        Capturing the data with no sync overhead would require either a fancier state machine and/or
-        async fifos, both which burn gates. Thus the call here is to incur some packet-to-packet overhead on 
-        the SPI bus by imposing a sync penalty after each packet received, but on the upside the bus can
-        run much faster, and also the implementation is extremely small.     
         """)
 
         self.protocol = ModuleDoc("""Enhanced Protocol for COM
@@ -222,12 +211,7 @@ class SpiFifoPeripheral(Module, AutoCSR, AutoDoc):
             CSRField("host_int", description="0->1 raises an interrupt to the COM host"), # rising edge triggered on other side
             CSRField("reset", description="Reset the fifos", pulse=True),
         ])
-
-
-        #### BRING THIS BACK
-        #!!!!!!!!!!!!!!!1 self.comb += pads.irq.eq(self.control.fields.host_int)
-        ####
-
+        self.comb += pads.irq.eq(self.control.fields.host_int)
 
         self.status = CSRStatus(fields=[
             CSRField("tip", description="Set when transaction is in progress"),
@@ -241,16 +225,6 @@ class SpiFifoPeripheral(Module, AutoCSR, AutoDoc):
             CSRField("tx_over", description="Set when Tx FIFO overflows"),
             CSRField("tx_under", description = "Set when Tx FIFO underflows"),
         ])
-        """
-        self.submodules.ev = EventManager()
-        self.ev.spi_avail = EventSourceProcess(description="Triggered when Rx FIFO leaves empty state")  # rising edge triggered
-        self.ev.spi_event = EventSourceProcess(description="Triggered every time a packet completes")  # falling edge triggered
-        self.ev.spi_err = EventSourceProcess(description="Triggered when any error condition occurs") # rising edge
-        self.ev.finalize()
-        self.comb += self.ev.spi_avail.trigger.eq(~self.status.fields.rx_avail)
-        self.comb += self.ev.spi_event.trigger.eq(self.status.fields.tip)
-        self.comb += self.ev.spi_err.trigger.eq(~(self.status.fields.rx_over | self.status.fields.rx_under | self.status.fields.tx_over | self.status.fields.tx_under))
-        """
         self.bus = bus = wishbone.Interface()
         rd_ack = Signal()
         wr_ack = Signal()
@@ -376,12 +350,12 @@ class SpiFifoPeripheral(Module, AutoCSR, AutoDoc):
         self.specials += Instance("SB_IO",
             p_IO_STANDARD = "SB_LVCMOS",
             p_PIN_TYPE = 0b0000_00,
-            p_NEG_TRIGGER = 0,
+            p_NEG_TRIGGER = 1,
             io_PACKAGE_PIN = self.copi,
             i_CLOCK_ENABLE = 1,
             i_INPUT_CLK = ClockSignal("sclk"),
             i_OUTPUT_ENABLE = 0,
-            o_D_IN_1 = rx[0], # D_IN_1 is falling edge when NEG_TRIGGER is 0
+            o_D_IN_0 = rx[0], # D_IN_0 is falling edge when NEG_TRIGGER is 1
         )
         for bit in range(15):
             self.specials += Instance("SB_DFFN",
@@ -401,13 +375,12 @@ class SpiFifoPeripheral(Module, AutoCSR, AutoDoc):
             i_OUTPUT_ENABLE = self.oe,
             i_D_OUT_0 = self.tx[15],
         )
-        spi_bitcount = Signal(4, reset_less=True)
-        spi_bitcount_next = Signal(4, reset_less=True)
         # tx is updated on the rising edge, but the SB_IO primitive pushes the new data out on the falling edge
         # so the total time we have to move the data from this shift register to the output register is a half
         # clock cycle.
+        spi_load = Signal()
         self.sync.sclk += [
-            If(spi_bitcount == 0,
+            If(spi_load,
                 If(self.tx_fifo.readable,
                     self.tx.eq(self.tx_fifo.dout),
                 ).Else(
@@ -417,26 +390,9 @@ class SpiFifoPeripheral(Module, AutoCSR, AutoDoc):
                 self.tx.eq(Cat(1, self.tx[0:15])) # if we overshift, we eventually get all 1's
             )
         ]
-        # an asynchronously resettable counter, reset whenever CS is high.
-        for bit in range(4):
-            self.specials += Instance("SB_DFFR",
-                i_C=ClockSignal("sclk"),
-                i_D=spi_bitcount_next[bit],
-                i_Q=spi_bitcount[bit],
-                i_R=self.csn, # when CS is high, this count resets to 0 asynchronously
-            )
-        self.comb += spi_bitcount_next.eq(spi_bitcount + 1)
-
-        self.comb += pads.irq.eq(ClockSignal("sclk"))
-"""
-        self.specials += Instance("SB_IO",
-            p_IO_STANDARD = "SB_LVCMOS",
-            p_PIN_TYPE = 0b1001_00,
-            io_PACKAGE_PIN = pads.irq,
-            i_CLOCK_ENABLE = 1,
-            i_OUTPUT_CLK = ClockSignal("sclk"),
-            i_OUTPUT_ENABLE = 1,
-            i_D_OUT_0 = spi_bitcount[0],
+        self.specials += Instance("SB_DFFS",
+            i_C=ClockSignal("sclk"),
+            i_D=0,
+            o_Q=spi_load,
+            i_S=self.csn,
         )
-
-"""
