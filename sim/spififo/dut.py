@@ -107,17 +107,18 @@ class Dut(Sim):
 
         Sim.__init__(self, platform, custom_clocks=local_clocks, spiboot=spiboot, vex_verilog_path=VEX_CPU_PATH, **kwargs) # SoC magic is in here
 
-        # FIXME: the SpiFifoPeripheral core inside spi_ice40 is *not* the code used in the EC
-        # FIXME: the EC currently keeps it in an "rtl" directory. This should be fixed to point to "gateware"
         # SPI interface
         self.submodules.spicontroller = ClockDomainsRenamer({"sys":"spi"})(spi_7series.SPIController(platform.request("com")))
         self.add_csr("spicontroller")
+        self.clock_domains.cd_sclk = ClockDomain()
+        self.comb += self.cd_sclk.clk.eq(self.spicontroller.sclk)
 
-        self.submodules.com = ClockDomainsRenamer({"spi_peripheral":"spi"})(spi_ice40.SpiFifoPeripheral(platform.request("peripheral")))
+        self.submodules.com = spi_ice40.SpiFifoPeripheral(platform.request("peripheral"))
+        self.comb += self.com.oe.eq(1),
         self.add_wb_slave(self.mem_map["com"], self.com.bus, 4)
         self.add_memory_region("com", self.mem_map["com"], 4, type='io')
         self.add_csr("com")
-        self.add_interrupt("com")
+        # self.add_interrupt("com")
 
 """
 generate all the files necessary to run xsim
@@ -157,7 +158,7 @@ before calling SimRunner
 """
 def run_sim(ci=False):
     # add third-party modules via extra_cmds, eg. "cd run && xvlog ../MX66UM1G45G/MX66UM1G45G.v"
-    extra_cmds = []
+    extra_cmds = ["cd run && xvlog ../cells_sim.v"]
     SimRunner(ci, extra_cmds, vex_verilog_path=VEX_CPU_PATH)
 
 

@@ -11,6 +11,8 @@ wire cipo;
 wire sclk;
 wire csn;
 wire copi;
+wire hold;
+wire irq;
 
 sim_bench dut (
     // don't touch these two lines
@@ -22,11 +24,14 @@ sim_bench dut (
     .com_copi(copi),
     .com_cipo(cipo),
     .com_csn(csn),
+    .com_hold(hold),
 
     .peripheral_sclk(sclk),
     .peripheral_copi(copi),
     .peripheral_cipo(cipo),
     .peripheral_csn(csn),
+    .peripheral_hold(hold),
+    .peripheral_irq(irq),
 
     // don't touch these three lines
     .sim_success(success),

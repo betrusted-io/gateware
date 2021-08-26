@@ -27,9 +27,9 @@ fn run(p: &pac::Peripherals) {
         p.COM.control.write( |w| w.reset().bit(true) ); // reset fifos
         p.COM.control.write( |w| w.clrerr().bit(true) ); // clear all error flags
 
-        p.COM.ev_enable.write(|w| w.bits(0x7));  // enable interrupts
+        //p.COM.ev_enable.write(|w| w.bits(0x7));  // enable interrupts
 
-        (*com).write(0x0f0f);
+        //(*com).write(0x0f0f);
 
         p.SPICONTROLLER.tx.write(|w| w.bits(0xf055));
 
