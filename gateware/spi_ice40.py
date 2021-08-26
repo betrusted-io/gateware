@@ -169,26 +169,38 @@ class StickyBit(Module):
         ]
 
 class SpiFifoPeripheral(Module, AutoCSR, AutoDoc):
-    def __init__(self, pads):
+    def __init__(self, pads, pipeline_cipo=False):
         self.intro = ModuleDoc("""SPI peripheral module optimized for Betrusted-EC (UP5K arch) use
 
-        A slightly non-standard SPI implementation. The implementation is very similar to
-        standard SPI Mode 1, with the exception that the CIPO is delayed by one clock. This
-        means that the controller has to sample CIPO for one "ghost" clock beyond the the number
-        of SCLK pulses.
-        
-        """)
+The `pipeline_cipo` argument configures the interface to put a pipeline register
+on the output of CIPO. Setting this to `False` gives you a standards-compliant SPI Mode 1
+interface, but it should run at around 12-15MHz. Also I'm unaware of a method to convince
+nextpnr to fix asynchronous delays from fabric to output, and therefore the total delay
+from the fabric registers to the output seems to vary quite widely.
+
+Setting `pipeline_cipo` to `True` shifts the CIPO output late by a half clock cycle by
+resampling the CIPO line using an SB_IO register, but the clock-to-q timing is better 
+(about 14ns versus 21ns). Also, because the origin of the data is from an SB_IO register,
+the timing should be very consistent regardless of nextpnr's internal machinations. 
+The downside is that the controller needs to sample an extra bit after the SCLK stops.
+This isn't a problem for an FPGA design (and the matching spi_7series.SPIController IP
+block has a `pipeline_cipo` argument to match this block), but it won't work with most
+off-the-shelf microcontrollers. However, by using `pipeline_cipo`, you can increase
+the clock rate of the SPI bus to 20MHz with margin to spare.
+
+This module was built with `pipeline_cipo` set to {} 
+        """.format(pipeline_cipo))
 
         self.protocol = ModuleDoc("""Enhanced Protocol for COM
-        The large performance differential between the SoC and the EC in Precursor/Betrusted means that
-        it's very easy for the EC to be overwhelmed with requests from the SoC. 
-        
-        We extend the SPI protocol with a "hold" signal to inform the SoC that read data is not yet ready.
-        
-        This, in essence, is a matter of tying the Tx FIFO's "read empty" signal to the hold pin. 
-        The EC signals readiness to accept new commands by writing a single word to the Tx FIFO.
-        Upon receipt of the word, the FIFO will empty, raising the "read empty" signal and producing a
-        "hold" condition until the next data is made available for reading.
+The large performance differential between the SoC and the EC in Precursor/Betrusted means that
+it's very easy for the EC to be overwhelmed with requests from the SoC. 
+
+We extend the SPI protocol with a "hold" signal to inform the SoC that read data is not yet ready.
+
+This, in essence, is a matter of tying the Tx FIFO's "read empty" signal to the hold pin. 
+The EC signals readiness to accept new commands by writing a single word to the Tx FIFO.
+Upon receipt of the word, the FIFO will empty, raising the "read empty" signal and producing a
+"hold" condition until the next data is made available for reading.
         """)
 
         self.copi = pads.copi
@@ -364,35 +376,72 @@ class SpiFifoPeripheral(Module, AutoCSR, AutoDoc):
                 o_Q=rx[bit+1],
             )
 
-        # output register on cipo. produces new result on falling-edge
-        self.specials += Instance("SB_IO",
-            p_IO_STANDARD = "SB_LVCMOS",
-            p_PIN_TYPE = 0b1001_00,
-            p_NEG_TRIGGER = 1, # this causes the output to update on the falling edge
-            io_PACKAGE_PIN = pads.cipo,
-            i_CLOCK_ENABLE = 1,
-            i_OUTPUT_CLK = ClockSignal("sclk"),
-            i_OUTPUT_ENABLE = self.oe,
-            i_D_OUT_0 = self.tx[15],
-        )
-        # tx is updated on the rising edge, but the SB_IO primitive pushes the new data out on the falling edge
-        # so the total time we have to move the data from this shift register to the output register is a half
-        # clock cycle.
-        spi_load = Signal()
-        self.sync.sclk += [
-            If(spi_load,
-                If(self.tx_fifo.readable,
-                    self.tx.eq(self.tx_fifo.dout),
-                ).Else(
-                    self.tx.eq(0xDDDD), # in case of underflow send error code
-                ),
-            ).Else(
-                self.tx.eq(Cat(1, self.tx[0:15])) # if we overshift, we eventually get all 1's
+        if pipeline_cipo:
+            # output register on cipo. produces new result on falling-edge
+            # this improves Tc-q timing, and more importantly, keeps it consistent between builds
+            self.specials += Instance("SB_IO",
+                p_IO_STANDARD = "SB_LVCMOS",
+                p_PIN_TYPE = 0b1001_00,
+                p_NEG_TRIGGER = 1, # this causes the output to update on the falling edge
+                io_PACKAGE_PIN = pads.cipo,
+                i_CLOCK_ENABLE = 1,
+                i_OUTPUT_CLK = ClockSignal("sclk"),
+                i_OUTPUT_ENABLE = self.oe,
+                i_D_OUT_0 = self.tx[15],
             )
-        ]
-        self.specials += Instance("SB_DFFS",
-            i_C=ClockSignal("sclk"),
-            i_D=0,
-            o_Q=spi_load,
-            i_S=self.csn,
-        )
+            # tx is updated on the rising edge, but the SB_IO primitive pushes the new data out on the falling edge
+            # so the total time we have to move the data from this shift register to the output register is a half
+            # clock cycle.
+            spi_load = Signal()
+            self.sync.sclk += [
+                If(spi_load,
+                    If(self.tx_fifo.readable,
+                        self.tx.eq(self.tx_fifo.dout),
+                    ).Else(
+                        self.tx.eq(0xDDDD), # in case of underflow send error code
+                    ),
+                ).Else(
+                    self.tx.eq(Cat(1, self.tx[0:15])) # if we overshift, we eventually get all 1's
+                )
+            ]
+            self.specials += Instance("SB_DFFS",
+                i_C=ClockSignal("sclk"),
+                i_D=0,
+                o_Q=spi_load,
+                i_S=self.csn,
+            )
+        else:
+            # this path gets you a "standards compliant" SPI interface, but it's slower and the timing is less reliable
+            self.cipo_ts = TSTriple(1)
+            self.specials += [
+                self.cipo_ts.get_tristate(pads.cipo)
+            ]
+            self.comb += [
+                self.cipo_ts.oe.eq(self.oe),
+                self.cipo_ts.o.eq(self.tx[15]),
+            ]
+
+            tx_staged=Signal(16)
+            for bit in range(16):
+                if bit != 0:
+                    self.specials += Instance("SB_DFFS",
+                        i_C=ClockSignal("sclk"),
+                        i_D=self.tx[bit - 1],
+                        o_Q=self.tx[bit],
+                        i_S=tx_staged[bit] & self.csn,
+                    )
+                else:
+                    self.specials += Instance("SB_DFFS",
+                        i_C=ClockSignal("sclk"),
+                        i_D=0,
+                        o_Q=self.tx[bit],
+                        i_S=tx_staged[bit] & self.csn,
+                    )
+            self.comb += [
+                If(self.tx_fifo.readable,
+                    tx_staged.eq(self.tx_fifo.dout),
+                ).Else(
+                    tx_staged.eq(0xDDDD),
+                )
+            ]
+
