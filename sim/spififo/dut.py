@@ -108,12 +108,12 @@ class Dut(Sim):
         Sim.__init__(self, platform, custom_clocks=local_clocks, spiboot=spiboot, vex_verilog_path=VEX_CPU_PATH, **kwargs) # SoC magic is in here
 
         # SPI interface
-        self.submodules.spicontroller = ClockDomainsRenamer({"sys":"spi"})(spi_7series.SPIController(platform.request("com")))
+        self.submodules.spicontroller = ClockDomainsRenamer({"sys":"spi"})(spi_7series.SPIController(platform.request("com"), pipeline_cipo=True))
         self.add_csr("spicontroller")
         self.clock_domains.cd_sclk = ClockDomain()
         self.comb += self.cd_sclk.clk.eq(self.spicontroller.sclk)
 
-        self.submodules.com = spi_ice40.SpiFifoPeripheral(platform.request("peripheral"))
+        self.submodules.com = spi_ice40.SpiFifoPeripheral(platform.request("peripheral"), pipeline_cipo=True)
         self.comb += self.com.oe.eq(1),
         self.add_wb_slave(self.mem_map["com"], self.com.bus, 4)
         self.add_memory_region("com", self.mem_map["com"], 4, type='io')
