@@ -28,7 +28,7 @@ from litex.build.generic_platform import *
 from litex.soc.integration.builder import *
 
 # pull in the common objects from sim_bench
-from sim_support.sim_bench import Sim, Platform, BiosHelper, CheckSim, SimRunner
+from sim_support.sim_bench import Sim, Platform, BiosHelper, CheckSim, SimRunner, Preamble
 
 # handy to keep around in case a DUT framework needs it
 from litex.soc.integration.soc_core import *
@@ -87,12 +87,12 @@ def generate_top():
 
     # we have to do two passes: once to make the SVD, without compiling the BIOS
     # second, to compile the BIOS, which is then built into the gateware.
+    Preamble()
 
     # pass #1 -- make the SVD
     platform = Platform(dutio)
     soc = Dut(platform, spiboot=boot_from_spi)
 
-    os.system("mkdir -p ../../target")  # this doesn't exist on the first run
     builder = Builder(soc, output_dir="./run", csr_svd="../../target/soc.svd", compile_gateware=False, compile_software=False)
     vns = builder.build(run=False)
     soc.do_exit(vns)

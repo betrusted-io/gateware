@@ -28,7 +28,7 @@ from litex.build.generic_platform import *
 from litex.soc.integration.builder import *
 
 # pull in the common objects from sim_bench
-from sim_support.sim_bench import Sim, Platform, BiosHelper, CheckSim, SimRunner
+from sim_support.sim_bench import Sim, Platform, BiosHelper, CheckSim, SimRunner, Preamble
 
 # handy to keep around in case a DUT framework needs it
 from litex.soc.integration.soc_core import *
@@ -94,6 +94,17 @@ def generate_top():
     global dutio
     global boot_from_spi
 
+    if os.name == 'nt':
+        cpname = 'copy'
+        with open('testbench/curve25519-dalek/.cargo/config', 'w') as config:
+            config.write('[build]\ntarget="x86_64-pc-windows-msvc"\n')
+    else:
+        cpname = 'cp'
+        with open('testbench/curve25519-dalek/.cargo/config', 'w') as config:
+            config.write('[build]\ntarget="x86_64-unknown-linux-gnu"\n')
+
+    Preamble()
+
     if ~os.path.isfile('testbench/curve25519-dalek/test_vectors.bin'):
         # create a dummy file so that DUT can bootstrap and build soc.svd, required for building test vectors
         with open('testbench/curve25519-dalek/test_vectors.bin', 'wb') as out:
@@ -107,7 +118,6 @@ def generate_top():
     platform = Platform(dutio)
     soc = Dut(platform, spiboot=boot_from_spi)
 
-    os.system("mkdir -p ../../target")  # this doesn't exist on the first run
     builder = Builder(soc, output_dir="./run", csr_svd="../../target/soc.svd", compile_gateware=False, compile_software=False)
     vns = builder.build(run=False)
     soc.do_exit(vns)
@@ -124,10 +134,7 @@ def generate_top():
     platform = Platform(dutio)
     soc = Dut(platform, spiboot=boot_from_spi)
 
-    builder = Builder(soc, output_dir="./run")
-    builder.software_packages = [  # Point to a dummy Makefile, so Litex pulls in bios.bin but doesn't try building over it
-        ("bios", os.path.abspath(os.path.join(os.path.dirname(__file__), "testbench")))
-    ]
+    builder = Builder(soc, output_dir="./run", compile_software=False)
     vns = builder.build(run=False)
     soc.do_exit(vns)
 

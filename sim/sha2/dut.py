@@ -29,7 +29,7 @@ from litex.soc.integration.builder import *
 from litex.soc.integration.soc import SoCRegion
 
 # pull in the common objects from sim_bench
-from sim_support.sim_bench import Sim, Platform, BiosHelper, CheckSim, SimRunner
+from sim_support.sim_bench import Sim, Platform, BiosHelper, CheckSim, SimRunner, Preamble, DoPac
 
 # handy to keep around in case a DUT framework needs it
 from litex.soc.integration.soc_core import *
@@ -90,30 +90,25 @@ def generate_top():
 
     # we have to do two passes: once to make the SVD, without compiling the BIOS
     # second, to compile the BIOS, which is then built into the gateware.
+    Preamble()
 
     # pass #1 -- make the SVD
     platform = Platform(dutio)
     soc = Dut(platform, spiboot=boot_from_spi)
 
-    os.system("mkdir -p ../../target")  # this doesn't exist on the first run
     builder = Builder(soc, output_dir="./run", csr_svd="../../target/soc.svd", compile_gateware=False, compile_software=False)
     vns = builder.build(run=False)
     soc.do_exit(vns)
 
-    os.system("rm -rf testbench/sha2-pac")  # nuke the old PAC if it exists
-    os.system("mkdir -p testbench/sha2-pac") # rebuild it from scratch every time
-    os.system("cp pac-cargo-template testbench/sha2-pac/Cargo.toml")
-    os.system("cd testbench/sha2-pac && svd2rust --target riscv -i ../../../../target/soc.svd && rm -rf src; form -i lib.rs -o src/; rm lib.rs")
+    DoPac('sha2-pac')
+
     BiosHelper(soc, boot_from_spi) # marshals cargo to generate the BIOS from Rust files
 
     # pass #2 -- generate the SoC, incorporating the now-built BIOS
     platform = Platform(dutio)
     soc = Dut(platform, spiboot=boot_from_spi)
 
-    builder = Builder(soc, output_dir="./run")
-    builder.software_packages = [  # Point to a dummy Makefile, so Litex pulls in bios.bin but doesn't try building over it
-        ("bios", os.path.abspath(os.path.join(os.path.dirname(__file__), "testbench")))
-    ]
+    builder = Builder(soc, output_dir="./run", compile_software=False)
     vns = builder.build(run=False)
     soc.do_exit(vns)
 

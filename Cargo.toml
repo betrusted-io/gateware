@@ -1,10 +1,15 @@
 [workspace]
 members = [
+    "sim/rom_block/testbench",
+    "sim/sram32_cached/testbench",
+    "sim/keyrom/testbench",
+    "sim/wdt/testbench",
+    "sim/trng_managed/testbench",
     "sim/curve_engine/testbench",
     "sim/sha512/testbench",
     "sim/sha2/testbench",
     "sim/aes/testbench",
-    "sim/jtag_phy/testbench",
+    "sim_noci/jtag_phy/testbench",
     "sim/spi_basic/testbench",
     "sim/spififo/testbench",
     "sim/sram32/testbench",

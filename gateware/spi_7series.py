@@ -1,3 +1,4 @@
+from os import pipe
 from migen.genlib.cdc import MultiReg
 from migen.genlib.cdc import BlindTransfer
 
@@ -30,14 +31,22 @@ class PulseStretch(Module):
 
 
 class SPIController(Module, AutoCSR, AutoDoc):
-    def __init__(self, pads):
+    def __init__(self, pads, pipeline_cipo=False):
         self.intro = ModuleDoc("""Simple soft SPI Controller module optimized for Betrusted applications
 
         Requires a clock domain 'spi', which runs at the speed of the SPI bus.
 
         Simulation benchmarks 16.5us to transfer 16x16 bit words including setup overhead (sysclk=100MHz, spiclk=25MHz)
         which is about 15Mbps system-level performance, assuming the receiver can keep up.
-        """)
+
+        A receiver running at 18MHz, with a spiclk of 20MHz, shows about 55us for 16x16bit words, or about 4.5Mbps performance.
+
+        The `pipeline_cipo` argument, when set, introduces an extra pipeline stage on the return path from the peripheral.
+        This can help improve the timing closure when talking to slow devices, such as a UP5K. However, it makes the
+        bus not standards-compliant. Thus, by default this is set to False.
+
+        For this build, `pipeline_cipo` has been set to {}
+        """.format(pipeline_cipo))
 
         self.cipo = pads.cipo
         self.copi = pads.copi
@@ -46,22 +55,6 @@ class SPIController(Module, AutoCSR, AutoDoc):
         self.hold = pads.hold
         hold = Signal()
         self.specials += MultiReg(self.hold, hold)
-
-        # self.comb += self.sclk.eq(~ClockSignal("spi"))  # TODO: add clock gating to save power; note receiver reqs for CS pre-clocks
-        # generate a clock, this is Artix-specific
-        # mirror the clock with zero delay, and 180 degrees out of phase
-        self.specials += Instance("ODDR2",
-            p_DDR_ALIGNMENT = "NONE",
-            p_INIT          = "0",
-            p_SRTYPE        = "SYNC",
-            o_Q  = self.sclk,
-            i_C0 = ClockSignal("spi"),
-            i_C1 = ~ClockSignal("spi"),
-            i_D0 = 0,
-            i_D1 = 1,
-            i_R  = ResetSignal("spi"),
-            i_S  = 0,
-        )
 
         self.tx = CSRStorage(16, name="tx", description="""Tx data, for COPI. Note: 32-bit CSRs are required for this block to work!""")
         self.rx = CSRStatus(16, name="rx", description="""Rx data, from CIPO""")
@@ -115,38 +108,100 @@ class SPIController(Module, AutoCSR, AutoDoc):
         fsm = ClockDomainsRenamer("spi")(fsm)
         self.submodules += fsm
         spicount = Signal(4)
+        # I/ODDR signals
+        clk_run = Signal()
+        cipo_sampled = Signal()
         fsm.act("IDLE",
+            NextValue(clk_run, 0),
             If(tx_go & ~(self.control.fields.autohold & hold),
-                NextState("RUN"),
-                NextValue(self.tx_r, Cat(0, self.tx.storage[:15])),
+                NextState("PRE_ASSERT"),
+                NextValue(self.tx_r, self.tx.storage),
                 # Stability guaranteed so no synchronizer necessary
                 NextValue(spicount, 15),
                 NextValue(self.csn_r, 0),
-                NextValue(self.copi, self.tx.storage[15]),
-                NextValue(self.rx_r, Cat(self.cipo, self.rx_r[:15])),
             ).Else(
                 NextValue(self.csn_r, 1),
             )
         )
+        fsm.act("PRE_ASSERT", # assert CS_N for a cycle before sending a clock, so that the receiver can bring its counter out of async clear
+                NextState("RUN"),
+                NextValue(clk_run, 1),
+        )
+        if pipeline_cipo:
+            turnaround_delay = 2
+        else:
+            turnaround_delay = 3
         fsm.act("RUN",
+            NextValue(self.rx_r, Cat(cipo_sampled, self.rx_r[:15])),
+            NextValue(self.tx_r, Cat(0, self.tx_r[:15])),
             If(spicount > 0,
-                NextValue(self.copi, self.tx_r[15]),
-                NextValue(self.tx_r, Cat(0, self.tx_r[:15])),
+                NextValue(clk_run, 1),
                 NextValue(spicount, spicount - 1),
-                NextValue(self.rx_r, Cat(self.cipo, self.rx_r[:15])),
             ).Else(
-                NextValue(self.csn_r, 1),
-                NextValue(spicount, 5),
-                NextState("WAIT"),
+                NextValue(clk_run, 0),
+                NextValue(spicount, turnaround_delay),
+                NextState("POST_ASSERT"),
             ),
         )
-        fsm.act("WAIT",  # guarantee a minimum CS_N high time after the transaction so Peripheral can capture
+        if pipeline_cipo:
+            fsm.act("POST_ASSERT",
+                # one cycle extra at the end, to grab the falling-edge asserted receive data
+                NextValue(self.rx_r, Cat(cipo_sampled, self.rx_r[:15])),
+                NextValue(self.csn_r, 1),
+                NextState("SAMPLE"),
+            )
+            fsm.act("SAMPLE",
+                # another extra cycle to grab pipelined data
+                NextValue(self.rx_r, Cat(cipo_sampled, self.rx_r[:15])),
+                NextState("WAIT"),
+            )
+        else:
+            fsm.act("POST_ASSERT",
+                # one cycle extra at the end, to grab the falling-edge asserted receive data
+                NextValue(self.rx_r, Cat(cipo_sampled, self.rx_r[:15])),
+                NextValue(self.csn_r, 1),
+                NextState("WAIT"),
+            )
+        fsm.act("WAIT",  # guarantee a minimum CS_N high time after the transaction so Peripheral can capture. Has to perculate through multiregs, 2 cycles/ea + sync FIFO latch.
             NextValue(self.rx.status, self.rx_r),
             NextValue(spicount, spicount - 1),
             If(spicount == 0,
                 setdone.eq(1),
                 NextState("IDLE"),
             )
+        )
+
+        # generate a clock, this is Artix-specific
+        # mirror the clock with zero delay
+        self.specials += Instance("ODDR",
+            p_DDR_CLK_EDGE = "SAME_EDGE",
+            p_INIT          = 0,
+            p_SRTYPE        = "SYNC",
+            o_Q  = self.sclk,
+            i_C = ClockSignal("spi"),
+            i_CE = 1,
+            i_D1 = clk_run,
+            i_D2 = 0,
+            i_R  = ResetSignal("spi"),
+            i_S  = 0,
+        )
+        self.specials += Instance("ODDR",
+            p_DDR_CLK_EDGE = "SAME_EDGE",
+            o_Q  = self.copi,
+            i_C = ClockSignal("spi"),
+            i_CE = 1,
+            i_D1 = self.tx_r[15],
+            i_D2 = self.tx_r[15],
+        )
+        self.specials += Instance("IDDR",
+            p_DDR_CLK_EDGE = "OPPOSITE_EDGE",
+            p_SRTYPE        = "SYNC",
+            i_C = ClockSignal("spi"),
+            i_CE = 1,
+            i_D = self.cipo,
+            o_Q1 = cipo_sampled,
+            i_R  = ResetSignal("spi"),
+            i_S  = 0,
         )
 
 
@@ -179,7 +234,7 @@ class SPIPeripheral(Module, AutoCSR, AutoDoc):
             CSRField("rxover", description="Set if Rx register was not read before another transaction was started")
         ])
 
-        self.submodules.ev = EventManager(document_fields=True)
+        self.submodules.ev = EventManager()
         self.ev.spi_int    = EventSourceProcess()  # Falling edge triggered
         self.ev.finalize()
         self.comb += self.ev.spi_int.trigger.eq(self.control.fields.intena & self.status.fields.tip)

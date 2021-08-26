@@ -50,11 +50,16 @@ class Hmac(Module, AutoDoc, AutoCSR):
             bus.ack.eq( ~ack_lsb_r & ack_lsb | ~ack_msb_r & ack_msb )  # single-cycle acks only!
         ]
 
+        self.power = CSRStorage(fields=[
+            CSRField("on", size=1, reset=0,
+                description="Writing `1` turns on the clocks to this block, `0` stops the clocks (for power savings)")
+        ])
         self.config = CSRStorage(description="Configuration register for the HMAC block", fields=[
             CSRField("sha_en", size=1, description="Enable the SHA512 core"),
             CSRField("endian_swap", size=1, description="Swap the endianness on the input data"),
             CSRField("digest_swap", size=1, description="Swap the endianness on the output digest"),
-            CSRField("select_256", size=1, description="Select SHA512/256 IV constants when set to `1`")
+            CSRField("select_256", size=1, description="Select SHA512/256 IV constants when set to `1`"),
+            CSRField("reset", size=1, description="Resets the hardware. Power must be on for this to take effect.", pulse=True),
         ])
         control_latch = Signal(self.config.size)
         ctrl_freeze = Signal()
@@ -67,6 +72,22 @@ class Hmac(Module, AutoDoc, AutoCSR):
             ),
             sha_en_50.eq(self.config.fields.sha_en),
         ]
+        reset_50 = Signal()
+        self.submodules.resetter = BlindTransfer("sys", "clk50")
+        self.comb += [ self.resetter.i.eq(self.config.fields.reset), reset_50.eq(self.resetter.o) ]
+        rescnt = Signal(max=16, reset=15)
+        sw_reset = Signal()
+        self.sync.clk50 += [
+            If(reset_50,
+                rescnt.eq(15)
+            ).Elif(rescnt > 0,
+                rescnt.eq(rescnt - 1)
+            ).Else(
+                rescnt.eq(rescnt)
+            ),
+            sw_reset.eq(rescnt != 0),
+        ]
+
         self.command = CSRStorage(description="Command register for the HMAC block", fields=[
             CSRField("hash_start", size=1, description="Writing a 1 indicates the beginning of hash data", pulse=True),
             CSRField("hash_process", size=1, description="Writing a 1 digests the hash data", pulse=True),
@@ -103,6 +124,7 @@ class Hmac(Module, AutoDoc, AutoCSR):
         fifo_rready=Signal()
         fifo_rdata_mask=Signal(72)
         self.fifo = CSRStatus(description="FIFO status", fields=[
+            CSRField("reset_status", size=1, description="when set, the block is undergoing a soft reset"),
             CSRField("read_count", size=9, description="read pointer"),
             CSRField("write_count", size=9, description="write pointer"),
             CSRField("read_error", size=1, description="read error occurred"),
@@ -111,6 +133,7 @@ class Hmac(Module, AutoDoc, AutoCSR):
             CSRField("almost_empty", size=1, description="almost empty"),
             CSRField("running", size=1, description="hash engine is running and controls are locked out"),
         ])
+        self.specials += MultiReg(sw_reset, self.fifo.fields.reset_status)
         ctrl_freeze_sys = Signal()
         self.specials += MultiReg(ctrl_freeze, ctrl_freeze_sys)
         self.comb += self.fifo.fields.running.eq(ctrl_freeze_sys)
@@ -130,7 +153,7 @@ class Hmac(Module, AutoDoc, AutoCSR):
             p_EN_SYN="FALSE",
             i_RDCLK=ClockSignal("clk50"),
             i_WRCLK=ClockSignal("clk50"),
-            i_RST=ResetSignal("clk50"),
+            i_RST=ResetSignal("clk50") | sw_reset,
             o_FULL=fifo_full_local,
             i_WREN=fifo_wvalid,
             i_DI=fifo_wdata_mask[:64],
@@ -157,7 +180,7 @@ class Hmac(Module, AutoDoc, AutoCSR):
 
         self.specials += Instance("sha512_litex",
             i_clk_i = ClockSignal("clk50"),
-            i_rst_ni = ~ResetSignal("clk50"),
+            i_rst_ni = ~(ResetSignal("clk50") | sw_reset),
 
             i_reg_hash_start=hash_start_50,
             i_reg_hash_process=hash_proc_50,
@@ -198,6 +221,8 @@ class Hmac(Module, AutoDoc, AutoCSR):
             i_err_valid_pending=self.ev.err_valid.pending,
             o_fifo_full_event=fifo_full,
         )
+        # relax the reset path, we assert it for quite some time
+        platform.add_platform_command("set_false_path -through [get_nets {net}]", net=sw_reset)
 
         platform.add_source(os.path.join("deps", "gateware", "gateware", "sha512", "hmac512_pkg.sv"))
         platform.add_source(os.path.join("deps", "gateware", "gateware", "sha512", "sha512.sv"))

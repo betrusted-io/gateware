@@ -21,7 +21,7 @@ opcodes = {  # mnemonic : [bit coding, docstring]
     "SUB" : [6, "Wd $\gets$ Ra - Rb  // 256-bit binary subtraction, this is not the same as a subtraction in the finite field"],
     "MUL" : [7, f"Wd $\gets$ Ra * Rb  // multiplication in {field_latex} - result is reduced"],
     "TRD" : [8, "If Ra $\geqq 2^{{255}}-19$ then Wd $\gets$ $2^{{255}}-19$, else Wd $\gets$ 0  // Test reduce"],
-    "BRZ" : [9, "If Ra == 0 then mpc[9:0] $\gets$ mpc[9:0] + immediate[9:0], else mpc $\gets$ mpc + 1  // Branch if zero"],
+    "BRZ" : [9, "If Ra == 0 then mpc[9:0] $\gets$ mpc[9:0] + immediate[9:0] + 1, else mpc $\gets$ mpc + 1  // Branch if zero"],
     "FIN" : [10, "halt execution and assert interrupt to host CPU that microcode execution is done"],
     "SHL" : [11, "Wd $\gets$ Ra << 1  // shift Ra left by one and store in Wd"],
     "XBT" : [12, "Wd[0] $\gets$ Ra[254]  // extract the 255th bit of Ra and put it into the 0th bit of Wd"],
@@ -50,9 +50,9 @@ to ensure a compact and performant implementation.
 The core primitive is the RAMB36E1. This can be configured as a 64/72-bit wide memory
 but only if used in "SDP" (simple dual port) mode. In SDP, you have one read, one write port.
 However, the register file needs to produce two operands per cycle, while accepting up to
-one operand per cycle. 
+one operand per cycle.
 
-In order to do this, we stipulate that the RF runs at `rf_clk` (200MHz), but uses four phases 
+In order to do this, we stipulate that the RF runs at `rf_clk` (200MHz), but uses four phases
 to produce/consume data. "Engine clock" `eng_clk` (50MHz) runs at a lower rate to accommodate
 large-width arithmetic in a single cycle.
 
@@ -66,14 +66,14 @@ Phase 2:
   - write data
 Phase 3:
   - quite cycle, used to create extra setup time for next stage (requires multicycle-path constraints)
-  
+
 The writing of data is done in the second phase means that write happen to the same address
 as being read, you get the old value. For pipelined operation, it could be desirable to shift
 the write to happen before the reads, but as of now the implementation is not pipelined.
 
 The register file is unavailable for {} `eng_clk` cycles after reset.
 
-When configured as a 64 bit memory, the depth of the block is 512 bits, corresponding to 
+When configured as a 64 bit memory, the depth of the block is 512 bits, corresponding to
 an address width of 9 bits.
 
         """.format(reset_cycles))
@@ -155,7 +155,7 @@ an address width of 9 bits.
                     self.rb_dat.eq(self.rb_dat),
                 ),
             ]
-        wren_pipe = Signal()
+        wren_pipe = Signal() # do not change this variable name, it is constrained in the XDC
         self.sync.rf_clk += [
             If(eng_sync,
                 phase.eq(0),
@@ -191,7 +191,7 @@ an address width of 9 bits.
                 o_DO = rf_dat[word*64 : word*64 + 64],
                 i_RDEN = self.running, # reduce power when not running
                 i_WREN = wren_pipe, # (phase == 2) & self.we, but pipelined one stage
-                i_RST = eng_sync,
+                i_RST = ResetSignal("rf_clk"),
                 i_WE = wd_bwe_pipe[word*8 : word*8 + 8],
 
                 i_REGCE = 1, # should be ignored, but added to quiet down simulation warnings
@@ -222,7 +222,12 @@ class Curve25519Const(Module, AutoDoc):
             1: [1, "one", "The number one"],
             2: [121665, "am24", "The value $\\frac{{A-2}}{{4}}$"],
             3: [0x7FFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFED, "field", f"Binary coding of {prime_string}"],
-            4: [121666, "ap24", "The value $\\frac{{A+2}}{{4}}"],
+            4: [121666, "ap24", "The value $\\frac{{A+2}}{{4}}$"],
+            5: [5, "five", "The number 5 (for pow22501)"],
+            6: [10, "ten", "The number 10 (for pow22501)"],
+            7: [20, "twenty", "The number 20 (for pow22501)"],
+            8: [50, "fifty", "The number 50 (for pow22501)"],
+            9: [100, "one hundred", "The number 100 (for pow22501)"],
         }
         self.adr = Signal(5)
         self.const = Signal(256)
@@ -246,20 +251,20 @@ class ExecUnit(Module, AutoDoc):
         if insert_docs:
             self.intro = ModuleDoc(title="ExecUnit class", body="""
     ExecUnit is the superclass template for execution units.
-    
+
     Configuration Arguments:
       - `opcode_list` is the list of opcodes that an ExecUnit can process
       - `width` is the bit-width of the execution pathway
-    
+
     Signal API for an exec unit:
-      - `a` and `b` are the inputs. 
+      - `a` and `b` are the inputs.
       - `instruction_in` is the instruction corresponding to the currently present `a` and `b` inputs
       - `start` is a single-clock signal which indicates processing should start
       - `q` is the output
-      - `instruction_out` is the instruction for the result present at the `q` output 
+      - `instruction_out` is the instruction for the result present at the `q` output
       - `q_valid` is a single cycle pulse that indicates that the `q` result and `wa_out` value is valid
-      
-      
+
+
             """)
         self.instruction = Record(instruction_layout)
 
@@ -291,7 +296,7 @@ Here is an example of how to swap the contents of `ra` and `rb` based on the val
   XOR  dummy, ra, rb       // dummy $\gets$ ra ^ rb
   MSK  dummy, swap, dummy  // If swap[0] then dummy $\gets$ dummy, else dummy $\gets$ 0
   XOR  ra, dummy, ra       // ra $\gets$ ra ^ dummy
-  XOR  rb, dummy, rb       // rb $\gets$ rb ^ dummy  
+  XOR  rb, dummy, rb       // rb $\gets$ rb ^ dummy
 """)
         self.sync.eng_clk += [
             self.q_valid.eq(self.start),
@@ -305,8 +310,8 @@ class ExecLogic(ExecUnit):
     def __init__(self, width=256):
         ExecUnit.__init__(self, width, ["XOR", "NOT", "PSA", "PSB", "XBT", "SHL"])
         self.intro = ModuleDoc(title="Logic ExecUnit Subclass", body=f"""
-This execution unit implements bit-wise logic operations: XOR, NOT, and 
-passthrough. 
+This execution unit implements bit-wise logic operations: XOR, NOT, and
+passthrough.
 
 * XOR returns the result of A^B
 * NOT returns the result of !A
@@ -353,7 +358,7 @@ Addition of Ra + Rb into Rc in {field_latex}:
 
   ADD Rc, Ra, Rb    // Rc <- Ra + Rb
   TRD Rd, Rc        // Rd <- ReductionValue(Rc)
-  SUB Rc, Rc, Rd    // Rc <- Rc - Rd 
+  SUB Rc, Rc, Rd    // Rc <- Rc - Rd
 
 Negation of Ra into Rc in {field_latex}:
 
@@ -372,9 +377,9 @@ Subtraction of Ra - Rb into Rc in {field_latex}:
   SUB Rb, #FIELDPRIME, Rb   //  Rb <- 2^255-19 - Rb
   ADD Rc, Ra, Rb    // Rc <- Ra + Rb
   TRD Rd, Rc        // Rd <- ReductionValue(Rc)
-  SUB Rc, Rc, Rd    // Rc <- Rc - Rd 
+  SUB Rc, Rc, Rd    // Rc <- Rc - Rd
 
-In all the examples above, Ra and Rb must be members of {field_latex}. 
+In all the examples above, Ra and Rb must be members of {field_latex}.
         """)
 
         self.sync.eng_clk += [
@@ -395,17 +400,17 @@ class ExecTestReduce(ExecUnit, AutoDoc):
 
         self.notes = ModuleDoc(title="Modular Reduction Test ExecUnit Subclass", body=f"""
 First, observe that $2^n-19$ is 0x07FF....FFED.
-Next, observe that arithmetic in the field of {prime_string} will never
+Next, observe that arithmetic in the field of {prime_string} will never set
 the 256th bit.
 
 Modular reduction must happen when an arithmetic operation
 overflows the bounds of the modulus. When this happens, one must
-subtract the modulus (in this case {prime_string}). 
+subtract the modulus (in this case {prime_string}).
 
 The reduce operation is done in two halves. The first half is
 to check if a reduction must happen. The second is to do the subtraction.
 In order to allow for constant-time operation, we always do the subtraction,
-even if it is not strictly necessary. 
+even if it is not strictly necessary.
 
 We use this to our advantage, and compute a reduction using
 a test operator that produces a residue, and a subtraction operation.
@@ -453,11 +458,11 @@ The base algorithm for this implementation is lifted from the paper "Compact and
 of Ed25519 and X25519" by Furkan Turan and Ingrid Verbauwhede (https://doi.org/10.1145/3312742).  The algorithm
 specified in this paper is optimized for the DSP48E blocks found inside a 7-Series Xilinx FPGA. In particular,
 we can compute 17-bit multiplies using this hardware block, and 255 divides evenly into 17 to produce
-a requirement of 15x DSP48E blocks. 
+a requirement of 15x DSP48E blocks.
 
 At a high level, the steps to compute the multiplication are:
 
-1. Schoolbook multiplication 
+1. Schoolbook multiplication
 2. Collapse partial sums
 3. Propagate carries
 4. Is the sum $\geq$ $2^{{255}}-19$?
@@ -474,16 +479,16 @@ we are spending a bunch of cycles propagating zeros most of the time.
 
 A constant-time optimization would be for the multiplier to simply produce a 256-bit
 result, and then use a subsequent TRD/SUB instruction pair. However, the non-pipelined
-version of the engine25519 executes at a rate of 60ns per instrution, or 120ns total to 
-compute the TRD/SUB combination, whereas iterating through the carry propagates 
-would take 140ns total (as the mul core runs 2x clock speed of the rest of the engine). 
-This is basically a wash. 
+version of the engine25519 executes at a rate of 60ns per instruction, or 120ns total to
+compute the TRD/SUB combination, whereas iterating through the carry propagates
+would take 140ns total (as the mul core runs 2x clock speed of the rest of the engine).
+This is basically a wash.
 
-However, if pipelining (and bypassing) were implemented, this might become a viable 
-optimization, but bypassing such a wide core would also have resource and speed 
+However, if pipelining (and bypassing) were implemented, this might become a viable
+optimization, but bypassing such a wide core would also have resource and speed
 implications of its own.
 
-The above steps are coordinated by the `mseq` state machine. Control lines for 
+The above steps are coordinated by the `mseq` state machine. Control lines for
 the DSP48E blocks are grouped into two sets, one controls the global state of
 things such as the operation mode and input modes, and the other controls the
 routing of individual 17-bit limbs (e.g. "digits" of our 17-bit representation of
@@ -497,12 +502,12 @@ Schoolbook Multiplication
 The first step in the algorithm is called "schoolbook multiplication". It's
 almost that, but with a twist. Below is what actual schoolbook multiplication
 would be like, if you had a pair of numbers that were broken into three "limbs" (digits)
-A[2:0] and B[2:0]. 
+A[2:0] and B[2:0].
 
 ::
 
                    |    A2        A1       A0
-    x              |    B2        B1       B0 
+    x              |    B2        B1       B0
    ------------------------------------------
                    | A2*B0     A1*B0    A0*B0
             A2*B1  | A1*B1     A0*B1
@@ -510,7 +515,7 @@ A[2:0] and B[2:0].
      (overflow)         (not overflowing)
 
 The result of schoolbook multiplication is a result that potentially has
-2x the number of limbs than the either multiplicand. 
+2x the number of limbs than the either multiplicand.
 
 Mapping the overflow back into the prime field (e.g. wrapping the overflow around)
 is a process called reduction. It turns out that for
@@ -518,15 +523,15 @@ a prime field like {field_latex}, reduction works out to taking the limbs that
 extend beyond the base number of limbs in the field, shifting them right by the
 number of limbs, multiplying it by 19, and adding it back in; and if the result
 isn't a member of the field, add 19 one last time, and take the result as just
-the bottom 255 bits (ignore any carry overflow). 
+the bottom 255 bits (ignore any carry overflow).
 
 This trick works because the form of the field is $2^{{n}}-p$: it is a power
 of 2, reduced by some small amount $p$. By starting from a power of 2,
 most of the binary numbers representable in an n-bit word are valid members of
-the field. The only ones that are not valid field members are the numbers that are equal 
+the field. The only ones that are not valid field members are the numbers that are equal
 to $2^{{n}}-p$ but less than $2^{{n}}-1$ (the biggest number that fits in n bits).
-To turn these invalid binary numbers into members of the field, you just need 
-to add $p$, and the reduction is complete. 
+To turn these invalid binary numbers into members of the field, you just need
+to add $p$, and the reduction is complete.
 
 .. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/reduction_diagram.png
    :alt: A diagram illustrating modular reduction
@@ -537,22 +542,22 @@ and increment until they roll over. The point at which $\mathbf{{F}}_{{{{2^{{n}}
 rolls over is a distance $p$ from the end of the binary number line: thus, we can
 observe that $2^{{n}}-1$ reduces to $p-1$. Adding 1 results in $2^{{n}}$, which reduces
 to $p$: that is, the top bit, wrapped around, and multiplied
-it by $p$. 
+it by $p$.
 
 As we continue toward the right, the numbers continue to go up and wrap around, and
 for each wrap the distance between the binary wrap point and the $\mathbf{{F}}_{{{{2^{{n}}}}-p}}$
 wrap point increases by a factor of $p$, such that $2^{{n+1}}$ reduces to $2*p$. Thus modular
 reduction of natural binary numbers that are larger than our field $2^{{n}}-p$
-consists of taking the bits that overflow an $n$-bit representation, shifting them to 
-the right by $n$, and multiplying by $p$. 
+consists of taking the bits that overflow an $n$-bit representation, shifting them to
+the right by $n$, and multiplying by $p$.
 
-A more tractable example to compute than {field_latex} is the field $\mathbf{{F}}_{{{{2^{{6}}}}-5}} = 59$. 
+A more tractable example to compute than {field_latex} is the field $\mathbf{{F}}_{{{{2^{{6}}}}-5}} = 59$.
 The members of the field are from 0-58, and reduction is done by taking any number modulo 59. Thus,
-the number 59 reduces to 0; 60 reduces to 1; 61 reduces to 2, and so forth, until we get to 64, which 
-reduces to 5 -- the value of the overflowed bits (1) times $p$. 
+the number 59 reduces to 0; 60 reduces to 1; 61 reduces to 2, and so forth, until we get to 64, which
+reduces to 5 -- the value of the overflowed bits (1) times $p$.
 
-Let's look at some more examples. First, recall that the biggest member of the 
-field, 58, in binary is 0b00_11_1010. 
+Let's look at some more examples. First, recall that the biggest member of the
+field, 58, in binary is 0b00_11_1010.
 
 Let's consider a simple case where we are presented a partial sum that overflows
 the field by one bit, say, the number 0b01_11_0000, which is decimal 112. In this case, we take
@@ -569,28 +574,28 @@ by yet another bit, say, the number 0b11_11_0000. Let's try the math again:
      ^ move to the right and multiply by 0b101: 0b101 * 0b11 = 0b1111
   0b00_11_0000 + 0b1111 = 0b00_11_1111
 
-This result is still not a member of the field, as the maximum value is 0b0011_1010. 
+This result is still not a member of the field, as the maximum value is 0b0011_1010.
 In this case, we need to add the number 5 once again to resolve this "special-case"
 overflow where we have a binary number that fits in $n$ bits but is in that sliver
 between $2^{{n}}-p$ and $2^{{n}}-1$:
-  
+
   0b00_11_1111 + 0b101 = 0b01_00_0100
 
-At this step, we can discard the MSB overflow, and the result is 0b0100 = 4; 
+At this step, we can discard the MSB overflow, and the result is 0b0100 = 4;
 and we can check with a calculator that 240 % 59 = 4.
 
-Therefore, when doing schoolbook multiplication, the partial products that start to 
+Therefore, when doing schoolbook multiplication, the partial products that start to
 overflow to the left can be brought back around to the right hand side, after
 multiplying by $p$, in this case, the number 19. This magical property is one
 of the reasons why {field_latex} is quite amenable to math on binary machines.
 
 Let's use this finding to rewrite the straight schoolbook
-multiplication form from above, but now with the modular reduction applied to 
+multiplication form from above, but now with the modular reduction applied to
 the partial sums, so it all wraps around into this compact form:
 ::
 
                    |    A2        A1       A0
-    x              |    B2        B1       B0 
+    x              |    B2        B1       B0
    ------------------------------------------
                    | A2*B0     A1*B0    A0*B0
                    | A1*B1     A0*B1 19*A2*B1
@@ -601,11 +606,11 @@ the partial sums, so it all wraps around into this compact form:
 As discussed above, each overflowed limb is wrapped around and multiplied by 19,
 creating a number of partial sums S[2:0] that now has as many terms as
 there are limbs, but with each partial sum still potentially
-overflowing the native width of the limb. Thus, the inputs to a limb are 17 bits wide, 
-but we retain precision up to 48 bits during the partial sum stage, and then do a 
+overflowing the native width of the limb. Thus, the inputs to a limb are 17 bits wide,
+but we retain precision up to 48 bits during the partial sum stage, and then do a
 subsequent condensation of partial sums to reduce things back down to 17 bits again.
 The condensation is done in the next three steps, "collapse partial sums", "propagate carries",
-and finally "normalize". 
+and finally "normalize".
 
 However, before moving on to those sections, there is an additional trick we need
 to apply for an efficient implementation of this multiplication step in hardware.
@@ -616,7 +621,7 @@ constant along the diagonals. Thus we can avoid re-loading the "A" values every
 cycle by shifting the partial sums diagonally through the computation, allowing
 the "A" values to be loaded as "A" and "A*19" into holding register once before
 the computations starts, and selecting between the two options based on the step
-number during the computation. 
+number during the computation.
 
 .. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/mapping.png
    :alt: Mapping schoolbook multiply onto the hardware array to minimize data movement
@@ -625,9 +630,9 @@ The diagram above illustrates how the schoolbook multiply is mapped onto the har
 array. The top diagram is an exact redrawing of the previous text box, where the
 partial sums that would extend to the left have been multiplied by 19 and wrapped around.
 Each colored block corresponds to a given DSP48E1 block. The red arrow
-illustrates the path of a partial sum in both the schoolbook form and the unrwapped
+illustrates the path of a partial sum in both the schoolbook form and the unwrapped
 form for hardware implementation. In the bottom diagram, one can clearly see that
-the Ax coefficients are constant for each column, and that for each row, the Bx 
+the Ax coefficients are constant for each column, and that for each row, the Bx
 values are identical across all blocks in each step. Thus each column corresponds to
 a single DSP48E1 block. We take advantage of the ability of the DSP48E1 block to
 hold two selectable A values to pre-load Ax and Ax*19 before the computation starts, and
@@ -638,7 +643,7 @@ result is one cycle shifted from the canonical mapping.
 We have a one-cycle structural pipeline delay going from this step to the next one, so
 we use this pipeline delay to do a shift with no add by setting the `opmode` from `C+M` to
 `C+0` (in other words, instead of adding to the current multiplication output for the last
-step, we squash that input and set it to 0). 
+step, we squash that input and set it to 0).
 
 The fact that we pipeline the data also gives us an opportunity to pick up the upper limb
 of the partial sum collapse "for free" by copying it into the "D" register of the DSP48E1
@@ -648,13 +653,13 @@ In C, the code basically looks like this:
 
 .. code-block:: c
 
-   // initialize the a_bar set of data                                                                                                                                                                                                        
+   // initialize the a_bar set of data
    for( int i = 0; i < DSP17_ARRAY_LEN; i++ ) {{
       a_bar_dsp[i] = a_dsp[i] * 19;
    }}
    operand p;
-   for( int i = 0; i < DSP17_ARRAY_LEN; i++ ) {{ 
-      p[i] = 0; 
+   for( int i = 0; i < DSP17_ARRAY_LEN; i++ ) {{
+      p[i] = 0;
    }}
 
    // core multiply
@@ -674,12 +679,12 @@ Collapse Partial Sums
 ---------------------
 
 The potential width of the partial sum is up to 43 bits wide (according to
-the paper cited above; the native partial sum precision of the DSP48E1 is 48 bits). 
+the paper cited above; the native partial sum precision of the DSP48E1 is 48 bits).
 This step divides the partial sums up into 17-bit words, and then shifts the higher
-to the next limbs over, allowing them to collapse into a smaller sum that 
+to the next limbs over, allowing them to collapse into a smaller sum that
 overflows less.
 
-:: 
+::
 
    ... P2[16:0]   P1[16:0]      P0[16:0]
    ... P1[33:17]  P0[33:17]     P14[33:17]*19
@@ -689,7 +694,7 @@ Again, the magic number 19 shows up to allow sums which "wrapped around"
 to add back in. Note that in the timing diagram below, we refer to the
 mid- and upper- words of the shifted partial sums as "Q" and "R" respectively,
 because the timing diagram lacks the width within a data bubble to
-write out the full notation: so `Q0,1` is P14[33:17] and `R0,2` is P13[50:34] for P0[16:0]. 
+write out the full notation: so `Q0,1` is P14[33:17] and `R0,2` is P13[50:34] for P0[16:0].
 
 This is what the C code equivalent looks like for this operation.
 
@@ -732,10 +737,10 @@ Normalize
 ---------
 
 We're almost here, except that $0 \leq result \leq 2^{{256}}-1$, which is slightly
-larger than the range of {field_latex}. 
+larger than the range of {field_latex}.
 
 Thus we need to check if number is somewhere in between 0x7ff....ffed and
-0x7ff....ffff, or if the 256th bit will be set. In these cases, we need to add 19 to 
+0x7ff....ffff, or if the 256th bit will be set. In these cases, we need to add 19 to
 the result, so that the result is a member of the field $2^{{255}}-19$ (the 256th bit
 is dropped automatically when concatenating the fifteen 17-bit limbs together).
 
@@ -745,15 +750,15 @@ detect" (PD) feature of the DSP48E1 to check for all "1's" in bit positions 255-
 single LUT to compare the final 5 bits to check for numbers between {prime_string} and
 $2^{{255}}-1$. We then OR this result with the 256th bit.
 
-If the result falls within this special "overflow" case, we add the number 19, otherwise, 
+If the result falls within this special "overflow" case, we add the number 19, otherwise,
 we add 0. Note that this add-by-19-or-0 step is implemented by pre-loading the number 19 into the A:B
 pipeline registers of the DSP4E1 block during the "propagate" stage. Selection of
 whether to add 19 or 0 relies on the fact that the DSP48E1 block has an input multiplexer
 to its internal adder that can pick data from multiple sources, including the ability to
 pick no source by loading the number 0. Thus the operation mode of the DSP48E1 is adjusted
-to either pull an input from A:B (that is, the number 19) or the number 0, based on the 
+to either pull an input from A:B (that is, the number 19) or the number 0, based on the
 result of the overflow computation. Thus the PD feature is important in preventing this
-step from being rate-limiting. With the PD feature we only have to check an effective 16 
+step from being rate-limiting. With the PD feature we only have to check an effective 16
 intermediate results, instead of 256 raw bits, and then drive set the operation mode of
 the ALU.
 
@@ -768,16 +773,16 @@ Once the second carry propagate is finished, we have the final result.
 Potential corner case
 ---------------------
 
-There is a potential corner case where if the carry-propagated result going into 
+There is a potential corner case where if the carry-propagated result going into
 "normalize" is between
 
   0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFDA and
   0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFEC
 
-In this case, the top bit would be wrapped around, multiplied by 19, and added to 
+In this case, the top bit would be wrapped around, multiplied by 19, and added to
 the LSB, but the result would not be a member of $2^{{255}}-19$ (it would be one
 of the 19 numbers just short of $2^{{255}}-1$), and the multiplier would pass it
-on as if it were a valid result. 
+on as if it were a valid result.
 
 In some cases, this isn't even a problem, because if the subsequent result goes through
 any operation that includes a "TRD" instruction, it should reduce the number
@@ -787,14 +792,14 @@ However, I do not think this corner case is possible, because the overflow path 
 high bit is from the top limb going from 0x1_FFFF -> 0x2_0000 (that is, 0x7FFFC -> 0x80000
 when written MSB-aligned) due to a carry coming in from the lower limb, and
 it would require the carry to be very large, not just +1 as shown in the simple
-rollover case, but a value from 0x1_FFED-0x1_FFDB.  
+rollover case, but a value from 0x1_FFED-0x1_FFDB.
 
-I don't have a formal mathematical proof of this, but I strongly suspect that 
+I don't have a formal mathematical proof of this, but I strongly suspect that
 carry values going into the top limb cannot approach these large numbers, and therefore
 it is not possible to hit this corner case.
 
 In the case that it _could_ be hit, the fix would be to add an additional
-detection stage to handle the case that the result is not normalized, and 
+detection stage to handle the case that the result is not normalized, and
 to add 19 to the final sum. This can be accelerated to a single cycle by also
 adding 1 into the partial products, short-circuiting the carry propagate because
 this should be the only special case we're trying to check for (we should definitely
@@ -807,7 +812,7 @@ Maybe this is a more solid reasoning why this corner case can't happen:
 
 The biggest value of a partial sum is 0x53_FFAC_0015 (0x1_FFFF * 0x1_FFFF * 15).
 This means the biggest value of the third overflowed 17-bit limb is 0x14. Therefore
-the biggest value resulting from the "collapse partial sums" stage is 
+the biggest value resulting from the "collapse partial sums" stage is
 0x1_FFFF + 0x1_FFFF + 0x14 = 0x4_0012. Thus the largest carry term that has
 to propagate is 0x4_0012 >> 17 = 2. 2 is much smaller than the amount required
 to trigger this condition, that is, a value in the range of 0x1_FFED-0x1_FFDB.
@@ -874,7 +879,7 @@ Signal descriptions:
 * `step` is a counter used by `mseq` to control how many iterations to run in a given state
 * `prop` is a counter used to count which iteration of the carry propagate we're on
 * `dsp.a`-`dsp.d` is the `a-d` inputs to the DSP48E1 blocks
-* `A1_CE` is the enable to the A1 pipe register. Note that we configure 2x pipeline registers on the A input. 
+* `A1_CE` is the enable to the A1 pipe register. Note that we configure 2x pipeline registers on the A input.
 * `A1` is a pipe register internal to the DSP48E1 block
 * `A2_CE` is the enable to the A2 pipe register
 * `A2` is a pipe register internal to the DSP48E1 block
@@ -884,7 +889,7 @@ Signal descriptions:
 * `D_CE` is the enable to the D pipe register. There is only one possible D register in the DSP48E1
 * `D` is a pipe register internal to the DSP48E1 block that feeds the pre-adder
 * `inmode` configures the input mode to the DSP48E1 ALU blocks. It is not pipelined and allows us to re-route data from A, B, C, and D to various ALU internals.
-* `opmode` configures what computation to perform by the DSP48E1 ALU on the current cycle. It is not pipelined. 
+* `opmode` configures what computation to perform by the DSP48E1 ALU on the current cycle. It is not pipelined.
 * `P_CE` is the enable for the output product register.
 * `P` is the output product register presented by the DSP48E1 ALU.
 * `overflow` is the overflow detection output from the DSP48E1 ALU. Its result timing is synchronous with the `P` register.
@@ -892,7 +897,7 @@ Signal descriptions:
 
 .. wavedrom::
   :caption: Detailed timing of the multiply operation
-  
+
   { "config": {skin : "default"},
   "signal" : [
   { "name": "clk",         "wave": "p......|.........|.......|....." },
@@ -924,9 +929,9 @@ Signal descriptions:
   { "name": "overflow",    "wave": "x...................2x.........", "data":["Y/N"]},
   { "name": "done",        "wave": "0...........................10." },
   ]}
-  
+
 Notes:
-   
+
 1. the final product sum on the first DLY cycle is just a shift to get the
   product results into the right unit. Thus, for the load of `dsp.d` `*Q0,1`, it needs
   to pick the result off of the neighboring DSP unit, because it needs to acquire the value
@@ -935,14 +940,14 @@ Notes:
    sometimes with the 19 added to the least significant limb, in the case that the result is greater than
    or equal to $2^{{255}}-19$. This addition must be propagated through the whole result.
 3. The "done" state is slightly more complicated than illustrated here. Because the multiplier runs at
-   twice the speed of the sequencing engine (two `mul_clk` per `eng_clk`), "done" actually spans between 
-   2 and 3 states. In the case that the computation finishes in-phase with the slower engine clock, we assert 
-   "done" for two cycles. In the case that we finish out of phase, have to wait a half `eng_clk` cycle 
-   (one state in `mul_clk`) before asserting the done pulse for two `mul_clk` cycles (thus 3 total cycles). 
+   twice the speed of the sequencing engine (two `mul_clk` per `eng_clk`), "done" actually spans between
+   2 and 3 states. In the case that the computation finishes in-phase with the slower engine clock, we assert
+   "done" for two cycles. In the case that we finish out of phase, have to wait a half `eng_clk` cycle
+   (one state in `mul_clk`) before asserting the done pulse for two `mul_clk` cycles (thus 3 total cycles).
    The computation is fixed-time, so the determination of how many wait states is done at the design stage and
-   hard-coded. However, anytime the algorithm is adjusted, the designer needs to re-check the number of 
+   hard-coded. However, anytime the algorithm is adjusted, the designer needs to re-check the number of
    cycles it took and pick the correct "done" sequencing.
-  
+
           """)
 
         self.diagrams = ModuleDoc(title="Dataflow Diagrams", body="""
@@ -958,45 +963,45 @@ but if you're just getting started here's a few breadcrumbs to help you steer ar
 1. The block contains a pre-adder, multiplier, and "ALU".
 2. It has four major inputs, A, B, C, and D. A/B are typically multiplier inputs, C is mostly intended for carry propagation and shuttling partial sums, and D is a pre-adder input. Thus a common form of computation is P = (A+D)*B + C.
 3. Almost any input can be zero'd out, and so if you wanted to compute just A*B, what is actually computed is (A+D)*B + C but with the C and D values zero'd out. This is controlled by combinations of `inmode` and `opmode`.
-4. Inputs A-D and output P can all be registered, and for this implementation we put two registers on A, one register on B, zero registers on C, one register on D, and one register on P. 
-5. Inputs A and B can have two pipeline registers. While the datasheet makes it look like you could be able to selectively write from the DSP48E1 input to either A1/A2 or B1/B2, in fact, you can't. 
-  A2 can only get a value from A1 (thus setting A2 necessitates overwriting the value in A1). However, you can gate the A2's enable, so it can hold a value indefinitely, and the multiplier can route an input from either A1 or A2. We use this to our advantage and load `dsp.a` into the A2 register, and `dsp.a*19` into the A1 register, and then use the `inmode` configuration to switch between these two inputs based on which partial sum we're computing at the moment. 
-  I think normally this feature is used to implement pipelining and pipeline bypassing in other applications, and we are slightly abusing it here to our advantage.  
+4. Inputs A-D and output P can all be registered, and for this implementation we put two registers on A, one register on B, zero registers on C, one register on D, and one register on P.
+5. Inputs A and B can have two pipeline registers. While the datasheet makes it look like you could be able to selectively write from the DSP48E1 input to either A1/A2 or B1/B2, in fact, you can't.
+  A2 can only get a value from A1 (thus setting A2 necessitates overwriting the value in A1). However, you can gate the A2's enable, so it can hold a value indefinitely, and the multiplier can route an input from either A1 or A2. We use this to our advantage and load `dsp.a` into the A2 register, and `dsp.a*19` into the A1 register, and then use the `inmode` configuration to switch between these two inputs based on which partial sum we're computing at the moment.
+  I think normally this feature is used to implement pipelining and pipeline bypassing in other applications, and we are slightly abusing it here to our advantage.
 6. Because we configured C to have no input register, it can be used for cycle-to-cycle feedback of partial sums.
   Introducing an input register here (per DRC recco spit out by Vivado) could speed up the clock rate but it also introduces a single-cycle stall every time we have to do a partial sum feedback, which is a greater performance impact for our implementation.
-7. The "ALU" part of the DSP48E1 is used as the partial sum adder in our implementation (but it can also do logic operations and other fun things that we don't need). It actually adds four numbers: P <- X + Y + Z + Carry bit.  
-  We don't use the carry "bit" as it is only one-bit wide and we are propgating several bits of carry at once, so it is hard-wired to 0. X/Y/Z are up to 48 bits wide, and allows us to add combinations of the multiplier output, a concatenation of A:B (A as MSB, B as LSB), C, P, the number 0, and a couple other source options we don't use in this implementation. This is controlled by `opmode`.
-8. In parallel to the "ALU" is a pattern detector. The pattern being detected is hard-coded into the bitstream, and in this case we are looking for a run of `1`'s to help accelerate the overflow detection problem. The output of the pattern detector is always being computed, and dataflow-synchronous to the P output.  
+7. The "ALU" part of the DSP48E1 is used as the partial sum adder in our implementation (but it can also do logic operations and other fun things that we don't need). It actually adds four numbers: P <- X + Y + Z + Carry bit.
+  We don't use the carry "bit" as it is only one-bit wide and we are propagating several bits of carry at once, so it is hard-wired to 0. X/Y/Z are up to 48 bits wide, and allows us to add combinations of the multiplier output, a concatenation of A:B (A as MSB, B as LSB), C, P, the number 0, and a couple other source options we don't use in this implementation. This is controlled by `opmode`.
+8. In parallel to the "ALU" is a pattern detector. The pattern being detected is hard-coded into the bitstream, and in this case we are looking for a run of `1`'s to help accelerate the overflow detection problem. The output of the pattern detector is always being computed, and dataflow-synchronous to the P output.
 9. Unused bits of verilog instances in Migen need to be tied to 0; Migen does not automatically extend/pad shorter `Signal` values to match verilog input widths. This is important because the DSP48E1 input widths don't always exactly match the Migen widths. We create a "zeros" signal and `Cat()` it onto the MSBs as necessary to ensure all inputs to the DSP48E1 are properly specified.
 
 .. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/mpy_pipe3.png
    :alt: data flow block diagram of the multiplier core
-      
+
 Above is the relevant elements of the DSP48E1 block as configured for the systolic dataflow for the "schoolbook"
 multiply operation. Items shaded in gray are external to the DSP48E1 block.
-  
+
 .. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/psum3.png
    :alt: data flow block diagram of the partial sum step
-      
+
 Above is the configuration of the DSP48E1 block for the partial sum steps. Partial sum takes two cycles to
 sum together the three 17-bit segments of the partial sums.
-  
+
 .. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/carry_prop3.png
    :alt: data flow block diagram of the carry propagate
 
-Above is the configuration of the DSP48E1 block for the carry propagate step. This step must be repeated 
+Above is the configuration of the DSP48E1 block for the carry propagate step. This step must be repeated
 14 times to handle the worst-case carry propagate path. During the carry propagate step, the pattern
 detector is active, and on the final step we check it to see if the result overflows $2^{{255}}-19$.
-  
+
 .. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/normalize4.png
    :alt: data flow block diagram of the normalization step
-  
+
 Above is the configuration of the DSP48E1 block for the normalization step. If the result overflows $2^{{255}}-19$,
 we must add 19 to make it a member of the prime field once again. We can do this in a single cycle by
 short-circuiting the carry propagate: we already know we will have to propagate a carry to handle the overflow
 case (there are only 19 possible numbers that will overflow this, and all of them have 1's set up the entire
 chain), so we pre-add the carry simultaneous with adding the number 19 to the least significant limb. We also
-use this step to mask out the upper level bits on the partial sums, because the to pbits are now the old
+use this step to mask out the upper level bits on the partial sums, because the top bits are now the old
 carries that have already been propagated. If we fail to do this, then we re-propagate the carries from the last step.
 
         """)
@@ -1167,14 +1172,33 @@ carries that have already been propagated. If we fail to do this, then we re-pro
             )
         ]
 
+        # reduce width of DSP's INMODE combinational path using a sub machine that reduces
+        # the complexity of the `mseq` machine and allows for a pipeline stage to be inserted...
+        INMODE_IDLE = 0
+        INMODE_MPY = 1
+        INMODE_PROP1 = 2
+        INMODE_PROP2 = 3
+        inmode_sel = Signal(2)
+        self.sync.mul_clk += [
+            If(mseq.ongoing("IDLE") | mseq.ongoing("SETUP_A"),
+                inmode_sel.eq(INMODE_IDLE)
+            ).Elif(mseq.ongoing("MULTIPLY"),
+                inmode_sel.eq(INMODE_MPY),
+            ).Elif(mseq.ongoing("P_DELAY") | mseq.ongoing("PSUM_LSB"),
+                inmode_sel.eq(INMODE_PROP1)
+            ).Else(
+                inmode_sel.eq(INMODE_PROP2)
+            )
+        ]
+
         for i in range(15):
             # INMODE is a critical path, so rewrite code not in computation order but in signal use order to better
             # understand how to optimize it.
             self.comb += [
-                If(mseq.ongoing("SETUP_A"),
+                If(inmode_sel == INMODE_IDLE,
                     getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_A1, INMODE_B2)),
                 ),
-                If(mseq.ongoing("MULTIPLY"),
+                If(inmode_sel == INMODE_MPY,
                     If(step == 0,
                         getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_A1, INMODE_B2)),
                         # A1 has Axx on the first step only
@@ -1185,13 +1209,10 @@ carries that have already been propagated. If we fail to do this, then we re-pro
                         # A2 has Axx for rest of steps
                     )
                 ),
-                If(mseq.ongoing("PSUM_LSB"),
+                If(inmode_sel == INMODE_PROP1,
                     getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_D, INMODE_B2)),
                 ),
-                If(mseq.ongoing("PSUM_MSB"),
-                    getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_D, INMODE_B2)),
-                ),
-                If(mseq.ongoing("NORMALIZE"),
+                If(inmode_sel == INMODE_PROP2,
                     getattr(self, "dsp_inmode" + str(i)).eq(Cat(INMODE_0, INMODE_B2)),
                 )
             ]
@@ -1405,12 +1426,12 @@ class Engine(Module, AutoCSR, AutoDoc):
 
         self.intro = ModuleDoc(title="Curve25519 Engine", body="""
 The Curve25519 engine is a microcoded hardware accelerator for Curve25519 operations.
-The Engine loosely resembles a Harvard architecture microcoded CPU, with a single 
+The Engine loosely resembles a Harvard architecture microcoded CPU, with a single
 512-entry, 256-bit wide 2R1W windowed-register file, a handful of execution units, and a "mailbox"
-unit (like a load/store, but transactional to wishbone). The Engine's microcode is 
+unit (like a load/store, but transactional to wishbone). The Engine's microcode is
 contained in a 1k-entry, 32-bit wide microcode block. Microcode procedures are written to
-the block, and execution will start from the `mpstart` offset when the `go` bit is set.  
-Execution will stop after either one of two conditions are met: either a `FIN` instruction 
+the block, and execution will start from the `mpstart` offset when the `go` bit is set.
+Execution will stop after either one of two conditions are met: either a `FIN` instruction
 is executed, or the microcode program counter (mpc) goes past the stop threshold, computed
 as `mpstart` + `mplen`.
 
@@ -1420,7 +1441,7 @@ as point doubling and point addition, are codable using no more than 32 intermed
 registers. The same microcode can be used, then, to serve point operations to up to
 16 different clients, selectable by setting the appropriate window. Note that the register
 file will stripe across four 4kiB pages, which means that memory protection can be
-enforced at page-level boundaries by hardware (with the help of the OS) for up to four 
+enforced at page-level boundaries by hardware (with the help of the OS) for up to four
 separate clients, each getting four register windows.
 
 Every register read can be overridden from a constant ROM, by asserting `ca` or `cb` for
@@ -1431,12 +1452,12 @@ in the hardware for quick retrieval.
 
 .. image:: https://raw.githubusercontent.com/betrusted-io/gateware/master/gateware/curve25519/block_diagram.png
    :alt: High-level block diagram of the Curev25519 engine
-   
+
 Above is a high-level block diagram of the Curve25519 engine. Four clocks are present
 in this microarchitecture, and they are phase-aligned thanks to the 7-Series MMCM
-and low-skew global clock network. `eng_clk` is 50MHz, `mul_clk` is 100MHz, and 
+and low-skew global clock network. `eng_clk` is 50MHz, `mul_clk` is 100MHz, and
 `rf_clk` is 200MHz. The slowest 50MHz `eng_clk` clock controls the `seq` state machine, whose
-state names are listed on the left. A 50MHz base clock is chosen because this allows a 
+state names are listed on the left. A 50MHz base clock is chosen because this allows a
 single-cycle 256-bit add/sub using hardware carry chains in the Spartan7 -1L speed grade,
 greatly simplifying most of the arithmetic blocks. Faster clocks are used to pump the microcode
 RAM (100MHz) and register file (200MHz), so that we are wasting less time fetching instructions
@@ -1455,28 +1476,28 @@ to the execution units.
 Note that execution units can take an arbitrary amount of time to complete. Most will complete
 in one cycle, but for example, the multiplier takes 52 cycles @ 100MHz, or 26 `eng_clk` cycles.
 The current implementation does not allow pipelined operation; registered stages are provided
-to break combinational paths and bring up the base clock rate, but every instruction must go through 
-the entire FETCH-EXEC-WAIT_DONE cycle before the next one can issue. 
+to break combinational paths and bring up the base clock rate, but every instruction must go through
+the entire FETCH-EXEC-WAIT_DONE cycle before the next one can issue.
 
-The design is partially outfitted with registers to facilitate pipelining in the future, but 
-the current simplified implementation is expected to provide adequate speedup. It's 
-probably not worth the additional resources to do e.g. pipeline bypassing and hazard checking, 
-as the target FPGA design is nearly at capacity.  
+The design is partially outfitted with registers to facilitate pipelining in the future, but
+the current simplified implementation is expected to provide adequate speedup. It's
+probably not worth the additional resources to do e.g. pipeline bypassing and hazard checking,
+as the target FPGA design is nearly at capacity.
 
 A conservative implementation (no optimization of intermediate values, immediate reduction of
 every add/sub operation) of Montgomery scalar multiplication using Engine25519
-completes one scalar multiply operation in 2.270ms, compared to 103ms in software. 
+completes one scalar multiply operation in 2.270ms, compared to 103ms in software.
 This does not include the time required to do the final affine inversion (done in software,
 with significant overhead -- about 100ms), or the time to load the microcode and operands (about 5us).
-The affine inversion can also be microcoded, it just hasn't been done yet. 
+The affine inversion can also be microcoded, it just hasn't been done yet.
 
 The Engine address space is divided up as follows (expressed as offset from base)::
 
  0x0_0000 - 0x0_0fff: microcode (one 4k byte page)
  0x1_0000 - 0x1_3fff: memory-mapped register file (4 x 4k pages = 16kbytes)
- 
+
 Here are the currently implemented opcodes for The Engine:
-{}  
+{}
         """.format(opdoc))
 
         microcode_width = 32
@@ -1490,8 +1511,6 @@ Here are the currently implemented opcodes for The Engine:
         rf_depth_raw = 512
         rf_width_raw = 256
         self.submodules.rf = rf = RegisterFile(depth=rf_depth_raw, width=rf_width_raw)
-        self.specials += MultiReg(ResetSignal("eng_clk"), rf.clear, "eng_clk") # sync up the register file's fast clock to our slow clock
-
         self.window = CSRStorage(fields=[
             CSRField("window", size=log2_int(rf_depth_raw) - log2_int(num_registers), description="Selects the current register window to use"),
         ])
@@ -1505,11 +1524,55 @@ Here are the currently implemented opcodes for The Engine:
         self.control = CSRStorage(fields=[
             CSRField("go", size=1, pulse=True, description="Writing to this puts the engine in `run` mode, and it will execute mplen microcode instructions starting at mpstart"),
         ])
-        self.status = CSRStorage(fields=[
+        self.mpresume = CSRStatus(fields=[
+            CSRField("mpresume", size=log2_int(microcode_depth), description="Where to resume execution after a pause")
+        ])
+
+        self.power = CSRStorage(fields=[
+            CSRField("on", size=1, reset=0,
+                description="Writing `1` turns on the clocks to this block, `0` stops the clocks (for power savings). The handling of the clock gate is in a different module, this is just a flag to that block."),
+            CSRField("pause_req", size=1, description="Writing a `1` to this block will pause execution at the next micro-op, and allow for read-out of data from RF/microcode. Must check pause_gnt to confirm the pause has happened. Used to interrupt flow for suspend/resume."),
+        ])
+        # bring pause into the eng_clk domain
+        pause_req = Signal()
+        self.sync.eng_clk += pause_req.eq(self.power.fields.pause_req)
+        # re-sync the eng_clk phase to the RF phase whenever clocks are re-applied. We don't guarantee that the clocks start exactly
+        # at the same time, so you can get phase shift...
+        power_on_delay = Signal(max=16, reset=15)
+        eng_powered_on = Signal()
+        self.sync += [ # stretch out any power on pulse so we can process a reset in the clk50 domain after its enable has been switched on
+            If(~self.power.fields.on,
+                power_on_delay.eq(15)
+            ).Elif(power_on_delay > 0,
+                power_on_delay.eq(power_on_delay - 1)
+            ).Else(
+                power_on_delay.eq(0)
+            ),
+            eng_powered_on.eq(power_on_delay == 0), # make a signal that specifies that the engine is powered on that happens 16 cycles after the clocks are turned on
+            # note that this signal drops only *after* the power has been toggled, because when the clock is cut,
+            # the downstream "eng_clk" domain signals won't capture the latest state. So, once the power comes on,
+            # eng_powered_on must drop for a few cycles, then come back up again, which properly triggers a synchronization of the RF.
+        ]
+        eng_on_50 = Signal()
+        eng_on_50_r = Signal()
+        self.specials += MultiReg(eng_powered_on, eng_on_50, "eng_clk")
+        self.sync.eng_clk += eng_on_50_r.eq(eng_on_50)
+        rf_reset_clear = Signal()
+        self.specials += MultiReg(ResetSignal("eng_clk"), rf_reset_clear, "eng_clk") # sync up the register file's fast clock to our slow clock
+        self.comb += rf.clear.eq(rf_reset_clear | (eng_on_50 & ~eng_on_50_r))
+
+        self.status = CSRStatus(fields=[
             CSRField("running", size=1, description="When set, the microcode engine is running. All wishbone access to RF and microcode memory areas will stall until this bit is clear"),
             CSRField("mpc", size=log2_int(microcode_depth), description="Current location of the microcode program counter. Mostly for debug."),
+            CSRField("pause_gnt", size=1, description="When set, the engine execution has been paused, and the RF & microcode ROM can be read out for suspend/resume"),
         ])
-        self.comb += self.status.fields.running.eq(running)
+        pause_gnt = Signal()
+        mpc = Signal(log2_int(microcode_depth))  # the microcode program counter
+        self.sync += [
+            self.status.fields.running.eq(running),
+            self.status.fields.pause_gnt.eq(pause_gnt),
+            self.status.fields.mpc.eq(mpc),
+        ]
 
         self.submodules.ev = EventManager()
         self.ev.finished = EventSourcePulse(description="Microcode run finished execution")
@@ -1536,7 +1599,6 @@ Here are the currently implemented opcodes for The Engine:
         micro_runport = microcode.get_port(mode=READ_FIRST) # , clock_domain="eng_clk"
         self.specials += micro_runport
 
-        mpc = Signal(log2_int(microcode_depth))  # the microcode program counter
         self.comb += [
             micro_runport.adr.eq(mpc),
             instruction.raw_bits().eq(micro_runport.dat_r),  # mapping should follow the record definition *exactly*
@@ -1567,7 +1629,7 @@ Here are the currently implemented opcodes for The Engine:
             If( ((bus.adr & ((0xFFFF_C000) >> 2)) >= ((prefix | 0x1_0000) >> 2)) & (((bus.adr & ((0xFFFF_C000) >> 2)) < ((prefix | 0x1_4000) >> 2))),
                 # fully decode register file address to avoid aliasing
                 If(bus.cyc & bus.stb & bus.we & ~bus.ack,
-                    If(~running,
+                    If(~running | pause_gnt,
                         wdata.eq(bus.dat_w),
                         wadr.eq(bus.adr[:wadr.nbits]),
                         wmask.eq(bus.sel),
@@ -1582,7 +1644,7 @@ Here are the currently implemented opcodes for The Engine:
                         bus.ack.eq(0),
                     )
                 ).Elif(bus.cyc & bus.stb & ~bus.we & ~bus.ack,
-                    If(~running,
+                    If(~running | pause_gnt,
                         radr.eq(bus.adr[:radr.nbits]),
                         rdata_re.eq(1),
                         bus.dat_r.eq( rf.ra_dat >> ((radr & 0x7) * 32) ),
@@ -1660,7 +1722,7 @@ Here are the currently implemented opcodes for The Engine:
             self.rb_const_rom.adr.eq(rb_adr),
             rf.window.eq(self.window.fields.window),
 
-            If(running,
+            If(running & ~pause_gnt,
                 rf.ra_adr.eq(Cat(ra_adr, self.window.fields.window)),
                 rf.rb_adr.eq(Cat(rb_adr, self.window.fields.window)),
                 rf.instruction_pipe_in.eq(instruction.raw_bits()),
@@ -1691,7 +1753,7 @@ Here are the currently implemented opcodes for The Engine:
         bus_rd_wait = Signal(max=(rd_wait_states+1))
         self.sync.rf_clk += [
             If(rdata_req,
-                If(~running,
+                If(~running | pause_gnt,
                     If(bus_rd_wait != 0,
                         bus_rd_wait.eq(bus_rd_wait-1),
                     ).Else(
@@ -1714,7 +1776,7 @@ Here are the currently implemented opcodes for The Engine:
         # primitive on its own will take about as much time as a couple instructions on The Engine.
         engine_go = Signal()
         go_stretch = Signal(2)
-        self.sync += [
+        self.sync += [ # note that we will miss this if the system throttles our clocks when this pulse arrives
             If(self.control.fields.go,
                 go_stretch.eq(2)
             ).Else(
@@ -1732,8 +1794,13 @@ Here are the currently implemented opcodes for The Engine:
         done = Signal()  # indicates when the given execution units are done (as-muxed from subunits)
         self.comb += rf.running.eq(~seq.ongoing("IDLE") | rdata_re),  # let the RF know when we're not executing, so it can idle to save power
         seq.act("IDLE",
+            NextValue(pause_gnt, 0),
             If(engine_go,
-                NextValue(mpc, self.mpstart.fields.mpstart),
+                If(pause_req,
+                    NextValue(mpc, self.mpresume.fields.mpresume)
+                ).Else(
+                    NextValue(mpc, self.mpstart.fields.mpstart)
+                ),
                 NextValue(mpc_stop, self.mpstart.fields.mpstart + self.mplen.fields.mplen - 1),
                 NextValue(window_latch, self.window.fields.window),
                 NextValue(running, 1),
@@ -1743,8 +1810,14 @@ Here are the currently implemented opcodes for The Engine:
             )
         )
         seq.act("FETCH",
-            # one cycle latency for instruction fetch
-            NextState("EXEC"),
+            If(pause_req,
+                NextState("PAUSED"),
+                NextValue(pause_gnt, 1),
+            ).Else(
+                # one cycle latency for instruction fetch
+                NextState("EXEC"),
+                NextValue(pause_gnt, 0),
+            )
         )
         seq.act("EXEC", # not a great name. This is actually where the register file fetches its contents.
             If(instruction.opcode == opcodes["BRZ"][0],
@@ -1793,6 +1866,12 @@ Here are the currently implemented opcodes for The Engine:
                     NextValue(running, 0),
                 )
             ),
+        )
+        seq.act("PAUSED",
+            If(~pause_req,
+                NextValue(pause_gnt, 0),
+                NextState("FETCH"), # could probably go directly to "EXEC", but, this is a minor detail recovering from pause
+            )
         )
 
         exec_units = {
@@ -1854,18 +1933,18 @@ Here are the currently implemented opcodes for The Engine:
         # read data is stable by the 3rd phase of the RF fetch cycle, and so it is in fact ready even before
         # the other signals that trigger the execute mode, hence 4+1 cycles total setup time
         platform.add_platform_command("set_multicycle_path 5 -setup -start -from [get_clocks clk200] -to [get_clocks clk50] -through [get_cells *rf_r*_dat_reg*]")
-        platform.add_platform_command("set_multicycle_path 4 -hold -from [get_clocks clk200] -to [get_clocks clk50] -through [get_cells *rf_r*_dat_reg*]")
+        platform.add_platform_command("set_multicycle_path 4 -hold -end -from [get_clocks clk200] -to [get_clocks clk50] -through [get_cells *rf_r*_dat_reg*]")
         ### clk200->clk100 multi-cycle paths:
         # same as above, but for the multiplier path.
         platform.add_platform_command("set_multicycle_path 3 -setup -start -from [get_clocks clk200] -to [get_clocks sys_clk] -through [get_cells *rf_r*_dat_reg*]")
-        platform.add_platform_command("set_multicycle_path 2 -hold -from [get_clocks clk200] -to [get_clocks sys_clk] -through [get_cells *rf_r*_dat_reg*]")
+        platform.add_platform_command("set_multicycle_path 2 -hold -end -from [get_clocks clk200] -to [get_clocks sys_clk] -through [get_cells *rf_r*_dat_reg*]")
 
         # unregistered exec units need this set of rules
         ### clk200->clk200 multi-cycle paths:
         # this is for the case when we don't register the data, and just go straight from RF out put RF input. In the worst case
         # we have three (? maybe five?) clk200 cycles to compute as we phase through the reads and writes
         platform.add_platform_command("set_multicycle_path 3 -setup -from [get_clocks clk200] -to [get_clocks clk200] -through [get_cells *rf_r*_dat_reg*]")
-        platform.add_platform_command("set_multicycle_path 2 -hold -from [get_clocks clk200] -to [get_clocks clk200] -through [get_cells *rf_r*_dat_reg*]")
+        platform.add_platform_command("set_multicycle_path 2 -hold -end -from [get_clocks clk200] -to [get_clocks clk200] -through [get_cells *rf_r*_dat_reg*]")
 
         # other paths
         ### sys->clk200 multi-cycle paths:
@@ -1885,11 +1964,14 @@ Here are the currently implemented opcodes for The Engine:
         ### sys->clk50 multi-cycle paths:
         # microcode fetch is guaranteed not to transition in the middle of an exec computation
         platform.add_platform_command("set_multicycle_path 2 -setup -start -from [get_clocks sys_clk] -to [get_clocks clk50] -through [get_cells microcode_reg*]")
-        platform.add_platform_command("set_multicycle_path 1 -hold -from [get_clocks sys_clk] -to [get_clocks clk50] -through [get_cells microcode_reg*]")
+        platform.add_platform_command("set_multicycle_path 1 -hold -end -from [get_clocks sys_clk] -to [get_clocks clk50] -through [get_cells microcode_reg*]")
         ### clk50->clk200 multi-cycle paths:
         # engine running will set up a full eng_clk cycle before any RF accesses need to be valid
         platform.add_platform_command("set_multicycle_path 4 -setup -from [get_clocks clk50] -to [get_clocks clk200] -through [get_nets {{ {net1} {net2} {net3} }}]", net1=running, net2=running_r, net3=rf.running)
         platform.add_platform_command("set_multicycle_path 3 -hold -end -from [get_clocks clk50] -to [get_clocks clk200] -through [get_nets {{ {net1} {net2} {net3} }}]", net1=running, net2=running_r, net3=rf.running)
+        # this signal is a combo from clk50+sys
+        platform.add_platform_command("set_multicycle_path 4 -setup -from [get_clocks clk50] -to [get_clocks clk200] -through [get_pins *rf_wren_pipe_reg/D]")
+        platform.add_platform_command("set_multicycle_path 3 -hold -end -from [get_clocks clk50] -to [get_clocks clk200] -through [get_pins *rf_wren_pipe_reg/D]")
         # data writeback happens on phase==2, and thus is stable for at least two clk200 clocks extra
         platform.add_platform_command("set_multicycle_path 2 -setup -from [get_clocks clk50] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/DI*DI*]")
         platform.add_platform_command("set_multicycle_path 1 -hold -end -from [get_clocks clk50] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/DI*DI*]")
@@ -1901,3 +1983,6 @@ Here are the currently implemented opcodes for The Engine:
         platform.add_platform_command("set_multicycle_path 3 -hold -end -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/DI*DI*]")
         platform.add_platform_command("set_multicycle_path 4 -setup -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/ADDR*ADDR*]")
         platform.add_platform_command("set_multicycle_path 3 -hold -end -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins RF_RAMB*/*/ADDR*ADDR*]")
+        # this signal is a combo from clk50+sys
+        platform.add_platform_command("set_multicycle_path 4 -setup -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins *rf_wren_pipe_reg/D]")
+        platform.add_platform_command("set_multicycle_path 3 -hold -end -from [get_clocks sys_clk] -to [get_clocks clk200] -through [get_pins *rf_wren_pipe_reg/D]")

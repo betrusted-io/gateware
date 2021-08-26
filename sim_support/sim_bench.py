@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
+from operator import floordiv
 import sys
 import os
+import shutil
 import argparse
 
 # ASSUME: project structure is <project_root>/deps/gateware/sim/<sim_proj>/this_script
@@ -62,7 +64,8 @@ crg_config = {
 
 class Platform(XilinxPlatform):
     def __init__(self, simio):
-        XilinxPlatform.__init__(self, "", simio + benchio)
+        part = "xc7s" + "50" + "-csga324-1il"
+        XilinxPlatform.__init__(self, part, simio + benchio, toolchain="vivado")
 
 
 class CRG(Module):
@@ -122,9 +125,13 @@ class Sim(SoCCore):
         if spiboot:
             reset_address = self.mem_map["spiflash"]
             rom_size = 0x0
+            rom_init = []
+        else:
+            rom_init = 'run/software/bios/bios.bin'
 
         SoCCore.__init__(self, platform, crg_config["sys"][0],
             integrated_rom_size=rom_size,
+            integrated_rom_init=rom_init,
             integrated_sram_size=0x20000,
             ident="simulation LiteX Base SoC",
             cpu_type="vexriscv",
@@ -134,6 +141,9 @@ class Sim(SoCCore):
             uart_name="crossover",  # use UART-over-wishbone for debugging
             cpu_reset_address=reset_address,
             **kwargs)
+        # work around for https://github.com/enjoy-digital/litex/commit/ceb8a6502cc1315eb48fa654a073101c783013a3
+        # LiteX has started hard-coding the location of SRAM, with no option to change it!
+        self.add_ram("sram2", 0x01000000, 0x20000)
 
         self.cpu.use_external_variant(vex_verilog_path)
 
@@ -154,13 +164,16 @@ class BiosHelper():
 
         # setup the correct linker script for the BIOS build based on the SoC's boot vector settings
         if spiboot:
-            os.system("cp -f ../../sim_support/memory_spi.x ../../target/memory.x")
+            shutil.copyfile('../../sim_support/memory_spi.x', '../../target/memory.x')
         else:
-            os.system("cp -f ../../sim_support/memory_rom.x ../../target/memory.x")
+            shutil.copyfile('../../sim_support/memory_rom.x', '../../target/memory.x')
 
         # run the BIOS build
         ret = 0
-        os.system("mkdir -p run/software/bios") # make the directory if it doesn't exist
+        try:
+            os.system("mkdir run" + os.path.sep + "software" + os.path.sep + "bios") # make the directory if it doesn't exist
+        except:
+            pass
         if nightly:
             ret += os.system("cd testbench && cargo +nightly build --target {} --release".format(target))
         else:
@@ -171,29 +184,79 @@ class BiosHelper():
         if ret != 0:
             sys.exit(1)  # fail the build
 
+class DoPac():
+    def __init__(self, name):
+        if os.name == 'nt':
+            subprocess.run("rd /S /Q testbench\\{}".format(name), shell=True)
+            subprocess.run("mkdir testbench\\{}".format(name), shell=True)
+            subprocess.run("copy pac-cargo-template testbench\\{}\\Cargo.toml".format(name), shell=True)
+            subprocess.run("cargo install svd2rust") # make sure dependencies are installed
+            subprocess.run("cargo install form") # make sure dependencies are installed
+            subprocess.run("cd testbench\\{} && svd2rust --target riscv -i ..\\..\\..\\..\\target\\soc.svd".format(name), shell=True)
+            subprocess.run("cd testbench\\{} && rd /S /Q src".format(name), shell=True)
+            subprocess.run("cd testbench\\{} && form -i lib.rs -o src\\".format(name), shell=True)
+            subprocess.run("cd testbench\\{} && del lib.rs\\".format(name), shell=True)
+        else:
+            os.system("rm -rf testbench/{}".format(name))  # nuke the old PAC if it exists
+            os.system("mkdir -p testbench/{}".format(name)) # rebuild it from scratch every time
+            os.system("cp pac-cargo-template testbench/{}/Cargo.toml".format(name))
+            os.system("cargo install svd2rust") # make sure dependencies are installed
+            os.system("cargo install form") # make sure dependencies are installed
+            os.system("cd testbench/{} && svd2rust --target riscv -i ../../../../target/soc.svd && rm -rf src; form -i lib.rs -o src/; rm lib.rs".format(name))
+
+class Preamble():
+    def __init__(self):
+        if os.name == 'nt':
+            # windows is really, really hard to do this right. Apparently mkdir and copy aren't "commands", they are shell built-ins
+            # plus path separators are different plus calling os.mkdir() is different from the mkdir version in the windows shell. ugh.
+            # just...i give up. we can't use a single syscall for both. we just have to do it differently for each platform.
+            subprocess.run("mkdir run\\software\\bios", shell=True)
+            subprocess.run("mkdir ..\\..\\target", shell=True)
+            subprocess.run("copy ..\\..\\sim_support\\placeholder_bios.bin run\\software\\bios\\bios.bin", shell=True)
+        else:
+            os.system("mkdir -p run/software/bios")
+            os.system("mkdir -p ../../target")  # this doesn't exist on the first run
+            os.system("cp ../../sim_support/placeholder_bios.bin run/software/bios/bios.bin")
+
 class SimRunner():
     def __init__(self, ci, os_cmds, vex_verilog_path=VEX_CPU_PATH):
-        os.system("mkdir -p run")
-        os.system("rm -rf run/xsim.dir")
+        # we need to use wildcards, so shutil is rather hard to code around. Use this hack instead.
+        if os.name == 'nt':
+            cpname = 'copy'
+        else:
+            cpname = 'cp'
+
+        try:
+            os.system("mkdir run") # was "mkdir -p run"
+        except:
+            pass
+
+        if os.name == 'nt':
+            os.system('rmdir /S /Q run\\xsim.dir')
+        else:
+            os.system("rm -rf run/xsim.dir")
 
         # copy over the top test bench and common code
-        os.system("cp top_tb.v run/top_tb.v")
-        os.system("cp ../../sim_support/common.v run/")
+        os.system("{} top_tb.v run".format(cpname) + os.path.sep + "top_tb.v") # "cp top_tb.v run/top_tb.v"
+        os.system("{} ..".format(cpname) + os.path.sep + ".." + os.path.sep + "sim_support" + os.path.sep + "common.v run" + os.path.sep) # "cp ../../sim_support/common.v run/"
 
         # initialize with a default waveform that contains the most basic execution tracing
         if os.path.isfile('run/top_tb_sim.wcfg') != True:
             if os.path.isfile('top_tb_sim.wcfg'):
-                os.system('cp top_tb_sim.wcfg run/')
+                os.system('{} top_tb_sim.wcfg run'.format(cpname) + os.path.sep) # 'cp top_tb_sim.wcfg run/'
             else:
-                os.system('cp ../../sim_support/top_tb_sim.wcfg run/')
+                os.system('{} ..'.format(cpname)+os.path.sep+'..'+os.path.sep+'sim_support'+os.path.sep+'top_tb_sim.wcfg run' + os.path.sep) # 'cp ../../sim_support/top_tb_sim.wcfg run/'
 
         # load up simulator dependencies
-        os.system("cd run && cp gateware/*.init .")
-        os.system("cd run && cp gateware/*.v .")
-        os.system("cd run && xvlog ../../../sim_support/glbl.v")
+        os.system("cd run && {} gateware".format(cpname)+os.path.sep+"*.init .") # "cd run && cp gateware/*.init ."
+        os.system("cd run && {} gateware".format(cpname)+os.path.sep+"*.v .") # "cd run && cp gateware/*.v ."
+        os.system("cd run && xvlog .."+os.path.sep+".."+os.path.sep+".."+os.path.sep+"sim_support"+os.path.sep+"glbl.v") # "cd run && xvlog ../../../sim_support/glbl.v"
         os.system("cd run && xvlog sim_bench.v -sv")
         os.system("cd run && xvlog top_tb.v -sv ")
-        os.system("cd run && xvlog {}".format("../" + vex_verilog_path))
+        vex_dir = os.path.dirname(VEX_CPU_PATH)
+        # copy any relevant .bin files into the run directory as well
+        os.system("{} {} ".format(cpname, vex_dir + os.path.sep + "*.bin") + " run" + os.path.sep) # "{} {} run/".format(cpname, vex_dir + "/*.bin")
+        os.system("cd run && xvlog {}".format(".." + os.path.sep + vex_verilog_path)) # "cd run && xvlog {}".format("../" + vex_verilog_path)
 
         # run user dependencies
         for cmd in os_cmds:

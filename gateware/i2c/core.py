@@ -36,7 +36,7 @@ class RTLI2C(Module, AutoCSR, AutoDoc):
         self.rxr = CSRStatus(8, name="rxr", description="""
         Data being read from slaved devices""")
         self.command = CSRStorage(write_from_dev=True, fields=[
-            CSRField("IACK",  size=1, description="Interrupt acknowledge; when set, clears a pending interrupt"),
+            CSRField("IACK",  size=1, description="Interrupt acknowledge; when set, clears a pending interrupt", pulse=True),
             CSRField("Resvd", size=2, description="reserved for cross-compatibility with OpenCores drivers"),
             CSRField("ACK",   size=1, description="when a receiver, sent ack (`ACK=0`) or nack (`ACK=1`)"),
             CSRField("WR",    size=1, description="write to slave"),
@@ -52,9 +52,13 @@ class RTLI2C(Module, AutoCSR, AutoDoc):
             CSRField("Busy",    size=1, description="I2C block is busy processing the latest command"),
             CSRField("RxACK",   size=1, description="Received acknowledge from slave. 1 = no ack received, 0 = ack received"),
         ])
+        self.core_reset = CSRStorage(1, name="core_reset", fields = [
+            CSRField("reset", size=1, description="Write `1` for a synchronous reset of the I2C core. Does not reset the prescale value. This signal is outside of the OpenCores spec.", pulse=True)
+        ])
 
         self.submodules.ev = EventManager()
-        self.ev.i2c_int    = EventSourcePulse()  # rising edge triggered
+        self.ev.i2c_int    = EventSourcePulse(description="Triggered when arbitration is lost or transaction done. Requires IACK write to clear or else it will re-trigger.")  # rising edge triggered
+        self.ev.txrx_done  = EventSourceProcess(description="Triggered on the falling edge of TIP") # falling edge triggered
         self.ev.finalize()
 
         # control register
@@ -105,7 +109,7 @@ class RTLI2C(Module, AutoCSR, AutoDoc):
         sda_oen = Signal()
         self.specials += Instance("i2c_controller_byte_ctrl",
             i_clk      = ClockSignal(),
-            i_rst      = ResetSignal(),
+            i_rst      = ResetSignal() | self.core_reset.fields.reset,
             i_nReset   = 1,
             i_ena      = ena,
             i_clk_cnt  = self.prescale.storage,
@@ -154,4 +158,5 @@ class RTLI2C(Module, AutoCSR, AutoDoc):
         ]
 
         self.comb += self.ev.i2c_int.trigger.eq(intflag & int_ena)
+        self.comb += self.ev.txrx_done.trigger.eq(tip)
 

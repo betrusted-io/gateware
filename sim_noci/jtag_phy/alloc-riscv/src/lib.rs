@@ -2,7 +2,7 @@
 //! Derived from cortex-m heap allocator
 
 #![feature(allocator_api)]
-#![feature(const_fn)]
+//#![feature(const_fn)]
 #![no_std]
 
 extern crate alloc;

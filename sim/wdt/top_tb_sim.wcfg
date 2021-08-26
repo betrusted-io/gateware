@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wave_config>
+   <wave_state>
+   </wave_state>
+   <db_ref_list>
+      <db_ref path="top_tb_sim.wdb" id="1">
+         <top_modules>
+            <top_module name="glbl" />
+            <top_module name="top_tb" />
+         </top_modules>
+      </db_ref>
+   </db_ref_list>
+   <zoom_setting>
+      <ZoomStartTime time="0fs"></ZoomStartTime>
+      <ZoomEndTime time="300109068fs"></ZoomEndTime>
+      <Cursor1Time time="24966866fs"></Cursor1Time>
+   </zoom_setting>
+   <column_width_setting>
+      <NameColumnWidth column_width="378"></NameColumnWidth>
+      <ValueColumnWidth column_width="68"></ValueColumnWidth>
+   </column_width_setting>
+   <WVObjectSize size="43" />
+   <wvobject type="logic" fp_name="/top_tb/dut/sys_rst">
+      <obj_property name="ElementShortName">sys_rst</obj_property>
+      <obj_property name="ObjectShortName">sys_rst</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/sys_clk">
+      <obj_property name="ElementShortName">sys_clk</obj_property>
+      <obj_property name="ObjectShortName">sys_clk</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/success">
+      <obj_property name="ElementShortName">success</obj_property>
+      <obj_property name="ObjectShortName">success</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/report">
+      <obj_property name="ElementShortName">report[31:0]</obj_property>
+      <obj_property name="ObjectShortName">report[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/wdt_wdt_reset">
+      <obj_property name="ElementShortName">wdt_wdt_reset</obj_property>
+      <obj_property name="ObjectShortName">wdt_wdt_reset</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_INSTRUCTION">
+      <obj_property name="ElementShortName">decode_to_execute_INSTRUCTION[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_INSTRUCTION[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_PC">
+      <obj_property name="ElementShortName">decode_to_execute_PC[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_PC[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_RS1">
+      <obj_property name="ElementShortName">decode_to_execute_RS1[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_RS1[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/VexRiscv/decode_to_execute_RS2">
+      <obj_property name="ElementShortName">decode_to_execute_RS2[31:0]</obj_property>
+      <obj_property name="ObjectShortName">decode_to_execute_RS2[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/update_value_re">
+      <obj_property name="ElementShortName">update_value_re</obj_property>
+      <obj_property name="ObjectShortName">update_value_re</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/update_value_storage">
+      <obj_property name="ElementShortName">update_value_storage</obj_property>
+      <obj_property name="ObjectShortName">update_value_storage</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/value">
+      <obj_property name="ElementShortName">value[31:0]</obj_property>
+      <obj_property name="ObjectShortName">value[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/value_re">
+      <obj_property name="ElementShortName">value_re</obj_property>
+      <obj_property name="ObjectShortName">value_re</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/value_status">
+      <obj_property name="ElementShortName">value_status[31:0]</obj_property>
+      <obj_property name="ObjectShortName">value_status[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/value_we">
+      <obj_property name="ElementShortName">value_we</obj_property>
+      <obj_property name="ObjectShortName">value_we</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/vexriscv">
+      <obj_property name="ElementShortName">vexriscv[31:0]</obj_property>
+      <obj_property name="ObjectShortName">vexriscv[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/watchdog_re">
+      <obj_property name="ElementShortName">watchdog_re</obj_property>
+      <obj_property name="ObjectShortName">watchdog_re</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/watchdog_storage">
+      <obj_property name="ElementShortName">watchdog_storage[16:0]</obj_property>
+      <obj_property name="ObjectShortName">watchdog_storage[16:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/wdog_counter">
+      <obj_property name="ElementShortName">wdog_counter[31:0]</obj_property>
+      <obj_property name="ObjectShortName">wdog_counter[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/wdog_cycle">
+      <obj_property name="ElementShortName">wdog_cycle</obj_property>
+      <obj_property name="ObjectShortName">wdog_cycle</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/wdog_enable_wdt">
+      <obj_property name="ElementShortName">wdog_enable_wdt</obj_property>
+      <obj_property name="ObjectShortName">wdog_enable_wdt</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/wdog_enabled">
+      <obj_property name="ElementShortName">wdog_enabled</obj_property>
+      <obj_property name="ObjectShortName">wdog_enabled</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/wdog_enabled_r">
+      <obj_property name="ElementShortName">wdog_enabled_r</obj_property>
+      <obj_property name="ObjectShortName">wdog_enabled_r</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/wdt_clk">
+      <obj_property name="ElementShortName">wdt_clk</obj_property>
+      <obj_property name="ObjectShortName">wdt_clk</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/wdt_count">
+      <obj_property name="ElementShortName">wdt_count[31:0]</obj_property>
+      <obj_property name="ObjectShortName">wdt_count[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/wdt_count_lock">
+      <obj_property name="ElementShortName">wdt_count_lock[31:0]</obj_property>
+      <obj_property name="ObjectShortName">wdt_count_lock[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/wdt_rst">
+      <obj_property name="ElementShortName">wdt_rst</obj_property>
+      <obj_property name="ObjectShortName">wdt_rst</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/wdt_wdt_reset">
+      <obj_property name="ElementShortName">wdt_wdt_reset</obj_property>
+      <obj_property name="ObjectShortName">wdt_wdt_reset</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/period">
+      <obj_property name="ElementShortName">period[31:0]</obj_property>
+      <obj_property name="ObjectShortName">period[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/period_re">
+      <obj_property name="ElementShortName">period_re</obj_property>
+      <obj_property name="ObjectShortName">period_re</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/period_storage">
+      <obj_property name="ElementShortName">period_storage[31:0]</obj_property>
+      <obj_property name="ObjectShortName">period_storage[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/period_sync_count">
+      <obj_property name="ElementShortName">period_sync_count[7:0]</obj_property>
+      <obj_property name="ObjectShortName">period_sync_count[7:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/period_sync_done">
+      <obj_property name="ElementShortName">period_sync_done</obj_property>
+      <obj_property name="ObjectShortName">period_sync_done</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/gsr">
+      <obj_property name="ElementShortName">gsr</obj_property>
+      <obj_property name="ObjectShortName">gsr</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/en_re">
+      <obj_property name="ElementShortName">en_re</obj_property>
+      <obj_property name="ObjectShortName">en_re</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/en_storage">
+      <obj_property name="ElementShortName">en_storage</obj_property>
+      <obj_property name="ObjectShortName">en_storage</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/enable">
+      <obj_property name="ElementShortName">enable</obj_property>
+      <obj_property name="ObjectShortName">enable</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/enable_re">
+      <obj_property name="ElementShortName">enable_re</obj_property>
+      <obj_property name="ObjectShortName">enable_re</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/enable_storage">
+      <obj_property name="ElementShortName">enable_storage</obj_property>
+      <obj_property name="ObjectShortName">enable_storage</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/do_reset">
+      <obj_property name="ElementShortName">do_reset</obj_property>
+      <obj_property name="ObjectShortName">do_reset</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/do_reset_sys">
+      <obj_property name="ElementShortName">do_reset_sys</obj_property>
+      <obj_property name="ObjectShortName">do_reset_sys</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/top_tb/dut/code_sync_count">
+      <obj_property name="ElementShortName">code_sync_count[7:0]</obj_property>
+      <obj_property name="ObjectShortName">code_sync_count[7:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/top_tb/dut/code_sync_done">
+      <obj_property name="ElementShortName">code_sync_done</obj_property>
+      <obj_property name="ObjectShortName">code_sync_done</obj_property>
+   </wvobject>
+</wave_config>
