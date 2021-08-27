@@ -236,7 +236,9 @@ would blow out L1 entirely are sped up much more.
         ]
 
         self.comb += access.eq(self.cbus.cyc) # power up the SRAM whenever the cbus is active
+        self.cache_idle = Signal()
         self.submodules.fsm = fsm = FSM()
+        self.comb += self.cache_idle.eq(fsm.ongoing("IDLE"))
         fsm.act("IDLE",
             NextValue(self.cbus.ack, 0),
             NextValue(config, 0),
