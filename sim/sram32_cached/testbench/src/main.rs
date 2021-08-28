@@ -29,6 +29,13 @@ fn run(p: &pac::Peripherals) {
         }
     }
 
+    // uninit read behavior....
+    for i in 0..(8*1024/4) {
+        unsafe {
+            let rd = ram_ptr.add(i).read_volatile();
+            p.SIMSTATUS.report.write(|w| w.bits( rd ));
+        }
+    }
     for i in 0..(8*1024/4) {
         unsafe {
             ram_ptr.add(i).write_volatile( (0xACE0_0000 + i) as u32 );

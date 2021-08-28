@@ -84,10 +84,12 @@ would blow out L1 entirely are sped up much more.
         config_oe_n     = Signal(reset=1)
         access          = Signal()
 
-        comb_oe_n   = Signal()
-        comb_we_n   = Signal()
-        comb_zz_n   = Signal()
-        comb_ce_n   = Signal()
+        comb_oe_n   = Signal(reset=1)
+        comb_we_n   = Signal(reset=1)
+        comb_zz_n   = Signal(reset=1)
+        comb_ce_n   = Signal(reset=1)
+        self.debug_ce = Signal()
+        self.comb += self.debug_ce.eq(comb_ce_n)
         comb_dm_n   = Signal(4)
         comb_adr    = Signal(22)
         comb_data_o = Signal(32)
@@ -164,22 +166,26 @@ would blow out L1 entirely are sped up much more.
         self.specials += [
             Instance("ODDR",
                 p_DDR_CLK_EDGE="SAME_EDGE",
-                i_C=ClockSignal(), i_R=ResetSignal(), i_S=0, i_CE=1,
+                p_INIT=1,
+                i_C=ClockSignal(), i_R=0, i_S=ResetSignal(), i_CE=1,
                 i_D1=comb_oe_n, i_D2=comb_oe_n, o_Q=pads.oe_n,
             ),
             Instance("ODDR",
                 p_DDR_CLK_EDGE="SAME_EDGE",
-                i_C=ClockSignal(), i_R=ResetSignal(), i_S=0, i_CE=1,
+                p_INIT=1,
+                i_C=ClockSignal(), i_R=0, i_S=ResetSignal(), i_CE=1,
                 i_D1=comb_we_n, i_D2=comb_we_n, o_Q=pads.we_n,
             ),
             Instance("ODDR",
                 p_DDR_CLK_EDGE="SAME_EDGE",
-                i_C=ClockSignal(), i_R=ResetSignal(), i_S=0, i_CE=1,
+                p_INIT=1,
+                i_C=ClockSignal(), i_R=0, i_S=ResetSignal(), i_CE=1,
                 i_D1=comb_zz_n, i_D2=comb_zz_n, o_Q=pads.zz_n,
             ),
             Instance("ODDR",
                 p_DDR_CLK_EDGE="SAME_EDGE",
-                i_C=ClockSignal(), i_R=ResetSignal(), i_S=0, i_CE=1,
+                p_INIT=1,
+                i_C=ClockSignal(), i_R=0, i_S=ResetSignal(), i_CE=1,
                 i_D1=comb_ce_n, i_D2=comb_ce_n, o_Q=pads.ce_n,
             ),
         ]
