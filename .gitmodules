@@ -4,3 +4,6 @@
 [submodule "sim/curve_engine/testbench/engine25519-as"]
 	path = sim/curve_engine/testbench/engine25519-as
 	url = https://github.com/betrusted-io/engine25519-as.git
+[submodule "sim/curve_engine/testbench/curve25519-dalek-patch"]
+	path = sim/curve_engine/testbench/curve25519-dalek-patch
+	url = https://github.com/betrusted-io/curve25519-dalek.git
