@@ -11,6 +11,27 @@ pub fn report(p: &pac::Peripherals, data: u32) {
     }
 }
 
+fn run_x25519() -> (bool, [u8; 32]) {
+    // vector 111
+    //"public" : "e96d2780e5469a74620ab5aa2f62151d140c473320dbe1b028f1a48f8e76f95f",
+    //"private" : "60a3a4f130b98a5be4b1cedb7cb85584a3520e142d474dc9ccb909a073a9767f",
+    //"shared" : "e5ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+    // converted using python3 one-liner in REPL: list(bytes.fromhex("hexstringhere"))
+    let public_u8: [u8; 32] = [233, 109, 39, 128, 229, 70, 154, 116, 98, 10, 181, 170, 47, 98, 21, 29, 20, 12, 71, 51, 32, 219, 225, 176, 40, 241, 164, 143, 142, 118, 249, 95];
+    let private_u8: [u8; 32] = [96, 163, 164, 241, 48, 185, 138, 91, 228, 177, 206, 219, 124, 184, 85, 132, 163, 82, 14, 20, 45, 71, 77, 201, 204, 185, 9, 160, 115, 169, 118, 127];
+    let secret_u8: [u8; 32] = [229, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 127];
+
+    use x25519_dalek::{PublicKey, StaticSecret};
+    let private = StaticSecret::from(private_u8);
+    let public = PublicKey::from(public_u8);
+    let shared = private.diffie_hellman(&public).to_bytes();
+    if shared != secret_u8 {
+        (false, shared)
+    } else {
+        (true, shared)
+    }
+}
+
 #[cfg(not(test))]
 #[sim_test]
 fn run(p: &pac::Peripherals) {
@@ -27,6 +48,21 @@ fn run(p: &pac::Peripherals) {
     let mut phase: u32 = 0x8000_0000;
 
     report(&p, phase);  phase += 1;
+
+    //// run a single point diffie hellman test - created to debug https://github.com/betrusted-io/xous-core/issues/76
+    if false {
+        let (result, vector) = run_x25519();
+        for &b in vector.iter() {
+            report(&p, b as u32);
+        }
+        if result {
+            report(&p, 0x1111_1111);
+        } else {
+            report(&p, 0xdddd_dddd);
+        }
+        p.SIMSTATUS.simstatus.modify(|_r, w| w.success().bit(pass));
+        return;
+    }
 
     ///////////////  APPLY AND RUN ARITHMETIC TEST VECTORS
     let mut test_offset: usize = 0x0;

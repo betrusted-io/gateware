@@ -22,3 +22,8 @@ members = [
     "sim_support/rust/pac",
     "sim_support/rust/macros",
 ]
+
+[patch.crates-io.curve25519-dalek]
+path="sim/curve_engine/testbench/curve25519-dalek-patch"
+default-features = false
+features = ["u32_backend", "pac_test"]

@@ -12,5 +12,15 @@ sim-bios = { path = "../../../sim_support/rust/bios" }
 xous-nommu = { path = "../../../sim_support/rust/xous-nommu" }
 volatile = "0.2.6"
 
+[dependencies.x25519-dalek]
+version = "1.1.1"
+default-features = false
+features = ["u32_backend"]
+
+[dependencies.curve25519-dalek]
+version = "3.1.0" # note this is patched to our fork in ./Cargo.toml
+default-features = false
+features = ["u32_backend", "pac_test"]
+
 [features]
 u32_backend = [] # makes RLS happy(-er)
