@@ -99,7 +99,6 @@ class SimStatus(Module, AutoCSR, AutoDoc):
 class Sim(SoCCore):
     SoCCore.mem_map = {
         "rom"           : 0x00000000,
-        "sram"          : 0x01000000,
         "spiflash"      : 0x20000000,
         "sram_ext"      : 0x40000000,
         "memlcd"        : 0xb0000000,
@@ -143,7 +142,7 @@ class Sim(SoCCore):
             **kwargs)
         # work around for https://github.com/enjoy-digital/litex/commit/ceb8a6502cc1315eb48fa654a073101c783013a3
         # LiteX has started hard-coding the location of SRAM, with no option to change it!
-        # self.add_ram("sram2", 0x01000000, 0x20000)
+        self.add_ram("sram2", 0x01000000, 0x20000)
 
         self.cpu.use_external_variant(vex_verilog_path)
 
