@@ -98,6 +98,7 @@ def generate_top():
     soc = Dut(platform, spiboot=boot_from_spi)
 
     builder = Builder(soc, output_dir="./run", csr_svd="../../target/soc.svd", compile_gateware=False, compile_software=False)
+    builder.software_packages = []
     vns = builder.build(run=False)
     soc.do_exit(vns)
 
@@ -109,6 +110,7 @@ def generate_top():
     soc = Dut(platform, spiboot=boot_from_spi)
 
     builder = Builder(soc, output_dir="./run", compile_software=False)
+    builder.software_packages = []
     vns = builder.build(run=False)
     soc.do_exit(vns)
 
