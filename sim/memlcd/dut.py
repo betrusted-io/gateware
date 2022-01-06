@@ -32,6 +32,7 @@ from sim_support.sim_bench import Sim, Platform, SimRunner, BiosHelper, CheckSim
 
 # handy to keep around in case a DUT framework needs it
 from litex.soc.integration.soc_core import *
+from litex.soc.integration.soc import SoCRegion
 from litex.soc.cores.clock import *
 from litex.soc.integration.doc import AutoDoc, ModuleDoc
 from litex.soc.interconnect.csr import *
@@ -86,7 +87,8 @@ class Dut(Sim):
         # LCD interface
         self.submodules.memlcd = memlcd.MemLCD(platform.request("lcd"))
         self.add_csr("memlcd")
-        self.register_mem("memlcd", self.mem_map["memlcd"], self.memlcd.bus, size=self.memlcd.fb_depth*4)
+        self.bus.add_slave("memlcd", self.memlcd.bus, SoCRegion(origin=self.mem_map["memlcd"], size=self.memlcd.fb_depth*4, mode="rw", cached=False))
+        # self.register_mem("memlcd", self.mem_map["memlcd"], self.memlcd.bus, size=self.memlcd.fb_depth*4)
 
         # external SRAM for testing the build system
         self.submodules.sram_ext = sram_32.SRAM32(platform.request("sram"), rd_timing=7, wr_timing=6, page_rd_timing=2)
