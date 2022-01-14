@@ -5,6 +5,12 @@ use sim_bios::sim_test;
 extern crate volatile;
 use volatile::Volatile;
 
+// work around a compiler bug in rustc-1.58: https://github.com/rust-lang/rust/issues/92897
+#[no_mangle]
+pub fn __atomic_load_4(arg: *const usize, _ordering: usize) -> usize {
+    unsafe { *arg }
+}
+
 // allocate a global, unsafe static string. You can use this to force writes to RAM.
 #[used] // This is necessary to keep DBGSTR from being optimized out
 static mut DBGSTR: [u32; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
