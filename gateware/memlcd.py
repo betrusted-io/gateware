@@ -191,7 +191,7 @@ class MemLCD(Module, AutoCSR, AutoDoc):
 
         # devboot indication facility -- create an indelible mark in the status area of the screen if the
         # device has been booted with developer keys
-        DEVBOOT_ADDR = bytes_per_line * 12  # draw the hash on this line
+        DEVBOOT_ADDR = bytes_per_line * 7  # draw the hash on this line
         self.devboot = CSRStorage(fields=[
             CSRField("devboot", description="When set to ``1``, permanently add a strike-through on the top of the screen. Cannot be cleared, except by a full reset. Do not rely on this register to determine if a devboot has happened; the *register* may be cleared, but the internal hardware bit cannot be.")
         ])
