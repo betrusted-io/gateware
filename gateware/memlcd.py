@@ -120,8 +120,7 @@ class MemLCD(Module, AutoCSR, AutoDoc):
         update request.
 
         A line is 336 bits wide. When padded to 32-bit words, this yields a line width of
-        44 bytes (``0x2C``, or 352 bits). In order to simplify math, the frame buffer rounds
-        the line width up to the nearest power of two, or 64 bytes.
+        44 bytes (``0x2C``, or 352 bits).
 
         The unused bits can be used as a "hint" to the MemLCD block as to which lines
         require updating. If the unused bits have any value other than 0, the MemLCD block
