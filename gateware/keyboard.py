@@ -1,5 +1,6 @@
 from migen.genlib.cdc import MultiReg, BlindTransfer
 from migen.genlib.coding import Decoder
+from migen.genlib import fifo
 
 from litex.soc.integration.doc import AutoDoc, ModuleDoc
 from litex.soc.interconnect.csr_eventmanager import *
@@ -55,13 +56,18 @@ an interrupt.
         self.inject_strobe = Signal() # on rising edge, latch uart_inject and raise an interrupt
         self.uart_char = CSRStatus(9, fields = [
             CSRField("char", size=8, description="character value being injected"),
-            CSRField("stb", size=1, description="current strobe value (for debugging)"),
+            CSRField("stb", size=1, description="FIFO has readable characters"),
         ])
+        self.submodules.injectfifo = injectfifo = fifo.SyncFIFOBuffered(width=8, depth=16)
         self.comb += [
-            self.uart_char.fields.char.eq(self.uart_inject),
-            self.uart_char.fields.stb.eq(self.inject_strobe),
-        ]
+            injectfifo.din.eq(self.uart_inject),
+            injectfifo.we.eq(self.inject_strobe),
 
+            #self.uart_char.fields.char.eq(self.uart_inject),
+            self.uart_char.fields.char.eq(injectfifo.dout),
+            self.uart_char.fields.stb.eq(injectfifo.readable),
+            injectfifo.re.eq(self.uart_char.we),
+        ]
         for c in range(0, cols.nbits):
             cols_ts = TSTriple(1)
             self.specials += cols_ts.get_tristate(pads.col[c])
@@ -171,10 +177,8 @@ an interrupt.
         self.ev.keypressed = EventSourcePulse(description="Triggered every time there is a difference in the row state") # Rising edge triggered
         self.ev.inject = EventSourcePulse(description="Key injection request received")
         self.ev.finalize()
-        inject_r = Signal()
         self.sync += [
-            inject_r.eq(self.inject_strobe),
-            self.ev.inject.trigger.eq(self.inject_strobe & ~inject_r) # make sure it's just one edge
+            self.ev.inject.trigger.eq(self.inject_strobe)
         ]
 
         # zero state auto-clear: the "delta" methodology gets stuck if the initial sampling state of the keyboard matrix isn't 0. this fixes that.
