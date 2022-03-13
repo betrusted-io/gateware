@@ -28,6 +28,8 @@ class BlockRom(Module):
         else:
             with open(init, "rb") as handle:
                 rawdata = handle.read()
+            print("First few bytes of bios:")
+            print("{}".format(rawdata[:16].hex()))
 
             if len(rawdata) >= TOTAL_BYTES:
                 print("CRITICAL ERROR: ROM file does not fit: {} bytes given, {} bytes available".format(len(rawdata), TOTAL_BYTES))
