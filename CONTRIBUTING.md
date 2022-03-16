@@ -3,7 +3,7 @@
 Contributions are welcome!
 
 Contributions can be bug reports, feature requests, testing and documentation
-in addition to code. Please see the github guide on
+in addition to code. Please see the GitHub guide on
 [Collaborating on projects using issues and pull requests](https://help.github.com/categories/collaborating-on-projects-using-issues-and-pull-requests/) for details.
 
 Contributions to this project are accepted on an
@@ -36,7 +36,7 @@ will not be tolerated).
 
 This is an overview of the contribution workflow:
 
- * Fork the repository on Github
+ * Fork the repository on GitHub
  * Create a topic branch from where you want to base your work (usually from the master branch)
  * Check the formatting rules from existing code (no trailing whitespace, mostly default indentation)
  * Ensure any new code is well-tested, and if possible, any issue fixed is covered by one or more new tests
@@ -73,20 +73,20 @@ Emacs configuration:
 
 Verifying commits is not essential for contributions to this project,
 but for those motivated to add additional security it is important
-to know that Github now [supports GPG signature verification](https://github.com/blog/2144-gpg-signature-verification).
+to know that GitHub now [supports GPG signature verification](https://github.com/blog/2144-gpg-signature-verification).
 
 Using GPG is a complex subject. Here are some pointers for further information:
  * [OpenPGP Best Practices](https://help.riseup.net/en/security/message-security/openpgp/best-practices)
  * [Debian Keysigning HOWTO](https://wiki.debian.org/Keysigning)
  * If you create a new key please ensure that the RSA key length is at least
    4096 bits and configured for [SHA-2](https://www.debian-administration.org/users/dkg/weblog/48)
- * If you use **caff** (from [signing-party](https://packages.debian.org/sid/signing-party)) to sign and distrubute signatures please verify that the *separate* [caff configuration is accurate](https://github.com/tmarble/kspsig).
+ * If you use **caff** (from [signing-party](https://packages.debian.org/sid/signing-party)) to sign and distribute signatures, please verify that the *separate* [caff configuration is accurate](https://github.com/tmarble/kspsig).
 
-You can export your GPG public key to a file for use with Github as follows
+You can export your GPG public key to a file for use with GitHub as follows
 (assuming your GPG key id is 0xCAFED00D):
 
 ````
 gpg --output 0xCAFED00D.asc --armor --export-options export-clean,export-minimal --export 0xCAFED00D
 ````
 
-Simply paste the contents of that file in the **SSH and GPG keys** section of your [Github settings](https://help.github.com/articles/adding-a-new-gpg-key-to-your-github-account/).
+Simply paste the contents of that file in the **SSH and GPG keys** section of your [GitHub settings](https://help.github.com/articles/adding-a-new-gpg-key-to-your-github-account/).
