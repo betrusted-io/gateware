@@ -36,7 +36,7 @@ In order to run the `dut.py` script, we assume two items (or the latest equivale
  - RISCV_TOOLS=/tools/riscv64-unknown-elf-gcc-8.3.0-2019.08.0-x86_64-linux-ubuntu14
  - VIVADO=/tools/Xilinx/Vivado/2019.2
 
-If you don't have these installed, please refer to the readme at
+If you don't have these installed, please refer to the README at
 https://github.com/betrusted-io/betrusted-soc for how to obtain and
 install these.
 
@@ -121,7 +121,7 @@ There are two goals of the testbenches in this repository:
  1. Create a record of the tests performed to validate a given gateware IP block.
  2. Ensure that this record is usable as dependencies change
 
-CI integration achieves goal #2: we want to know when upstream
+CI integration achieves goal #&ZeroWidthSpace;2: we want to know when upstream
 dependencies (e.g. Litex) change and break our testbenches, so we
 don't accrue huge technical debt on the test benches. The current
 problem is that Litex is very actively developed and growing, and so
@@ -130,7 +130,7 @@ everything. This motivates splitting out the top_tb.v and code into
 "stub" files that allows for recursive search-and-replace strategies
 to fix changing paths or API names.
 
-Goal #1 is achieved by the original designer, and baked into the
+Goal #&ZeroWidthSpace;1 is achieved by the original designer, and baked into the
 testbench.  The quality and depth of coverage for the IP is not baked
 into this methodology. However, typically the test vectors originate
 from the simulated soft-core CPU, and the simulated CPU is responsible
