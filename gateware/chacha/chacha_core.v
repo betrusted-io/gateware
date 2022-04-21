@@ -36,8 +36,6 @@
 //
 //======================================================================
 
-`default_nettype none
-
 module chacha_core(
                    input wire            clk,
                    input wire            reset_n,
