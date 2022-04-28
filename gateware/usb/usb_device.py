@@ -14,6 +14,7 @@ from litex import get_data_mod
 from litex.soc.interconnect import wishbone
 
 from migen.genlib.cdc import MultiReg
+from litex.soc.interconnect.csr_eventmanager import *
 
 import subprocess, sys
 
@@ -25,6 +26,12 @@ class USBDevice(Module):
         self.dma_data_width = dma_data_width
 
         self.wb_ctrl = wb_ctrl = wishbone.Interface(data_width=32)
+
+        usb_int = Signal()
+        self.submodules.ev = EventManager()
+        self.ev.usb    = EventSourceProcess(edge="rising")   # rising edge triggered
+        self.comb += self.ev.usb.trigger.eq(usb_int)
+        self.ev.finalize()
 
         self.specials += Instance(self.get_netlist_name(),
             # Clk / Rst.
@@ -51,6 +58,9 @@ class USBDevice(Module):
             o_io_usb_dm_write       = usb_ios.dm_o,
             o_io_usb_dm_writeEnable = usb_ios.dm_oe,
 
+            # interrupt
+            o_io_interrupt = usb_int,
+
             # unsure what this does
             i_io_power = 1,
         )
@@ -72,7 +82,7 @@ class USBDevice(Module):
         platform.add_source(netlist_path, "verilog")
 
     def generate_netlist(self):
-        print(f"Generating USB Device netlist")
+        print(f"Generating USB Device netlist. Note this needs to be run on the 'dev' branch for it to work correctly. The pre-committed netlist is built from the correct branch, this command is mainly for reference.")
         exec_path = os.path.join("deps", "gateware", "gateware", "usb", "SpinalUsb")
         subprocess.run('sbt "runMain spinal.lib.com.usb.udc.UsbDeviceCtrlWishboneGen"', cwd=exec_path, shell=True)
 
