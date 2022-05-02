@@ -15,13 +15,40 @@ from litex.soc.interconnect import wishbone
 
 from migen.genlib.cdc import MultiReg
 from litex.soc.interconnect.csr_eventmanager import *
+from litex.soc.integration.doc import AutoDoc, ModuleDoc
 
 import subprocess, sys
 
 # USB OHCI -----------------------------------------------------------------------------------------
 
-class USBDevice(Module):
+class USBDevice(Module, AutoCSR, AutoDoc):
     def __init__(self, platform, usb_ios, usb_clk_freq=48e6, dma_data_width=32):
+        self.intro = ModuleDoc("""Spinal USB Device Wrapper
+This is a thin wrapper around the Spinal USB device core.
+The device core itself is included as a hard netlist in this repo, but if it requires
+regeneration, one may do it as follows:
+- clone https://github.com/SpinalHDL/SpinalHDL.git; it will checkout branch `dev` by default.
+- Then in the SpinalHDL repo root run
+  `sbt "lib/runMain spinal.lib.com.usb.udc.UsbDeviceCtrlWishboneGen"`
+You will need to have the SBT/Scala tools installed to do this. And, as noted above,
+the working version of the core is currently in the `dev` branch and has not been
+pushed into `main` yet. However, we don't auto-gen the netlist every time because
+the `dev` branch is not guarateed to be stable, so the intermediate solution is
+to capture a generated netlist at a particular commit state here.
+
+The commit of the generated netlist is: bd693a71ce0fceaeea821864eae571f80931dc2e in
+https://github.com/SpinalHDL/SpinalHDL/commits/dev/lib/src/main/scala/spinal/lib/com/usb/udc
+
+Note that the registers for this block are not native LiteX CSRs. The SpinalHDL USB
+core comes from the SpinalHDL ecosystem, and uses a strategy of allocating just a
+single block of RAM to contain registers and descriptors. The offsets of the memory-mapped
+registers can thus be found at:
+
+https://spinalhdl.github.io/SpinalDoc-RTD/dev/SpinalHDL/Libraries/Com/usb_device.html
+
+The only CSR used by this block is thus the interrupt handler, which is implemented
+using native LiteX primitives.
+        """)
         self.usb_clk_freq   = usb_clk_freq
         self.dma_data_width = dma_data_width
 
@@ -29,7 +56,7 @@ class USBDevice(Module):
 
         usb_int = Signal()
         self.submodules.ev = EventManager()
-        self.ev.usb    = EventSourceProcess(edge="rising")   # rising edge triggered
+        self.ev.usb    = EventSourceProcess(edge="rising", description="Interrupt from SpinalHDL core. Stays high until cleared; must read the INTERRUPT register for more detail on which interrupt caused the event.")   # rising edge triggered
         self.comb += self.ev.usb.trigger.eq(usb_int)
         self.ev.finalize()
 
