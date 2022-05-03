@@ -49,6 +49,9 @@ https://spinalhdl.github.io/SpinalDoc-RTD/dev/SpinalHDL/Libraries/Com/usb_device
 The only CSR used by this block is thus the interrupt handler, which is implemented
 using native LiteX primitives.
         """)
+        self.usbdisable = CSRStorage(1, name="usbdisable", description="When set to ``1``, USB debug core is limited by remapping all wishbone request addresses to 0x8000_0000. This does not affect the USB device core.")
+        self.usbselect = CSRStorage(1, name="usbselect", description="When set to ``1``, the spinal USB device core is selected", reset=0)
+
         self.usb_clk_freq   = usb_clk_freq
         self.dma_data_width = dma_data_width
 
@@ -115,17 +118,30 @@ using native LiteX primitives.
 
 
 class IoBuf(Module):
-    def __init__(self, usbp_pin, usbn_pin, alt_ios, alt_sel, usb_pullup_pin=None):
+    def __init__(self, usbp_pin, usbn_pin, alt_ios, select_device, usb_pullup_pin=None):
         reset_duration_in_s = 0.1
         reset_cycles = int(32768 * reset_duration_in_s)
         reset_counter = Signal(log2_int(reset_cycles, need_pow2=False)+1, reset=reset_cycles - 1)
+        iface_change = Signal(2)
+        select_device_lpclk = Signal()
         usb_phy_reset = Signal(reset=1)
-        self.sync.lpclk += \
-            If(reset_counter != 0,
-                reset_counter.eq(reset_counter - 1)
+        self.specials += MultiReg(select_device, select_device_lpclk)
+        self.sync.lpclk += [
+            iface_change[0].eq(select_device_lpclk),
+            iface_change[1].eq(iface_change[0]),
+            # on change, reload the reset counter
+            If(iface_change[1] ^ iface_change[0],
+                reset_counter.eq(reset_cycles - 1),
+                usb_phy_reset.eq(1)
             ).Else(
-                usb_phy_reset.eq(0)
+                If(reset_counter != 0,
+                    reset_counter.eq(reset_counter - 1),
+                    usb_phy_reset.eq(1)
+                ).Else(
+                    usb_phy_reset.eq(0)
+                )
             )
+        ]
 
         # tx/rx io interface
         self.usb_tx_en = Signal()
@@ -147,7 +163,7 @@ class IoBuf(Module):
             # inputs directly through
             alt_ios.dp_i.eq(usb_p_t.i),
             alt_ios.dm_i.eq(usb_n_t.i),
-            If(alt_sel,
+            If(select_device,
                 mux_dp_o.eq(alt_ios.dp_o),
                 mux_dm_o.eq(alt_ios.dm_o),
                 mux_dp_oe.eq(alt_ios.dp_oe),
