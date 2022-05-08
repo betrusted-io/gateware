@@ -125,7 +125,7 @@ class IoBuf(Module):
         iface_change = Signal(2)
         select_device_lpclk = Signal()
         usb_phy_reset = Signal(reset=1)
-        self.specials += MultiReg(select_device, select_device_lpclk)
+        self.specials += MultiReg(select_device, select_device_lpclk, odomain="lpclk")
         self.sync.lpclk += [
             iface_change[0].eq(select_device_lpclk),
             iface_change[1].eq(iface_change[0]),
@@ -159,16 +159,27 @@ class IoBuf(Module):
         mux_dm_o = Signal()
         mux_dp_oe = Signal()
         mux_dm_oe = Signal()
+        dbg_i_p = Signal()
+        dbg_i_n = Signal()
         self.comb += [
-            # inputs directly through
-            alt_ios.dp_i.eq(usb_p_t.i),
-            alt_ios.dm_i.eq(usb_n_t.i),
             If(select_device,
+                # inputs
+                alt_ios.dp_i.eq(usb_p_t.i),
+                alt_ios.dm_i.eq(usb_n_t.i),
+                dbg_i_p.eq(0),
+                dbg_i_n.eq(0),
+                # outputs
                 mux_dp_o.eq(alt_ios.dp_o),
                 mux_dm_o.eq(alt_ios.dm_o),
                 mux_dp_oe.eq(alt_ios.dp_oe),
                 mux_dm_oe.eq(alt_ios.dm_oe),
             ).Else(
+                # inputs
+                alt_ios.dp_i.eq(0),
+                alt_ios.dm_i.eq(0),
+                dbg_i_p.eq(usb_p_t.i),
+                dbg_i_n.eq(usb_n_t.i),
+                # outputs
                 mux_dp_o.eq(self.usb_p_tx),
                 mux_dm_o.eq(self.usb_n_tx),
                 mux_dp_oe.eq(self.usb_tx_en),
@@ -193,8 +204,8 @@ class IoBuf(Module):
         usb_p_t_i = Signal()
         usb_n_t_i = Signal()
         self.specials += [
-            MultiReg(usb_p_t.i, usb_p_t_i),
-            MultiReg(usb_n_t.i, usb_n_t_i)
+            MultiReg(dbg_i_p, usb_p_t_i),
+            MultiReg(dbg_i_n, usb_n_t_i)
         ]
         self.comb += [
             If(self.usb_tx_en,
