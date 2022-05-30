@@ -119,7 +119,7 @@ using native LiteX primitives.
 
 class IoBuf(Module):
     def __init__(self, usbp_pin, usbn_pin, alt_ios, select_device, usb_pullup_pin=None):
-        reset_duration_in_s = 0.1
+        reset_duration_in_s = 0.015 # spec targets between 10-20ms for a reset
         reset_cycles = int(32768 * reset_duration_in_s)
         reset_counter = Signal(log2_int(reset_cycles, need_pow2=False)+1, reset=reset_cycles - 1)
         iface_change = Signal(2)
