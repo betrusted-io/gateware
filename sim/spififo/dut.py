@@ -35,6 +35,7 @@ from litex.soc.integration.soc_core import *
 from litex.soc.cores.clock import *
 from litex.soc.integration.doc import AutoDoc, ModuleDoc
 from litex.soc.interconnect.csr import *
+from litex.soc.integration.soc import SoCRegion
 
 # specific to a given DUT
 from gateware import spi_7series
@@ -115,8 +116,9 @@ class Dut(Sim):
 
         self.submodules.com = spi_ice40.SpiFifoPeripheral(platform.request("peripheral"), pipeline_cipo=True)
         self.comb += self.com.oe.eq(1),
-        self.add_wb_slave(self.mem_map["com"], self.com.bus, 4)
-        self.add_memory_region("com", self.mem_map["com"], 4, type='io')
+        self.bus.add_slave("com", self.com.bus, SoCRegion(origin=self.mem_map["com"], size=4, mode="rw", cached=False))
+        #self.add_wb_slave(self.mem_map["com"], self.com.bus, 4)
+        #self.add_memory_region("com", self.mem_map["com"], 4, type='io')
         self.add_csr("com")
         # self.add_interrupt("com")
 
