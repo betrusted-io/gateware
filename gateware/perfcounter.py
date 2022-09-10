@@ -13,7 +13,7 @@ FIFO_WIDTH = 64
 FIFO_DEPTH = 4096 # this will consume 4x RAM blocks
 
 # maximum number of event sources -- each is mapped into a separate memory space
-EVENT_SOURCES = 6
+EVENT_SOURCES = 5
 # maximum width of the event code field, as an integer that represents the number of bits minus 1 (so 31 codes for 32 bits, 0 codes for 1 bit)
 EVENT_WIDTH = 5
 
