@@ -10,10 +10,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     svd2utra_path.push("rust");
     svd2utra_path.push("utralib");
     println!("{}", svd2utra_path.display());
+    let target = if cfg!(target_os = "linux") {
+        "i686-unknown-linux-gnu"
+    } else if cfg!(target_os = "windows") {
+        "x86_64-pc-windows-msvc"
+    } else {
+        panic!("unsupported host target for simulation");
+        // the resolution to this could be as simple as just adding the target here.
+    };
     let status = Command::new(cargo())
         .current_dir(svd2utra_path)
         .args(&[
             "build",
+            "--target",
+            target,
         ])
         .status()?;
     if !status.success() {
