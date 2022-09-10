@@ -1,0 +1,14 @@
+[package]
+name = "svd2utra"
+version = "0.1.0"
+authors = ["Sean Cross <sean@xobs.io>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+# Dependency versions enforced by Cargo.lock.
+[dependencies]
+quick-xml = "0.19.0"
+clap = "2.33.3"
+anyhow = "1.0.43"
+convert_case = "0.4.0"

@@ -1,0 +1,16 @@
+[package]
+name = "utralib"
+version = "0.1.0"
+authors = ["Sean Cross <sean@xobs.io>"]
+edition = "2018"
+
+[features]
+std = []
+
+default_features = ["std"]
+
+# Dependency versions enforced by Cargo.lock.
+[dependencies]
+
+[build-dependencies]
+svd2utra = { path = "../svd2utra" }
