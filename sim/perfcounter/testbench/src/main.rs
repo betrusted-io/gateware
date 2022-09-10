@@ -83,7 +83,7 @@ fn run(p: &pac::Peripherals) {
     let mut event2_csr = CSR::new(HW_EVENT_SOURCE2_BASE as *mut u32);
     let mut event3_csr = CSR::new(HW_EVENT_SOURCE3_BASE as *mut u32);
     let mut event4_csr = CSR::new(HW_EVENT_SOURCE4_BASE as *mut u32);
-    let mut event5_csr = CSR::new(HW_EVENT_SOURCE5_BASE as *mut u32);
+    //let mut event5_csr = CSR::new(HW_EVENT_SOURCE5_BASE as *mut u32);
     perf_csr.wfo(utra::perfcounter::RUN_STOP, 1);
 
     // configure the system
@@ -101,7 +101,7 @@ fn run(p: &pac::Peripherals) {
         event2_csr.wfo(utra::event_source0::PERFEVENT_CODE, i * 4);
         event3_csr.wfo(utra::event_source1::PERFEVENT_CODE, i * 4 + 1);
         event4_csr.wfo(utra::event_source1::PERFEVENT_CODE, i * 4 + 2);
-        event5_csr.wfo(utra::event_source1::PERFEVENT_CODE, i * 4 + 3);
+        //event5_csr.wfo(utra::event_source1::PERFEVENT_CODE, i * 4 + 3);
     }
 
     // stop the timer
