@@ -83,7 +83,7 @@ class Dut(Sim):
         self.add_interrupt("engine")
         self.bus.add_slave("engine", self.engine.bus, SoCRegion(origin=self.mem_map["engine"], size=0x2_0000, cached=False))
 
-        vector_data = get_mem_data("testbench/curve25519-dalek/test_vectors.bin", "little")
+        vector_data = get_mem_data("testbench/curve25519-dalek/test_vectors.bin", endianness="little")
         self.add_rom("vectors", self.mem_map["vectors"], len(vector_data)*4, vector_data)
 
 
