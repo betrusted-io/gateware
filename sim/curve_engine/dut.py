@@ -131,6 +131,16 @@ def generate_top():
         print("Problem generating test vectors, aborting.")
         sys.exit(1)
 
+    # pad out the test vector file to 32 bits
+    with open('testbench/curve25519-dalek/test_vectors.bin', 'rb') as pad:
+        tv = bytearray(pad.read())
+        tv_len = len(tv)
+        tv_pad_amount = 32 - (tv_len % 32)
+        tv += bytearray(tv_pad_amount)
+
+    with open('testbench/curve25519-dalek/test_vectors.bin', 'wb') as pad_w:
+        pad_w.write(tv)
+
     # pass #2 -- generate the SoC, incorporating the now-built BIOS
     platform = Platform(dutio)
     soc = Dut(platform, spiboot=boot_from_spi)
