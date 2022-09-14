@@ -51,6 +51,7 @@ class PerfCounter(Module, AutoCSR, AutoDoc):
             CSRField("running", description="Counter is running when value is `1`"),
             CSRField("overflow", description="Counter has overflowed since it was started"),
             CSRField("readable", description="If `1` indicates that there are events to read"),
+            CSRField("full", description="If `1` indicates that the buffer is full"),
         ])
 
         event_re = Signal(EVENT_SOURCES)
@@ -144,4 +145,5 @@ class PerfCounter(Module, AutoCSR, AutoDoc):
             self.event_raw.fields.timestamp.eq(logfifo.dout),
             logfifo.re.eq(self.event_index.we),
             self.status.fields.readable.eq(logfifo.readable),
+            self.status.fields.full.eq(~logfifo.writable),
         ]
