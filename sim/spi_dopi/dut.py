@@ -105,8 +105,8 @@ class Dut(Sim):
             )
         self.delay_rdy = Signal()
         self.specials += Instance("IDELAYCTRL", i_REFCLK=ClockSignal("idelay_ref"), i_RST=ic_reset, o_RDY=self.delay_rdy)
-        self.ready = CSRStatus()
-        self.comb += self.ready.status.eq(self.delay_rdy)
+        # self.ready = CSRStatus()
+        # self.comb += self.ready.status.eq(self.delay_rdy)
 
         # spi control -- that's the point of this simulation!
         SPI_FLASH_SIZE=128 * 1024 * 1024
