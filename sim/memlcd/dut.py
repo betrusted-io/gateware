@@ -88,13 +88,12 @@ class Dut(Sim):
         self.submodules.memlcd = memlcd.MemLCD(platform.request("lcd"))
         self.add_csr("memlcd")
         self.bus.add_slave("memlcd", self.memlcd.bus, SoCRegion(origin=self.mem_map["memlcd"], size=self.memlcd.fb_depth*4, mode="rw", cached=False))
-        # self.register_mem("memlcd", self.mem_map["memlcd"], self.memlcd.bus, size=self.memlcd.fb_depth*4)
 
         # external SRAM for testing the build system
         self.submodules.sram_ext = sram_32.SRAM32(platform.request("sram"), rd_timing=7, wr_timing=6, page_rd_timing=2)
         self.add_csr("sram_ext")
-        self.register_mem("sram_ext", self.mem_map["sram_ext"],
-                  self.sram_ext.bus, size=0x1000000)
+        self.bus.add_slave(name="sram_ext", slave=self.sram_ext.bus,
+            region=SoCRegion(self.mem_map["sram_ext"], size=0x1000000, mode="rwx"))
 
 
 # generate all the files necessary to run xsim

@@ -35,6 +35,7 @@ from litex.soc.integration.soc_core import *
 from litex.soc.cores.clock import *
 from litex.soc.integration.doc import AutoDoc, ModuleDoc
 from litex.soc.interconnect.csr import *
+from litex.soc.integration.soc import SoCRegion
 
 # specific to a given DUT
 from gateware import sram_32_cached  # for example...
@@ -91,9 +92,8 @@ class Dut(Sim):
         # page_rd_timing = 3 -> 30ns access cycle, gives 5ns for setup/hold
         self.submodules.sram_ext = sram_32_cached.SRAM32(platform.request("sram"), rd_timing=7, wr_timing=7, page_rd_timing=3, l2_cache_size=0x1000)
         self.add_csr("sram_ext")
-        self.register_mem("sram_ext", self.mem_map["sram_ext"],
-                  self.sram_ext.bus, size=0x1000000)
-
+        self.bus.add_slave(name="sram_ext", slave=self.sram_ext.bus,
+            region=SoCRegion(self.mem_map["sram_ext"], size=0x1000000, mode="rwx"))
 
 """
 generate all the files necessary to run xsim
