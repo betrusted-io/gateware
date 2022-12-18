@@ -35,6 +35,7 @@ from litex.soc.integration.soc_core import *
 from litex.soc.cores.clock import *
 from litex.soc.integration.doc import AutoDoc, ModuleDoc
 from litex.soc.interconnect.csr import *
+from litex.soc.integration.soc import SoCRegion
 
 # specific to a given DUT
 from litex.soc.cores.spi_opi import S7SPIOPI
@@ -105,8 +106,6 @@ class Dut(Sim):
             )
         self.delay_rdy = Signal()
         self.specials += Instance("IDELAYCTRL", i_REFCLK=ClockSignal("idelay_ref"), i_RST=ic_reset, o_RDY=self.delay_rdy)
-        self.ready = CSRStatus()
-        self.comb += self.ready.status.eq(self.delay_rdy)
 
         # spi control -- that's the point of this simulation!
         SPI_FLASH_SIZE=128 * 1024 * 1024
@@ -117,7 +116,7 @@ class Dut(Sim):
                                                sclk_name=sclk_instance_name, iddr_name=iddr_instance_name,
                                                cipo_name=cipo_instance_name, sim=True)
         platform.add_source("../../gateware/spimemio.v") ### NOTE: this actually doesn't help for SIM, but it reminds us to scroll to the bottom of this file and add it to the xvlog imports
-        self.register_mem("spiflash", self.mem_map["spiflash"], self.spinor.bus, size=SPI_FLASH_SIZE)
+        self.bus.add_slave(name="spiflash", slave=self.spinor.bus, region=SoCRegion(self.mem_map["spiflash"], size=SPI_FLASH_SIZE, mode="rwx"))
         self.add_csr("spinor")
 
 

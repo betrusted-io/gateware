@@ -19,8 +19,8 @@ class TickTimer(Module, AutoCSR, AutoDoc):
 
         The hardware parameter to the block is the divisor of sysclk, and sysclk. So if
         the divisor is 1000, then the increment for a tick is 1ms. If the divisor is 2000,
-        the increment for a tick is 0.5ms. 
-        
+        the increment for a tick is 0.5ms.
+
         Note to self: substantial area savings could be hand by being smarter about the
         synchronization between the always-on and the TickTimer domains. Right now about 1.8%
         of the chip is eaten up by ~1100 synchronization registers to cross the 64-bit values
@@ -99,12 +99,12 @@ class TickTimer(Module, AutoCSR, AutoDoc):
         ]
 
         self.msleep = ModuleDoc("""msleep extension
-        
+
         The msleep extension is a Xous-specific add-on to aid the implementation of the msleep server.
-        
+
         msleep fires an interrupt when the requested time is less than or equal to the current elapsed time in
-        systicks. The interrupt remains active until a new target is set, or masked. 
-        
+        systicks. The interrupt remains active until a new target is set, or masked.
+
         There is a slight slip in time (~200ns) from when the msleep timer is set before it can take effect.
         This is because it takes many CPU clock cycles to transfer this data into the always-on clock
         domain, which runs at a much slower rate than the CPU clock.
@@ -116,6 +116,7 @@ class TickTimer(Module, AutoCSR, AutoDoc):
         # corresponds tightly to the setting of the target time
         alarm_trigger = Signal()
         self.comb += self.ev.alarm.trigger.eq(alarm_trigger)
+        self.ev.finalize()
 
         # always_on domain gets a delayed copy of msleep_target
         # thus its output may not match that of the sys-domain alarm
