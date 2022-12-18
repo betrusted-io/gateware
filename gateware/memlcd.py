@@ -2,13 +2,14 @@ from migen import *
 from migen.genlib.fsm import FSM, NextState
 
 from litex.soc.interconnect import wishbone
+from litex.soc.interconnect import axi
 from litex.soc.interconnect.csr import *
 from litex.soc.interconnect.csr_eventmanager import *
 from litex.soc.integration.doc import AutoDoc, ModuleDoc
 
 
 class MemLCD(Module, AutoCSR, AutoDoc):
-    def __init__(self, pads):
+    def __init__(self, pads, interface="wishbone"):
         self.background = ModuleDoc("""MemLCD: Driver for the SHARP Memory LCD model LS032B7DD02
 
         The ``LS032B7DD02`` is a 336x536 pixel black and white memory LCD, with a 200ppi dot pitch.
@@ -164,13 +165,20 @@ class MemLCD(Module, AutoCSR, AutoDoc):
         self.specials.rdport = mem.get_port(write_capable=False, mode=READ_FIRST) # READ_FIRST allows BRAM to be used
         self.comb += self.rdport.adr.eq(pixadr_rd)
 
-        # memory-mapped write port to wishbone bus
-        self.bus = wishbone.Interface()
-        self.submodules.wb_sram_if = wishbone.SRAM(mem, read_only=False)
         decoder_offset = log2_int(fb_depth, need_pow2=False)
         def slave_filter(a):
                 return a[decoder_offset:32-decoder_offset] == 0  # no aliasing in the block
-        self.submodules.wb_con = wishbone.Decoder(self.bus, [(slave_filter, self.wb_sram_if.bus)], register=True)
+        # memory-mapped write port to bus
+        if interface == "wishbone":
+            self.bus = wishbone.Interface()
+            self.submodules.wb_sram_if = wishbone.SRAM(mem, read_only=False)
+            self.submodules.wb_con = wishbone.Decoder(self.bus, [(slave_filter, self.wb_sram_if.bus)], register=True)
+        elif interface == "axi-lite":
+            self.bus = axi.AXILiteInterface()
+            self.submodules.wb_sram_if = axi.AXILiteSRAM(mem, read_only=False)
+            self.submodules.wb_con = axi.AXILiteDecoder(self.bus, [(slave_filter, self.wb_sram_if.bus)], register=True)
+        else:
+            print("interface must be either of type 'wishbone' or 'axi-lite'")
 
         self.command = CSRStorage(2, fields=[
             CSRField("UpdateDirty", description="Write a ``1`` to flush dirty lines to the LCD", pulse=True),
