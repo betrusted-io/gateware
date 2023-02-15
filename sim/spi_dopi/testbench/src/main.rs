@@ -28,6 +28,7 @@ pub fn write_tests(p: &pac::Peripherals) {
     let mut phase = 0x5000_0000;
     report(&p, phase); phase += 1;
 
+    // read ID
     unsafe {
         p.SPINOR.cmd_arg.write(|w| w.cmd_arg().bits(0));
         p.SPINOR.command.write(|w| w
@@ -43,6 +44,65 @@ pub fn write_tests(p: &pac::Peripherals) {
     let status = p.SPINOR.cmd_rbk_data.read().bits();
     report(&p, status);
 
+    // test control register write
+    report(&p, 0xc000_0000);
+    unsafe {
+        p.SPINOR.command.write(|w| w
+            .lock_reads().set_bit()
+            .exec_cmd().set_bit()
+            .cmd_code().bits(0x06) // WREN
+        );
+    }
+    while p.SPINOR.status.read().wip().bit_is_set() {}
+    // write one die
+    unsafe {
+        p.SPINOR.wdata.write(|w| w
+            .wdata().bits(0x0000)
+        );
+    }
+    unsafe {
+        p.SPINOR.cmd_arg.write(|w| w.cmd_arg().bits(0x0800));
+        p.SPINOR.command.write(|w| w
+            .exec_cmd().set_bit()
+            .lock_reads().set_bit()
+            .cmd_code().bits(0x72) // WRCR2
+            .dummy_cycles().bits(0)
+            .data_words().bits(1)
+            .has_arg().set_bit()
+        );
+    }
+    while p.SPINOR.status.read().wip().bit_is_set() {}
+    // write the other die
+    unsafe {
+        p.SPINOR.command.write(|w| w
+            .lock_reads().set_bit()
+            .exec_cmd().set_bit()
+            .cmd_code().bits(0x06) // WREN
+        );
+    }
+    while p.SPINOR.status.read().wip().bit_is_set() {}
+    unsafe {
+        p.SPINOR.wdata.write(|w| w
+            .wdata().bits(0x0000)
+        );
+    }
+    unsafe {
+        p.SPINOR.cmd_arg.write(|w| w.cmd_arg().bits(0x0400_0800));
+        p.SPINOR.command.write(|w| w
+            .exec_cmd().set_bit()
+            .lock_reads().set_bit()
+            .cmd_code().bits(0x72) // WRCR2
+            .dummy_cycles().bits(0)
+            .data_words().bits(1)
+            .has_arg().set_bit()
+        );
+    }
+    while p.SPINOR.status.read().wip().bit_is_set() {}
+
+    let status = p.SPINOR.cmd_rbk_data.read().bits();
+    report(&p, status);
+
+    // test writes
     unsafe {
         p.SPINOR.command.write(|w| w
             .lock_reads().set_bit()
