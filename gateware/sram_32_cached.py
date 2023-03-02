@@ -12,7 +12,9 @@ class SRAM32(Module, AutoCSR, AutoDoc):
             l2_cache_size=0x10000,
             reverse=False,
             l2_cache_full_memory_we = True,
-            use_idelay = False ):
+            use_idelay = False,
+            expose_csr = True
+            ):
 
         # adjust input parameters so they are in multiples of 10 ns
         page_rd_timing = page_rd_timing - 1
@@ -30,7 +32,7 @@ Small routines that mostly ran out of L1 cache are sped up less; large routines 
 would blow out L1 entirely are sped up much more.
         """)
 
-        # Insert L2 cache inbetween Wishbone bus and SRAM
+        # Insert L2 cache in between Wishbone bus and SRAM
         l2_cache_data_width = 256
         l2_cache_size = max(l2_cache_size, int(2*l2_cache_data_width/8)) # Use minimal size if lower
         l2_cache_size = 2**int(log2(l2_cache_size))                  # Round to nearest power of 2
@@ -45,12 +47,19 @@ would blow out L1 entirely are sped up much more.
         self.cbus = self.l2_cache.slave
         self.bus = self.l2_cache.master
 
-        config_status = self.config_status = CSRStatus(fields=[
-            CSRField("mode", size=32, description="The current configuration mode of the SRAM")
-        ])
-        read_config = self.read_config = CSRStorage(fields=[
-            CSRField("trigger", size=1, description="Writing to this bit triggers the SRAM mode status read update", pulse=True)
-        ])
+        config_status_wire = Signal(32)
+        read_config_wire = Signal()
+        if expose_csr:
+            config_status = self.config_status = CSRStatus(fields=[
+                CSRField("mode", size=32, description="The current configuration mode of the SRAM")
+            ])
+            read_config = self.read_config = CSRStorage(fields=[
+                CSRField("trigger", size=1, description="Writing to this bit triggers the SRAM mode status read update", pulse=True)
+            ])
+            self.comb += [
+                config_status.fields.mode.eq(config_status_wire),
+                read_config_wire.eq(read_config.fields.trigger),
+            ]
 
         # # #
 
@@ -248,7 +257,7 @@ would blow out L1 entirely are sped up much more.
         fsm.act("IDLE",
             NextValue(self.cbus.ack, 0),
             NextValue(config, 0),
-            If(read_config.fields.trigger,
+            If(read_config_wire,
                 NextValue(config_override, 1),
                 NextState("CONFIG_READ")
             ),
@@ -317,7 +326,7 @@ would blow out L1 entirely are sped up much more.
                 NextValue(config_ce_n, 0),
                 NextValue(config_oe_n, 0),
                 If(counter_done,
-                    NextValue(config_status.fields.mode, data_i),
+                    NextValue(config_status_wire, data_i),
                     NextValue(config_ce_n, 1), # Should be 5ns min high time
                     NextValue(config_oe_n, 1),
                     NextValue(config_override, 0),
