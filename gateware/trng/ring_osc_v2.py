@@ -50,6 +50,9 @@ as an independent variable, so I think the paper's core idea still works.
         dwell_now = Signal()   # level-signal to indicate dwell or measure
         sample_now = Signal()  # single-sysclk wide pulse to indicate sampling time (after leaving dwell)
         rand_cnt = Signal(max=self.rand.size+1)
+        # synchronize the random output into the clock domain. RO, by definition, has no relationship to the core domain.
+        rand_sync = Signal(len(self.rand))
+        self.specials += MultiReg(rand, rand_sync)
         # keep track of how many bits have been shifted in since the last read-out
         self.sync += [
             If(self.rand.we,
@@ -60,7 +63,7 @@ as an independent variable, so I think the paper's core idea still works.
                     If(rand_cnt < self.rand.size+1, # +1 because the very first bit never got sample entropy, just dwell, so we throw it away
                        rand_cnt.eq(rand_cnt + 1),
                     ).Else(
-                       self.rand.fields.rand.eq(rand),
+                       self.rand.fields.rand.eq(rand_sync),
                        self.status.fields.fresh.eq(1),
                        rand_cnt.eq(0),
                     )

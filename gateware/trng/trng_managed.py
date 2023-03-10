@@ -127,8 +127,8 @@ to as little as 15-20ms and still probably be quite safe.
             CSRField("adaptive_cutoff", av_adaptive_bits, description="Sets the `C` (cutoff) parameter in the NIST adaptive proportion test for the avalanche generator", reset=410),
         ])
         self.ro_nist = CSRStorage(fields=[
-            CSRField("repcount_cutoff", ro_repcount_bits, description="Sets the `C` (cutoff) parameter in the NIST repetition count test for the ringosc generator", reset=67),
-            CSRField("adaptive_cutoff", ro_adaptive_bits, description="Sets the `C` (cutoff) parameter in the NIST adaptive proportion test for the ringosg generator", reset=840),
+            CSRField("repcount_cutoff", ro_repcount_bits, description="Sets the `C` (cutoff) parameter in the NIST repetition count test for the ring osc generator", reset=67),
+            CSRField("adaptive_cutoff", ro_adaptive_bits, description="Sets the `C` (cutoff) parameter in the NIST adaptive proportion test for the ring osc generator", reset=840),
         ])
         self.underruns = CSRStatus(fields=[
             CSRField("server_underrun", size=10, description="If non-zero, a server underrun has occurred. Will count number of underruns up to max field size"),
@@ -818,7 +818,7 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             ]
 
         else:
-            print("Error! unsuppored revision")
+            print("Error! unsupported revision")
 
         # instantiate the on-chip ring oscillator TRNG. This one has no power-on delay, but the first
         # reading should be discarded after enabling (this is handled by the high level sequencer)
@@ -826,7 +826,8 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             self.submodules.ringosc = TrngRingOscV2Managed(platform, cores=ro_cores)
         else:
             self.submodules.ringosc = TrngRingOscSim(cores=ro_cores) # fake source for simulation purposes
-        # pass-through config and mangamement signals to the RO
+        platform.add_platform_command("set_false_path -through [get_pins FDCE_E*/D]")
+        # pass-through config and management signals to the RO
         ro_rand = Signal(32)
         ro_fresh = Signal()
         ro_rand_read = Signal()
@@ -1802,6 +1803,9 @@ parallel cores that are XOR'd simultaneously to generate the final output.
         dwell_now = Signal()   # level-signal to indicate dwell or measure
         sample_now = Signal()  # single-sysclk wide pulse to indicate sampling time (after leaving dwell)
         rand_cnt = Signal(9)
+        # synchronize the random output into the clock domain. RO, by definition, has no relationship to the core domain.
+        rand_sync = Signal(len(rand))
+        self.specials += MultiReg(rand, rand_sync)
         # keep track of how many bits have been shifted in since the last read-out
         self.sync += [
             If(self.rand_read,
@@ -1812,7 +1816,7 @@ parallel cores that are XOR'd simultaneously to generate the final output.
                     If(rand_cnt < self.rand_out.nbits + self.oversampling +1, # +1 because the very first bit never got sample entropy, just dwell, so we throw it away
                        rand_cnt.eq(rand_cnt + 1),
                     ).Else(
-                       self.rand_out.eq(rand),
+                       self.rand_out.eq(rand_sync),
                        self.fresh.eq(1),
                        rand_cnt.eq(0),
                     )
