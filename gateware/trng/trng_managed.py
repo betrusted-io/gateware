@@ -826,7 +826,6 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             self.submodules.ringosc = TrngRingOscV2Managed(platform, cores=ro_cores)
         else:
             self.submodules.ringosc = TrngRingOscSim(cores=ro_cores) # fake source for simulation purposes
-        platform.add_platform_command("set_false_path -through [get_pins FDCE_E*/D]")
         # pass-through config and management signals to the RO
         ro_rand = Signal(32)
         ro_fresh = Signal()
@@ -1691,6 +1690,7 @@ class TrngRingOscCore(Module, AutoDoc, AutoCSR):
         for element in range(ro_elements):
             setattr(self, "ro_elem" + str(element), Signal(ro_stages+1))
             setattr(self, "ro_samp" + str(element), Signal())
+            setattr(self, "ro_samp_freerun" + str(element), Signal())
             for stage in range(ro_stages):
                 stagename = 'RINGOSC_E' + str(element) + stage_id + '_S' + str(stage)
                 self.specials += Instance("LUT1", name=stagename, p_INIT=1,
@@ -1703,13 +1703,21 @@ class TrngRingOscCore(Module, AutoDoc, AutoCSR):
                 platform.add_platform_command("set_false_path -through [get_pins " + stagename + "/O]")
             # add "gang" sampler to pull out extra entropy during dwell mode
             if element != 32: # element 32 is a special case, handled at end of loop
-                self.specials += Instance("FDCE", name='FDCE_E' + str(element) + stage_id,
-                    i_D=getattr(self, "ro_elem" + str(element))[0],
-                    i_C=ClockSignal(),
-                    i_CE=self.gang,
-                    i_CLR=0,
-                    o_Q=getattr(self, "ro_samp" + str(element))
-                )
+                self.specials += MultiReg(getattr(self, "ro_elem" + str(element))[0], getattr(self, "ro_samp_freerun" + str(element)))
+                self.sync += [
+                    If(self.gang,
+                       getattr(self, "ro_samp" + str(element)).eq(getattr(self, "ro_samp_freerun" + str(element)))
+                    ).Else(
+                       getattr(self, "ro_samp" + str(element)).eq(getattr(self, "ro_samp" + str(element)))
+                    )
+                ]
+                # self.specials += Instance("FDCE", name='FDCE_E' + str(element) + stage_id,
+                #     i_D=getattr(self, "ro_elem" + str(element))[0],
+                #     i_C=ClockSignal(),
+                #     i_CE=self.gang,
+                #     i_CLR=0,
+                #     o_Q=getattr(self, "ro_samp" + str(element))
+                # )
             if (element != 0) & (element != 32): # element 0 is a special case, handled at end of loop
                 self.sync += [
                     If(self.sample_now,
@@ -1726,13 +1734,14 @@ class TrngRingOscCore(Module, AutoDoc, AutoCSR):
             ]
 
         # build the input tap
-        self.specials += Instance("FDCE", name='FDCE_E32' + stage_id,
-            i_D=getattr(self, "ro_elem32")[0],
-            i_C=ClockSignal(),
-            i_CE=1, # element 32 is not part of the gang, it's the output element of the "big loop"
-            i_CLR=0,
-            o_Q=getattr(self, "ro_samp32")
-        )
+        # self.specials += Instance("FDCE", name='FDCE_E32' + stage_id,
+        #     i_D=getattr(self, "ro_elem32")[0],
+        #     i_C=ClockSignal(),
+        #     i_CE=1, # element 32 is not part of the gang, it's the output element of the "big loop"
+        #     i_CLR=0,
+        #     o_Q=getattr(self, "ro_samp32")
+        # )
+        self.specials += MultiReg(getattr(self, "ro_elem32")[0], getattr(self, "ro_samp32"))
         self.sync += [
             If(self.sample_now,
                 # shift in sample entropy from a tap on the one stage that's not already wired to a gang mixer
@@ -1803,9 +1812,6 @@ parallel cores that are XOR'd simultaneously to generate the final output.
         dwell_now = Signal()   # level-signal to indicate dwell or measure
         sample_now = Signal()  # single-sysclk wide pulse to indicate sampling time (after leaving dwell)
         rand_cnt = Signal(9)
-        # synchronize the random output into the clock domain. RO, by definition, has no relationship to the core domain.
-        rand_sync = Signal(len(rand))
-        self.specials += MultiReg(rand, rand_sync)
         # keep track of how many bits have been shifted in since the last read-out
         self.sync += [
             If(self.rand_read,
@@ -1816,7 +1822,7 @@ parallel cores that are XOR'd simultaneously to generate the final output.
                     If(rand_cnt < self.rand_out.nbits + self.oversampling +1, # +1 because the very first bit never got sample entropy, just dwell, so we throw it away
                        rand_cnt.eq(rand_cnt + 1),
                     ).Else(
-                       self.rand_out.eq(rand_sync),
+                       self.rand_out.eq(rand),
                        self.fresh.eq(1),
                        rand_cnt.eq(0),
                     )

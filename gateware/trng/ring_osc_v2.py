@@ -79,6 +79,7 @@ as an independent variable, so I think the paper's core idea still works.
         for element in range(ro_elements):
             setattr(self, "ro_elem" + str(element), Signal(ro_stages+1))
             setattr(self, "ro_samp" + str(element), Signal())
+            setattr(self, "ro_samp_freerun" + str(element), Signal())
             for stage in range(ro_stages):
                 stagename = 'RINGOSC_E' + str(element) + '_S' + str(stage)
                 self.specials += Instance("LUT1", name=stagename, p_INIT=1,
@@ -91,13 +92,21 @@ as an independent variable, so I think the paper's core idea still works.
                 platform.add_platform_command("set_false_path -through [get_pins " + stagename + "/O]")
             # add "gang" sampler to pull out extra entropy during dwell mode
             if element != 32: # element 32 is a special case, handled at end of loop
-                self.specials += Instance("FDCE", name='FDCE_E' + str(element),
-                    i_D=getattr(self, "ro_elem" + str(element))[0],
-                    i_C=ClockSignal(),
-                    i_CE=self.ctl.fields.gang,
-                    i_CLR=0,
-                    o_Q=getattr(self, "ro_samp" + str(element))
-                )
+                self.specials += MultiReg(getattr(self, "ro_elem" + str(element))[0], getattr(self, "ro_samp_freerun" + str(element)))
+                self.sync += [
+                    If(self.ctl.fields.gang,
+                       getattr(self, "ro_samp" + str(element)).eq(getattr(self, "ro_samp_freerun" + str(element)))
+                    ).Else(
+                       getattr(self, "ro_samp" + str(element)).eq(getattr(self, "ro_samp" + str(element)))
+                    )
+                ]
+                # self.specials += Instance("FDCE", name='FDCE_E' + str(element),
+                #     i_D=getattr(self, "ro_elem" + str(element))[0],
+                #     i_C=ClockSignal(),
+                #     i_CE=self.ctl.fields.gang,
+                #     i_CLR=0,
+                #     o_Q=getattr(self, "ro_samp" + str(element))
+                # )
             if (element != 0) & (element != 32): # element 0 is a special case, handled at end of loop
                 self.sync += [
                     If(sample_now,
@@ -114,13 +123,14 @@ as an independent variable, so I think the paper's core idea still works.
             ]
 
         # build the input tap
-        self.specials += Instance("FDCE", name='FDCE_E32',
-            i_D=getattr(self, "ro_elem32")[0],
-            i_C=ClockSignal(),
-            i_CE=1, # element 32 is not part of the gang, it's the output element of the "big loop"
-            i_CLR=0,
-            o_Q=getattr(self, "ro_samp32")
-        )
+        # self.specials += Instance("FDCE", name='FDCE_E32',
+        #     i_D=getattr(self, "ro_elem32")[0],
+        #     i_C=ClockSignal(),
+        #     i_CE=1, # element 32 is not part of the gang, it's the output element of the "big loop"
+        #     i_CLR=0,
+        #     o_Q=getattr(self, "ro_samp32")
+        # )
+        self.specials += MultiReg(getattr(self, "ro_elem32")[0], getattr(self, "ro_samp32"))
         self.sync += [
             If(sample_now,
                 rand[0].eq(getattr(self, "ro_samp32")), # shift in sample entropy from a tap on the one stage that's not already wired to a gang mixer
