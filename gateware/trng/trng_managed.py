@@ -1804,7 +1804,7 @@ parallel cores that are XOR'd simultaneously to generate the final output.
 
         ## NOTE: for managed mode, don't change ro_elements or ro_stages. We assume 32 bit settings.
         ro_elements = 33  # needs to be an odd number, and larger than the size of `self.rand`. 33 is probably optimal.
-        ro_stages = 3     # needs to be an odd number. 1 is probably optimal, but coded to accept other numbers, too.
+        ro_stages = 1     # needs to be an odd number. 1 is probably optimal, but coded to accept other numbers, too.
 
         shift_rand = Signal()
         rand = Signal(ro_elements-1)
