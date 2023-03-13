@@ -107,6 +107,22 @@ class RTLI2C(Module, AutoCSR, AutoDoc):
         sda_i   = Signal()
         sda_o   = Signal()
         sda_oen = Signal()
+        # sda_i, scl_i are assumed to be already synchronized by our tweaked version of the IP block
+        # SAME_EDGE_PIPELINED puts two registers in series in the IDDR, making effectively a synchronizer.
+        self.specials += [
+            Instance("IDDR",
+                p_DDR_CLK_EDGE="SAME_EDGE_PIPELINED",
+                i_C=ClockSignal(), i_R=ResetSignal() | self.core_reset.fields.reset, i_S=0, i_CE=1,
+                i_D=self.sda.i, o_Q1=sda_i
+            ),
+            Instance("IDDR",
+                p_DDR_CLK_EDGE="SAME_EDGE_PIPELINED",
+                i_C=ClockSignal(), i_R=ResetSignal() | self.core_reset.fields.reset, i_S=0, i_CE=1,
+                i_D=self.scl.i, o_Q1=scl_i
+            ),
+            # MultiReg(sda_iddr, sda_i),
+            # MultiReg(scl_iddr, scl_i),
+        ]
         self.specials += Instance("i2c_controller_byte_ctrl",
             i_clk      = ClockSignal(),
             i_rst      = ResetSignal() | self.core_reset.fields.reset,
@@ -134,11 +150,6 @@ class RTLI2C(Module, AutoCSR, AutoDoc):
         platform.add_source(os.path.join("deps", "gateware", "gateware", "i2c", "i2c_controller_defines.v"))
         platform.add_source(os.path.join("deps", "gateware", "gateware", "i2c", "i2c_controller_bit_ctrl.v"))
         platform.add_source(os.path.join("deps", "gateware", "gateware", "i2c", "i2c_controller_byte_ctrl.v"))
-        # Underlying IP is not sufficiently hardened against metastability, need to add MultiRegs for good function across PVT
-        self.specials += [
-            MultiReg(self.sda.i, sda_i),
-            MultiReg(self.scl.i, scl_i),
-        ]
         self.comb += [
             self.sda.o.eq(sda_o),
             self.sda.oe.eq(~sda_oen),

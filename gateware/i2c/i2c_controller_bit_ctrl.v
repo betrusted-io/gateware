@@ -169,7 +169,6 @@ module i2c_controller_bit_ctrl (
     // variable declarations
     //
 
-    reg [ 1:0] cSCL, cSDA;      // capture SCL and SDA
     reg [ 2:0] fSCL, fSDA;      // SCL and SDA filter inputs
     reg        sSCL, sSDA;      // filtered and synchronized SCL and SDA inputs
     reg        dSCL, dSDA;      // delayed versions of sSCL and sSDA
@@ -219,7 +218,7 @@ module i2c_controller_bit_ctrl (
       else if (peripheral_wait)
       begin
           cnt    <= #1 cnt;
-          clk_en <= #1 1'b0;    
+          clk_en <= #1 1'b0;
       end
       else
       begin
@@ -229,26 +228,6 @@ module i2c_controller_bit_ctrl (
 
 
     // generate bus status controller
-
-    // capture SDA and SCL
-    // reduce metastability risk
-    always @(posedge clk or negedge nReset)
-      if (!nReset)
-      begin
-          cSCL <= #1 2'b00;
-          cSDA <= #1 2'b00;
-      end
-      else if (rst)
-      begin
-          cSCL <= #1 2'b00;
-          cSDA <= #1 2'b00;
-      end
-      else
-      begin
-          cSCL <= {cSCL[0],scl_i};
-          cSDA <= {cSDA[0],sda_i};
-      end
-
 
     // filter SCL and SDA signals; (attempt to) remove glitches
     always @(posedge clk or negedge nReset)
@@ -271,8 +250,9 @@ module i2c_controller_bit_ctrl (
       end
       else if (~|filter_cnt)
       begin
-          fSCL <= {fSCL[1:0],cSCL[1]};
-          fSDA <= {fSDA[1:0],cSDA[1]};
+          // use LiteX MultiReg construction at top level to do the async input capture, so we can safely map directly to the scl_i/sda_i pins.
+          fSCL <= {fSCL[1:0],scl_i};
+          fSDA <= {fSDA[1:0],sda_i};
       end
 
 
