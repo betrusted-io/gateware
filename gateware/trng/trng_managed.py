@@ -1703,7 +1703,9 @@ class TrngRingOscCore(Module, AutoDoc, AutoCSR):
                 platform.add_platform_command("set_false_path -through [get_pins " + stagename + "/O]")
             # add "gang" sampler to pull out extra entropy during dwell mode
             if element != 32: # element 32 is a special case, handled at end of loop
-                self.specials += MultiReg(getattr(self, "ro_elem" + str(element))[0], getattr(self, "ro_samp_freerun" + str(element)))
+                # This substitutes for the FDCE code below. It improves the metastability resistance of the core.
+                # Use n=3 to harden against mestability; the RO is by definition going to be biased into the center of the metastability point
+                self.specials += MultiReg(getattr(self, "ro_elem" + str(element))[0], getattr(self, "ro_samp_freerun" + str(element)), n=3)
                 self.sync += [
                     If(self.gang,
                        getattr(self, "ro_samp" + str(element)).eq(getattr(self, "ro_samp_freerun" + str(element)))
@@ -1734,6 +1736,9 @@ class TrngRingOscCore(Module, AutoDoc, AutoCSR):
             ]
 
         # build the input tap
+        # this substitutes for the FDCE below. This improves metastability resistance of the core.
+        # Use n=3 to harden against mestability; the RO is by definition going to be biased into the center of the metastability point
+        self.specials += MultiReg(getattr(self, "ro_elem32")[0], getattr(self, "ro_samp32"), n=3)
         # self.specials += Instance("FDCE", name='FDCE_E32' + stage_id,
         #     i_D=getattr(self, "ro_elem32")[0],
         #     i_C=ClockSignal(),
@@ -1741,7 +1746,6 @@ class TrngRingOscCore(Module, AutoDoc, AutoCSR):
         #     i_CLR=0,
         #     o_Q=getattr(self, "ro_samp32")
         # )
-        self.specials += MultiReg(getattr(self, "ro_elem32")[0], getattr(self, "ro_samp32"))
         self.sync += [
             If(self.sample_now,
                 # shift in sample entropy from a tap on the one stage that's not already wired to a gang mixer
@@ -1765,7 +1769,8 @@ class TrngRingOscCore(Module, AutoDoc, AutoCSR):
 
         self.trng_slow = Signal()
         self.trng_fast = Signal()
-        self.sync += [self.trng_fast.eq(self.ro_fbk0), self.trng_slow.eq(self.rand[0])]
+        self.specials += MultiReg(self.ro_fbk0, self.trng_fast)
+        self.sync += self.trng_slow.eq(self.rand[0])
 
 
 class TrngRingOscV2Managed(Module, AutoCSR, AutoDoc):
