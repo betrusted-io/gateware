@@ -134,11 +134,14 @@ class RTLI2C(Module, AutoCSR, AutoDoc):
         platform.add_source(os.path.join("deps", "gateware", "gateware", "i2c", "i2c_controller_defines.v"))
         platform.add_source(os.path.join("deps", "gateware", "gateware", "i2c", "i2c_controller_bit_ctrl.v"))
         platform.add_source(os.path.join("deps", "gateware", "gateware", "i2c", "i2c_controller_byte_ctrl.v"))
+        # Underlying IP is not sufficiently hardened against metastability, need to add MultiRegs for good function across PVT
+        self.specials += [
+            MultiReg(self.sda.i, sda_i),
+            MultiReg(self.scl.i, scl_i),
+        ]
         self.comb += [
-            sda_i.eq(self.sda.i),
             self.sda.o.eq(sda_o),
             self.sda.oe.eq(~sda_oen),
-            scl_i.eq(self.scl.i),
             self.scl.o.eq(scl_o),
             self.scl.oe.eq(~scl_oen),
         ]
