@@ -109,19 +109,22 @@ class RTLI2C(Module, AutoCSR, AutoDoc):
         sda_oen = Signal()
         # sda_i, scl_i are assumed to be already synchronized by our tweaked version of the IP block
         # SAME_EDGE_PIPELINED puts two registers in series in the IDDR, making effectively a synchronizer.
+        self.filter_clk = Signal()
+        sda_iddr = Signal()
+        scl_iddr = Signal()
         self.specials += [
             Instance("IDDR",
                 p_DDR_CLK_EDGE="SAME_EDGE_PIPELINED",
-                i_C=ClockSignal(), i_R=ResetSignal() | self.core_reset.fields.reset, i_S=0, i_CE=1,
-                i_D=self.sda.i, o_Q1=sda_i
+                i_C=self.filter_clk, i_R=ResetSignal() | self.core_reset.fields.reset, i_S=0, i_CE=1,
+                i_D=self.sda.i, o_Q1=sda_iddr
             ),
             Instance("IDDR",
                 p_DDR_CLK_EDGE="SAME_EDGE_PIPELINED",
-                i_C=ClockSignal(), i_R=ResetSignal() | self.core_reset.fields.reset, i_S=0, i_CE=1,
-                i_D=self.scl.i, o_Q1=scl_i
+                i_C=self.filter_clk, i_R=ResetSignal() | self.core_reset.fields.reset, i_S=0, i_CE=1,
+                i_D=self.scl.i, o_Q1=scl_iddr
             ),
-            # MultiReg(sda_iddr, sda_i),
-            # MultiReg(scl_iddr, scl_i),
+            MultiReg(sda_iddr, sda_i),
+            MultiReg(scl_iddr, scl_i),
         ]
         self.specials += Instance("i2c_controller_byte_ctrl",
             i_clk      = ClockSignal(),
