@@ -22,7 +22,11 @@ The register cannot be updated once the WDT is running.
         self.gsr = Signal() # wire to the GSR line for the FPGA
         self.cfgmclk = Signal() # wire to FPGA's CFGMCLK ring oscillator, a "typical" 65MHz clock
         self.clock_domains.cd_wdt = ClockDomain()
-        self.specials += Instance("BUFG", i_I=self.cfgmclk, o_O=self.cd_wdt.clk)
+        self.specials += Instance(
+            "BUFG", i_I=self.cfgmclk, o_O=self.cd_wdt.clk,
+        )
+        # prevent this signal from being optimized away, as it needs to exist for us to apply the constraint
+        self.cd_wdt.clk.attr.add("KEEP")
         platform.add_platform_command("create_clock -name wdt -period 10.256 [get_nets {net}]", net=self.cd_wdt.clk) # 65MHz + 50% tolerance
 
         ### WATCHDOG RESET, uses the extcomm_div divider to save on gates
