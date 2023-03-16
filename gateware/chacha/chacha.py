@@ -490,8 +490,7 @@ https://github.com/secworks/chacha/commit/2636e87a7e695bd3fa72981b43d0648c49ecb1
         # relax the return path, the valid pulse is pipelined so there are oodles of setup/hold time
         # setup is defined w.r.t destination clock, so the numbers are 2x larger in th clk50->sys direction
         platform.add_platform_command("set_multicycle_path 4 -setup -start -from [get_clocks clk50] -to [get_clocks sys_clk] -through [get_pins chacha_core/data_out_reg*/Q]")
-        platform.add_platform_command("set_multicycle_path 2 -hold -end -from [get_clocks clk50] -to [get_clocks sys_clk] -through [get_pins chacha_core/data_out_reg*/Q]")
-        platform.add_platform_command("set_false_path -through [get_pins *trngmanaged_data_out_reg*/D]") # use a big hammer because the timing analyzer is refusing to obey the less drastic measures below
+        platform.add_platform_command("set_multicycle_path 6 -hold -end -from [get_clocks clk50] -to [get_clocks sys_clk] -through [get_pins chacha_core/data_out_reg*/Q]")
         #platform.add_platform_command("set_multicycle_path 4 -setup -start -from [get_clocks clk50] -to [get_clocks sys_clk] -through [get_pins *trngmanaged_data_out_reg*/D]")
         #platform.add_platform_command("set_multicycle_path 2 -hold -end -from [get_clocks clk50] -to [get_clocks sys_clk] -through [get_pins *trngmanaged_data_out_reg*/D]")
 
