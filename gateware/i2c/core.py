@@ -111,7 +111,14 @@ class RTLI2C(Module, AutoCSR, AutoDoc):
         # SAME_EDGE_PIPELINED puts two registers in series in the IDDR, making effectively a synchronizer.
         self.filter_clk = Signal()
         sda_iddr = Signal()
+        sda_unfilt = Signal()
+        sda_filt = Signal()
         scl_iddr = Signal()
+        scl_unfilt = Signal()
+        scl_filt = Signal()
+        # Rise time can be as long as 200ns = 10 clock cycles @ 50MHz
+        # But we must pass a high/low decision with no more lag than 15 cycles @ 50MHz
+        # to meet the oversampling requirement of the upstream block
         self.specials += [
             Instance("IDDR",
                 p_DDR_CLK_EDGE="SAME_EDGE_PIPELINED",
@@ -123,9 +130,25 @@ class RTLI2C(Module, AutoCSR, AutoDoc):
                 i_C=self.filter_clk, i_R=ResetSignal() | self.core_reset.fields.reset, i_S=0, i_CE=1,
                 i_D=self.scl.i, o_Q1=scl_iddr
             ),
-            MultiReg(sda_iddr, sda_i),
-            MultiReg(scl_iddr, scl_i),
+            MultiReg(sda_iddr, sda_unfilt, odomain="clk50_always_on"),
+            MultiReg(scl_iddr, scl_unfilt, odomain="clk50_always_on"),
+            # finally bring it into the 100MHz domain via a MultiReg
+            MultiReg(scl_filt, scl_i),
+            MultiReg(sda_filt, sda_i),
         ]
+        sda_glitch = Signal(4)
+        scl_glitch = Signal(4)
+        # this filter will only pass a high once 4 cycles of high are seen, but a low
+        # is immediate. This asymmetry is OK because H->L transitions are very fast (active pulldown),
+        # so we can be sure of a low as soon as it happens; but L->H are very slow (up to 200ns), and
+        # so we want to wait until we're solidly H before declaring it as H.
+        self.sync.clk50_always_on += [
+            sda_glitch.eq(Cat(sda_unfilt, sda_glitch[:-1])),
+            sda_filt.eq(sda_glitch == ((2**sda_glitch.nbits)-1)),
+            scl_glitch.eq(Cat(scl_unfilt, scl_glitch[:-1])),
+            scl_filt.eq(scl_glitch == ((2**scl_glitch.nbits)-1)),
+        ]
+
         self.specials += Instance("i2c_controller_byte_ctrl",
             i_clk      = ClockSignal(),
             i_rst      = ResetSignal() | self.core_reset.fields.reset,
