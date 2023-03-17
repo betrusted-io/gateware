@@ -115,16 +115,16 @@ class RTLI2C(Module, AutoCSR, AutoDoc):
         self.specials += [
             Instance("IDDR",
                 p_DDR_CLK_EDGE="SAME_EDGE_PIPELINED",
-                i_C=self.filter_clk, i_R=0, i_S=ResetSignal(), i_CE=1,
+                i_C=self.filter_clk, i_R=ResetSignal() | self.core_reset.fields.reset, i_S=0, i_CE=1,
                 i_D=self.sda.i, o_Q1=sda_iddr
             ),
             Instance("IDDR",
                 p_DDR_CLK_EDGE="SAME_EDGE_PIPELINED",
-                i_C=self.filter_clk, i_R=0, i_S=ResetSignal(), i_CE=1,
+                i_C=self.filter_clk, i_R=ResetSignal() | self.core_reset.fields.reset, i_S=0, i_CE=1,
                 i_D=self.scl.i, o_Q1=scl_iddr
             ),
-            MultiReg(sda_iddr, sda_i, reset=1),
-            MultiReg(scl_iddr, scl_i, reset=1),
+            MultiReg(sda_iddr, sda_i),
+            MultiReg(scl_iddr, scl_i),
         ]
         self.specials += Instance("i2c_controller_byte_ctrl",
             i_clk      = ClockSignal(),
