@@ -151,7 +151,7 @@ module i2c_controller_bit_ctrl (
     input      [ 3:0] cmd,      // command (from byte controller)
     output reg        cmd_ack,  // command complete acknowledge
     output reg        busy,     // i2c bus busy
-    output reg        al,       // i2c bus arbitration lost
+    output            al,       // i2c bus arbitration lost
 
     input             din,
     output reg        dout,
@@ -172,10 +172,8 @@ module i2c_controller_bit_ctrl (
     reg [ 2:0] fSCL, fSDA;      // SCL and SDA filter inputs
     reg        sSCL, sSDA;      // filtered and synchronized SCL and SDA inputs
     reg        dSCL, dSDA;      // delayed versions of sSCL and sSDA
-    reg        dscl_oen;        // delayed scl_oen
     reg        sda_chk;         // check SDA output (Multi-controller arbitration)
     reg        clk_en;          // clock generation signals
-    reg        peripheral_wait;      // peripheral inserts wait states
     reg [15:0] cnt;             // clock divider counter (synthesis)
     reg [13:0] filter_cnt;      // clock divider for filter
 
@@ -187,22 +185,6 @@ module i2c_controller_bit_ctrl (
     // module body
     //
 
-    // whenever the peripheral is not ready it can delay the cycle by pulling SCL low
-    // delay scl_oen
-    always @(posedge clk)
-      dscl_oen <= #1 scl_oen;
-
-    // peripheral_wait is asserted when controller wants to drive SCL high, but the peripheral pulls it low
-    // peripheral_wait remains asserted until the peripheral releases SCL
-    always @(posedge clk or negedge nReset)
-      if (!nReset) peripheral_wait <= 1'b0;
-      else         peripheral_wait <= (scl_oen & ~dscl_oen & ~sSCL) | (peripheral_wait & ~sSCL);
-
-    // controller drives SCL high, but another controller pulls it low
-    // controller start counting down its low cycle now (clock synchronization)
-    wire scl_sync   = dSCL & ~sSCL & scl_oen;
-
-
     // generate clk enable signal
     always @(posedge clk or negedge nReset)
       if (~nReset)
@@ -210,15 +192,10 @@ module i2c_controller_bit_ctrl (
           cnt    <= #1 16'h0;
           clk_en <= #1 1'b1;
       end
-      else if (rst || ~|cnt || !ena || scl_sync)
+      else if (rst || ~|cnt || !ena)
       begin
           cnt    <= #1 clk_cnt;
           clk_en <= #1 1'b1;
-      end
-      else if (peripheral_wait)
-      begin
-          cnt    <= #1 cnt;
-          clk_en <= #1 1'b0;
       end
       else
       begin
@@ -312,27 +289,8 @@ module i2c_controller_bit_ctrl (
       else              busy <= #1 (sta_condition | busy) & ~sto_condition;
 
 
-    // generate arbitration lost signal
-    // aribitration lost when:
-    // 1) controller drives SDA high, but the i2c bus is low
-    // 2) stop detected while not requested
-    reg cmd_stop;
-    always @(posedge clk or negedge nReset)
-      if (~nReset)
-          cmd_stop <= #1 1'b0;
-      else if (rst)
-          cmd_stop <= #1 1'b0;
-      else if (clk_en)
-          cmd_stop <= #1 cmd == `I2C_CMD_STOP;
-
-    always @(posedge clk or negedge nReset)
-      if (~nReset)
-          al <= #1 1'b0;
-      else if (rst)
-          al <= #1 1'b0;
-      else
-          al <= #1 (sda_chk & ~sSDA & sda_oen) | (|c_state & sto_condition & ~cmd_stop);
-
+    // arb lost logic doesn't work. It triggers on spurious noise. Remove since we don't have mulitple bus masters
+    assign al = 0;
 
     // generate dout signal (store SDA on rising edge of SCL)
     always @(posedge clk)
