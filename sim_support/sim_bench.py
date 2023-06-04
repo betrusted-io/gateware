@@ -36,7 +36,8 @@ from litex.soc.cores.clock import *
 from litex.soc.integration.doc import AutoDoc, ModuleDoc
 from litex.soc.interconnect.csr import *
 
-VEX_CPU_PATH = "../../../pythondata-cpu-vexriscv/pythondata_cpu_vexriscv/verilog/VexRiscv_BetrustedSoC_Debug.v"
+VEX_CPU_PATH = "../../../../VexRiscv/VexRiscv_BetrustedSoC.v"
+VEX_CPU_BIN = "../../../../VexRiscv/VexRiscv_BetrustedSoC.v_toplevel_memory_AesPlugin_rom_storage.bin"
 TARGET = "riscv32imac-unknown-none-elf"
 
 benchio = [
@@ -254,7 +255,7 @@ class SimRunner():
         os.system("cd run && xvlog top_tb.v -sv ")
         vex_dir = os.path.dirname(VEX_CPU_PATH)
         # copy any relevant .bin files into the run directory as well
-        os.system("{} {} ".format(cpname, vex_dir + os.path.sep + "*.bin") + " run" + os.path.sep) # "{} {} run/".format(cpname, vex_dir + "/*.bin")
+        os.system("{} {} ".format(cpname, vex_dir.replace("/",os.path.sep) + os.path.sep + "*.bin") + " run" + os.path.sep) # "{} {} run/".format(cpname, vex_dir + "/*.bin")
         os.system("cd run && xvlog {}".format(".." + os.path.sep + vex_verilog_path)) # "cd run && xvlog {}".format("../" + vex_verilog_path)
 
         # run user dependencies

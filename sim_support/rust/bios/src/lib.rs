@@ -1,7 +1,6 @@
 #![no_std]
 
 use betrusted_rt::entry;
-pub use sim_bios_macros::sim_test;
 
 extern "Rust" {
     pub fn run_test(p: &pac::Peripherals);

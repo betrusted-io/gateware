@@ -11,4 +11,3 @@ betrusted-rt = "0.0.1"
 pac = { path = "../pac" }
 #test = { path = "test" }
 xous-nommu = { path = "../xous-nommu" }
-sim-bios-macros = { path = "../macros", version = "0.0.1" }
