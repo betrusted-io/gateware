@@ -21,7 +21,6 @@ members = [
     "sim/template/testbench",
     "sim_support/rust/bios",
     "sim_support/rust/pac",
-    "sim_support/rust/macros",
     "sim_support/rust/svd2utra",
     "sim_support/rust/utralib",
 ]
