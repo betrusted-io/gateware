@@ -1,9 +1,7 @@
 #![no_std]
-
 use betrusted_rt::entry;
-
 extern "Rust" {
-    pub fn run_test(p: &pac::Peripherals);
+    pub fn run(p: &pac::Peripherals);
 }
 
 #[entry]
@@ -14,9 +12,17 @@ fn main() -> ! {
 
     // extern functions are unsafe, even if they're Rust
     let p = unsafe { pac::Peripherals::steal() };
-    unsafe { run_test(&p) };
+    unsafe { run(&p) };
 
     // set the done bit
     p.SIMSTATUS.simstatus.modify(|_r, w| w.done().bit(true));
+    loop {}
+}
+
+use core::panic::PanicInfo;
+#[panic_handler]
+pub fn panic(_panic_info: &PanicInfo<'_>) -> ! {
+    unsafe{ pac::Peripherals::steal().SIMSTATUS.report.write(|w| w.bits(0xC0DE_DEAD)); }
+    unsafe{ pac::Peripherals::steal().SIMSTATUS.simstatus.write(|w| w.success().bit(false).done().bit(true)); }
     loop {}
 }
