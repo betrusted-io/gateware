@@ -1,8 +1,6 @@
 #![no_std]
 #![no_main]
 
-use sim_bios::sim_test;
-
 extern crate digest;
 use digest::Digest;
 extern crate sha512_hal;
@@ -20,8 +18,9 @@ fn report(p: &pac::Peripherals, data: u32) {
     unsafe{ p.SIMSTATUS.report.write(|w| w.bits(data)); }
 }
 
-#[sim_test]
-fn run(p: &pac::Peripherals) {
+use sim_bios::*;
+#[no_mangle]
+pub extern "Rust" fn run(p: &pac::Peripherals) {
     let mut pass: bool = true;
 
     report(p, 0x1000_0000);

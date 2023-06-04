@@ -1,7 +1,6 @@
 #![no_std]
 #![no_main]
 
-use sim_bios::sim_test;
 extern crate volatile;
 use volatile::Volatile;
 
@@ -33,8 +32,9 @@ fn run_x25519() -> (bool, [u8; 32]) {
 }
 
 #[cfg(not(test))]
-#[sim_test]
-fn run(p: &pac::Peripherals) {
+use sim_bios::*;
+#[no_mangle]
+pub extern "Rust" fn run(p: &pac::Peripherals) {
     let microcode_ptr: *mut u32 = 0xe002_0000 as *mut u32;
     let microcode = microcode_ptr as *mut Volatile<u32>;
 

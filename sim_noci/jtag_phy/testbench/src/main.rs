@@ -2,7 +2,6 @@
 #![no_main]
 #![feature(alloc_error_handler)]
 
-use sim_bios::sim_test;
 extern crate volatile;
 use volatile::Volatile;
 extern crate jtag;
@@ -37,8 +36,9 @@ fn alloc_error_handler(layout: alloc::alloc::Layout) -> ! {
 
 const CMD_FUSE_KEY: u32 = 0b110001;
 
-#[sim_test]
-fn run(p: &pac::Peripherals) {
+use sim_bios::*;
+#[no_mangle]
+pub extern "Rust" fn run(p: &pac::Peripherals) {
     unsafe {
         let heap_start = &_sheap as *const u8 as usize;
         let heap_size = &_heap_size as *const u8 as usize;

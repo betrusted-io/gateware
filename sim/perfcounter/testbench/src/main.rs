@@ -1,7 +1,6 @@
 #![no_std]
 #![no_main]
 
-use sim_bios::sim_test;
 use utralib::{generated::*};
 
 // allocate a global, unsafe static string. You can use this to force writes to RAM.
@@ -14,8 +13,9 @@ pub fn report(p: &pac::Peripherals, data: u32) {
     }
 }
 
-#[sim_test]
-fn run(p: &pac::Peripherals) {
+use sim_bios::*;
+#[no_mangle]
+pub extern "Rust" fn run(p: &pac::Peripherals) {
     let mut perf_csr = CSR::new(HW_PERFCOUNTER_BASE as *mut u32);
     let mut event0_csr = CSR::new(HW_EVENT_SOURCE0_BASE as *mut u32);
     let mut event1_csr = CSR::new(HW_EVENT_SOURCE1_BASE as *mut u32);

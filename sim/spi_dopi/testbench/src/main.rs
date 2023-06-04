@@ -1,7 +1,6 @@
 #![no_std]
 #![no_main]
 
-use sim_bios::sim_test;
 extern crate volatile;
 use volatile::Volatile;
 
@@ -252,8 +251,9 @@ pub fn write_tests(p: &pac::Peripherals) {
     report(&p, phase);
 }
 
-#[sim_test]
-fn run(p: &pac::Peripherals) {
+use sim_bios::*;
+#[no_mangle]
+pub extern "Rust" fn run(p: &pac::Peripherals) {
     let rom_ptr: *mut u32 = 0x2000_0000 as *mut u32;
     let rom = rom_ptr as *mut Volatile<u32>;
 

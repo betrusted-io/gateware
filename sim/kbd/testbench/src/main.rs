@@ -1,8 +1,6 @@
 #![no_std]
 #![no_main]
 
-use sim_bios::sim_test;
-
 fn row_read(p: &pac::Peripherals, row: u32) -> u32 {
     unsafe {
         match row {
@@ -30,8 +28,9 @@ fn do_key_event(p: &pac::Peripherals) {
     unsafe{ p.KEYBOARD.ev_pending.write(|w| w.bits(1)); }
 }
 
-#[sim_test]
-fn run(p: &pac::Peripherals) {
+use sim_bios::*;
+#[no_mangle]
+pub extern "Rust" fn run(p: &pac::Peripherals) {
     let mut state = 0x8000_0000;
     // first key-down
     let mut count = 0;

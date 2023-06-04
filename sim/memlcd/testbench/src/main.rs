@@ -1,8 +1,6 @@
 #![no_std]
 #![no_main]
 
-use sim_bios::sim_test;
-
 // allocate a global, unsafe static string for debug output
 #[used] // This is necessary to keep DBGSTR from being optimized out
 static mut DBGSTR: [u32; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
@@ -55,8 +53,9 @@ fn lcd_animate(p: &pac::Peripherals) {
     }
 }
 
-#[sim_test]
-fn run(p: &pac::Peripherals) {
+use sim_bios::*;
+#[no_mangle]
+pub extern "Rust" fn run(p: &pac::Peripherals) {
 
     unsafe{ p.MEMLCD.prescaler.write(|w| w.bits(49)); }  // 2 MHz clock (top speed allowed)
     unsafe {

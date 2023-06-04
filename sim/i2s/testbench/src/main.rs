@@ -1,7 +1,6 @@
 #![no_std]
 #![no_main]
 
-use sim_bios::sim_test;
 extern crate volatile;
 use volatile::Volatile;
 
@@ -13,8 +12,9 @@ pub fn report(p: &pac::Peripherals, data: u32) {
         p.SIMSTATUS.report.write(|w| w.bits( data ));
     }
 }
-#[sim_test]
-fn run(p: &pac::Peripherals) {
+use sim_bios::*;
+#[no_mangle]
+pub extern "Rust" fn run(p: &pac::Peripherals) {
     const FIFODEPTH: usize = 8;
 
     let duplex_ptr: *mut u32 = 0xe000_1000 as *mut u32;
