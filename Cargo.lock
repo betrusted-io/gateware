@@ -701,20 +701,8 @@ version = "0.1.0"
 dependencies = [
  "betrusted-rt",
  "pac",
- "sim-bios-macros",
  "vexriscv",
  "xous-nommu",
-]
-
-[[package]]
-name = "sim-bios-macros"
-version = "0.0.1"
-dependencies = [
- "pac",
- "proc-macro2 0.4.30",
- "quote 0.6.13",
- "rand",
- "syn 0.15.44",
 ]
 
 [[package]]
