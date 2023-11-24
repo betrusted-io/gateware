@@ -190,7 +190,7 @@ class DoPac():
             subprocess.run("rd /S /Q testbench\\{}".format(name), shell=True)
             subprocess.run("mkdir testbench\\{}".format(name), shell=True)
             subprocess.run("copy pac-cargo-template testbench\\{}\\Cargo.toml".format(name), shell=True)
-            subprocess.run("cargo install svd2rust") # make sure dependencies are installed
+            subprocess.run("cargo install svd2rust --version 0.30.3") # make sure dependencies are installed
             subprocess.run("cargo install form") # make sure dependencies are installed
             subprocess.run("cd testbench\\{} && svd2rust --target riscv -i ..\\..\\..\\..\\target\\soc.svd".format(name), shell=True)
             subprocess.run("cd testbench\\{} && rd /S /Q src".format(name), shell=True)
@@ -200,7 +200,7 @@ class DoPac():
             os.system("rm -rf testbench/{}".format(name))  # nuke the old PAC if it exists
             os.system("mkdir -p testbench/{}".format(name)) # rebuild it from scratch every time
             os.system("cp pac-cargo-template testbench/{}/Cargo.toml".format(name))
-            os.system("cargo install svd2rust") # make sure dependencies are installed
+            os.system("cargo install svd2rust --version 0.30.3") # sv2drust breaks after this version, due to requiring a method call instead of a reference to a struct element to access peripherals
             os.system("cargo install form") # make sure dependencies are installed
             os.system("cd testbench/{} && svd2rust --target riscv -i ../../../../target/soc.svd && rm -rf src; form -i lib.rs -o src/; rm lib.rs".format(name))
 
