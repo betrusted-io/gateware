@@ -227,7 +227,15 @@ to as little as 15-20ms and still probably be quite safe.
         ])
         self.more_seed = CSRStorage(name="seed", size=32, description="Extra data to be rotated into the seed pool. This is supplemental to the automatically seeded TRNG data. Data is committed to the pool immediately upon write.")
         self.urandom = CSRStatus(name="urandom", size=32, description="Unlimited random numbers, output from the ChaCha conditioner. Generally, you want to use this.")
-        self.urandom_valid = CSRStatus(size=1, description="Set when `urandom` is valid. Always check before taking `urandom`")
+        self.urandom_valid = CSRStatus(fields=[
+            CSRField("valid", size=1, description="Set when `urandom` is valid. Always check before taking `urandom`"),
+            CSRField("av_ready", size = 1, description="AV noiseout ready"),
+            CSRField("ro_fresh", size = 1, description="RO data ready"),
+            CSRField("av_pass", size = 1, description="AV passing"),
+            CSRField("ro_pass", size = 1, description="RO passing"),
+            CSRField("configured", size = 1, description="AV configured"),
+            CSRField("powered", size = 1, description = "AV powered on"),
+        ])
         self.test = CSRStorage(fields=[
             CSRField("simultaneous", size=1, description="Force a simultaneous advance of kernel/user urandom. Used to exercise a corner case in testing. Not harmful in production, just wasteful.", pulse=True),
         ])
@@ -627,7 +635,7 @@ CSR block.
 
 
 class TrngManaged(Module, AutoCSR, AutoDoc):
-    def __init__(self, platform, analog_pads, noise_pads, kernel, server, sim=False, revision='pvt', ro_cores=4):
+    def __init__(self, platform, analog_pads, noise_pads, kernel, server, sim=False, revision='pvt', ro_cores=4, test_bypass=False):
         if sim == True:
             fifo_depth = 64
             refill_mark = int(fifo_depth // 2)
@@ -1200,12 +1208,17 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             av_reconfigure.eq(1),  # edge-triggered signal to initiate XADC config
             NextState("WAIT_ON"),
         )
-        refill.act("WAIT_ON",
-            If(av_powerstate & av_configured,
-                NextState("SELFTEST"), # skip PUMP in favor of SELFTEST
-                NextValue(av_config_noise, 0),  # prep for next av_reconfigure pulse
+        if test_bypass:
+            refill.act("WAIT_ON",
+                NextState("REFILL_KERNEL"), # skip to reseeding
+            ),
+        else:
+            refill.act("WAIT_ON",
+                If(av_powerstate & av_configured,
+                    NextState("SELFTEST"), # skip PUMP in favor of SELFTEST
+                    NextValue(av_config_noise, 0),  # prep for next av_reconfigure pulse
+                )
             )
-        )
         # refill.act("PUMP", # discard the first value out of the TRNG, as it's potentially biased by power-on effects
         #     # do pump here
         #     If((av_noiseout_ready | server.control.fields.av_dis) & (ro_fresh | server.control.fields.ro_dis),
@@ -1219,50 +1232,75 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
         #     )
         # )
         # we don't need to discard the first value anymore because we pump out lots of values for the selftest
-        refill.act("SELFTEST",
-            # pump each machine as fast as we can for the self-test
-            If( av_noiseout_ready,
-                av_noiseout_read.eq(~server.control.fields.av_dis),
-            ).Else(
-                av_noiseout_read.eq(0)
-            ),
-            If( ro_fresh,
-                ro_rand_read.eq(~server.control.fields.ro_dis), # don't read from a disabled source
-            ).Else(
-                ro_rand_read.eq(0)
-            ),
-            #### NOTE: we allow the refill to happen if *either* TRNG passes. This allows us to proceed and get minimum
-            #### functionality in the case that one generator source is failing. But at least one must pass!
-            #### For the "and" you need this: (av_pass | server.control.fields.av_dis) & (ro_pass | server.control.fields.ro_dis)
-            #### the *_dis fields must be considered otherwise you would block on a deliberately disabled TRNG source before booting
-            If( av_pass | ro_pass & ~server.av_config.fields.required, # added a clause to force av_pass to be required, if desired by the user
+        if test_bypass:
+            refill.act("SELFTEST",
                 NextState("REFILL_KERNEL")
             )
-        )
-        refill.act("REFILL_KERNEL",
-            If(kernel_fifo_full,
-                NextState("REFILL_SERVER")
-            ).Else(
-                # this logic is set to allow the system to boot to minimum viable kernel, even if one of the TRNGs is failing
-                # if there is a spontaneous failure during run-time, it's up to the OS to catch this and make a policy decision.
-                If((av_noiseout_ready | server.control.fields.av_dis) & (ro_fresh | server.control.fields.ro_dis) & (av_pass | ro_pass),
+        else:
+            refill.act("SELFTEST",
+                # pump each machine as fast as we can for the self-test
+                If( av_noiseout_ready,
+                    av_noiseout_read.eq(~server.control.fields.av_dis),
+                ).Else(
+                    av_noiseout_read.eq(0)
+                ),
+                If( ro_fresh,
+                    ro_rand_read.eq(~server.control.fields.ro_dis), # don't read from a disabled source
+                ).Else(
+                    ro_rand_read.eq(0)
+                ),
+                #### NOTE: we allow the refill to happen if *either* TRNG passes. This allows us to proceed and get minimum
+                #### functionality in the case that one generator source is failing. But at least one must pass!
+                #### For the "and" you need this: (av_pass | server.control.fields.av_dis) & (ro_pass | server.control.fields.ro_dis)
+                #### the *_dis fields must be considered otherwise you would block on a deliberately disabled TRNG source before booting
+                If( av_pass | ro_pass & ~server.av_config.fields.required, # added a clause to force av_pass to be required, if desired by the user
+                    NextState("REFILL_KERNEL")
+                )
+            )
+        if test_bypass:
+            refill.act("REFILL_KERNEL",
+                If(kernel_fifo_full,
+                    NextState("REFILL_SERVER")
+                ).Else(
                     kernel_fifo_wren.eq(1),
                     av_noiseout_read.eq(1),  # note that trng stream selection considers the _dis field state, so it's safe to always pump both even if one is disabled
                     ro_rand_read.eq(1),
-                ),
+                )
             )
-        )
-        refill.act("REFILL_SERVER",
-            If(server_fifo_full,
-                NextState("GO_IDLE"),
-            ).Else(
-                If((av_noiseout_ready | server.control.fields.av_dis) & (ro_fresh | server.control.fields.ro_dis) & (av_pass | ro_pass),
+            refill.act("REFILL_SERVER",
+                If(server_fifo_full,
+                    NextState("GO_IDLE"),
+                ).Else(
                     server_fifo_wren.eq(1),
                     av_noiseout_read.eq(1),
                     ro_rand_read.eq(1),
                 )
             )
-        )
+        else:
+            refill.act("REFILL_KERNEL",
+                If(kernel_fifo_full,
+                    NextState("REFILL_SERVER")
+                ).Else(
+                    # this logic is set to allow the system to boot to minimum viable kernel, even if one of the TRNGs is failing
+                    # if there is a spontaneous failure during run-time, it's up to the OS to catch this and make a policy decision.
+                    If((av_noiseout_ready | server.control.fields.av_dis) & (ro_fresh | server.control.fields.ro_dis) & (av_pass | ro_pass),
+                        kernel_fifo_wren.eq(1),
+                        av_noiseout_read.eq(1),  # note that trng stream selection considers the _dis field state, so it's safe to always pump both even if one is disabled
+                        ro_rand_read.eq(1),
+                    ),
+                )
+            )
+            refill.act("REFILL_SERVER",
+                If(server_fifo_full,
+                    NextState("GO_IDLE"),
+                ).Else(
+                    If((av_noiseout_ready | server.control.fields.av_dis) & (ro_fresh | server.control.fields.ro_dis) & (av_pass | ro_pass),
+                        server_fifo_wren.eq(1),
+                        av_noiseout_read.eq(1),
+                        ro_rand_read.eq(1),
+                    )
+                )
+            )
         refill.act("GO_IDLE",
             NextValue(av_config_noise, 0), # should already be 0, as this was set leaving "WAIT_ON" state
             av_reconfigure.eq(1), # pulse to set XADC back into the "system" sampling mode
@@ -1282,7 +1320,13 @@ The refill mark is configured at {} entries, with a total depth of {} entries.
             # data outputs
             # userland gets "B" port
             server.urandom.status.eq(self.chacha.output_b),
-            server.urandom_valid.status.eq(self.chacha.valid_b),
+            server.urandom_valid.fields.valid.eq(self.chacha.valid_b),
+            server.urandom_valid.fields.av_ready.eq(av_noiseout_ready),
+            server.urandom_valid.fields.ro_fresh.eq(ro_fresh),
+            server.urandom_valid.fields.av_pass.eq(av_pass),
+            server.urandom_valid.fields.ro_pass.eq(ro_pass),
+            server.urandom_valid.fields.configured.eq(av_configured),
+            server.urandom_valid.fields.powered.eq(av_powerstate),
             self.chacha.advance_b.eq(server.urandom.we | server.test.fields.simultaneous),
             # kernel gets "A" port (has priority over B in case of simultaeous read)
             kernel.urandom.status.eq(self.chacha.output_a),
