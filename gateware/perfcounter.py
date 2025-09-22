@@ -79,7 +79,7 @@ class PerfCounter(Module, AutoCSR, AutoDoc):
             CSRField("index", size=log2_int(FIFO_DEPTH), description="Index of the event in the FIFO. Auto-increments on read, clears on a `reset_run`")
         ])
         self.event_raw = CSRStatus(fields=[
-            CSRField("timestamp", size=FIFO_WIDTH, description="Event code + timestamp, concatenated together per `event_width_minus_one` parameter".format(FIFO_WIDTH))
+            CSRField("timestamp", size=FIFO_WIDTH-1, description="Event code + timestamp, concatenated together per `event_width_minus_one` parameter".format(FIFO_WIDTH-1))
         ])
         event_index_ctr = Signal(log2_int(FIFO_DEPTH))
         self.sync += [
@@ -147,3 +147,4 @@ class PerfCounter(Module, AutoCSR, AutoDoc):
             self.status.fields.readable.eq(logfifo.readable),
             self.status.fields.full.eq(~logfifo.writable),
         ]
+
