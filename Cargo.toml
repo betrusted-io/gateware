@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "sim/perfcounter/testbench",
+    "sim_noci/perfcounter/testbench",
     "sim/rom_block/testbench",
     "sim/sram32_cached/testbench",
     "sim/keyrom/testbench",
